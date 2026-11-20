@@ -15277,3 +15277,121 @@ burst, so the two cannot drift apart again. `PauseSparks.gdshader`: the default 
 the pulse): C100 the emitter's amount 10, one shot, explosiveness 1, the shader's count 10; shots 57a-c at 4 / 9 / 14 frames into the burst -- ten
 yellow streaks flying out all round CONTINUE's ellipse, no gap. The regression drive 68 / 68 (gh), the shine hud quiet run 8 / 8 (ap). No knobs
 added; no deviation (the game's own geometry).
+
+### 237 -- the SECRET COURSES, part 1: the Secret of Ricco Tower (Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) laid out as the game lays it out and under the game's own sky -- every piece at coro_ex2's scene.bin position, rotation and scale (MsMtxSetTRS), his piece scenes scaled to the game's model sizes, the umaibou spinning at the game's rates, the three rail blocks tumbling along their scene.ral rails (new assets/Sms/SmsRailBlock.cs, the game's TRailBlock), the game's start camera as the intro pan, the sky dome the game's sky.bmd with its btk / brk running in a shader (feature/kingboo-casino, code `cfd6c07`)
+
+**Jaysonn**: "i want you to also go and clean up the two other levels of rico4 secret and bianco 3 secret. i think both skyboxes need to be redone. and i
+want you to position the level how it is in game. i should have a lot set up so should be just a lot of clean up work?" -- "Keep it all on the casino
+branch since its more touch up related." The demo for 2026-11-26: his starting room -> these two secret courses -> the King Boo fight -> the rematch.
+
+**Which courses.** His Rico4Secret.tscn is coro_ex2 (the Secret of Ricco Tower: the start island, ten umaibou sticks, the two blue walls, three rail
+blocks, four nails, the tilted sticks down to the end); his assets/secrect_level.tscn is coro_ex1 (the Hillside Cave Secret: the stair blocks, the
+pillar, the grid of shuffling lifts, the EX roll cubes, the spinning stars, the bridge, the banana tree). The ISO on the PC is a mod (its coro_ex1 is
+rebuilt); the layouts come from the VANILLA extraction (E:/fromC/Documents/FinModelUtility-main/.../extracted/data/scene/<stage>/map: scene.bin,
+scene.ral, camera/startcamera.bck, map/sky.bmd / .btk / .brk), read by tools/projectshine/rematch157/secret237/secret_data237.py the way the game
+reads them (TActor::load: name, TRS, the character string, the light map; TMapObjBase::load: the individual name; TRailMapObj::load: the rail name,
+the lift's float, the wood block's tint ints; TRollBlock::load: the roll speed int).
+
+**The layout** (tools/projectshine/rematch157/secret237/gen_level237.py writes the scene). Every placed object is re-emitted at the game's position
+(74.44 u = 1 m), rotation and scale -- MsMtxSetTRS (MathUtil.cpp): rows of Rz(roll) Ry(yaw) Rx(pitch) S, which Godot's Transform3D takes as written --
+with HIS piece scenes, each root scaled by the game's scale x the ratio of the game's model size to his glb's units (his umaibou glb is the model at
+0.01209 per unit -> x 1.1111 for the game's scale 1; his island x 3.41, the rail block x 0.896 for the game's scale 2, the nails x 1.068, the end
+platform x 2.66, his woodblock_wide.tscn IS the game's WoodBlockLong (200 x 200 x 600 u, x 0.235) and his woodblocklong.tscn IS the game's
+WoodBlockLarge (800 x 200 x 800, x 0.401)). The wood blocks take the scene.bin's tints (the walls (100, 150, 255), the big platforms (200, 200, 80),
+the end bridge (255, 255, 200)). The course runs along +X; Mario starts at (-7200, 4700, 0) u -- 400 u over the island -- facing +X (PlayerSpawner and
+MarioSpawnPoint: Godot's forward is -Z, so the basis is Ry(-90)). His plumbing is kept at the new places: the Level root and its paths, the
+ShineTimer (his AutoStart) and TimerHud, the environment (black background now, his ambient and glow) and light, the transition rects, the switch
+(its ShineTimerPath / CameraPath fixed to ../ShineTimer and ../PlayerSpawner/Mario/CamController -- they pointed at a Mario node the scene no longer
+has) and its eight coin spots at the game's red coins, the Shine (his sprite, its exit to Level.tscn) at the game's Shine, the red-coin Shine's spot,
+the two 1-ups (his scene at his size), his FluddItem on the island.
+
+**The movers.** The umaibou (TRollBlock) spin about their own Z -- the stick's axis -- at the scene.bin's speed x 0.01 degrees a frame: 25 / 30 / 20 / 35
+= 7.5 / 9 / 6 / 10.5 degrees a second (his MovingPlatform's SpinAxis (0, 0, 1), SpinSpeed; he had 40). The three rail blocks are the game's TRailBlock
+(MapObjRailBlock.cpp), ported as **assets/Sms/SmsRailBlock.cs** (new): the block walks its rail node to node at each node's own speed (TRailNode mSpeed
+x 0.01 u a frame: 1.2 / 1.0 / 1.4) and turns by each node's pitch / yaw / roll over the segment that reaches it, spread evenly, about the WORLD axes
+(calcRootMatrix = RotRPH(the step so far) x the turns banked at the nodes) -- R1_1 rolls 90 degrees per 600 u, R1_2 270 = -90 the short way
+(MsAngleDiff), R1_3 100 per 800 u so it lands 10 degrees off square each pass; a dead end turns it back (TGraphWeb::getShortestNextIndex: one
+connection = back; at the start the nearest connected node, the lower index on a tie, so R1_2's block sets off toward -Z). Knobs are the rail's own
+numbers: RailNodes (u, the parent's frame), RailTurns (degrees), RailSpeeds (u per frame), ClosedLoop, StartNode, StartTowards (-1 = the game's
+pick), SpeedScale 1. The umaibou's old spin (40 degrees a second) and his rails' slide (MovingPlatform waypoints) go.
+
+**The sky.** Map/Sky.cpp's TSky: the stage's sky.bmd follows the CAMERA's position (rotation fixed; the Corona yaw spin is stage 15 only), drawn unlit
+with its "sky" btk / brk. models/Sms/Sky/RiccoSecret/sky_ricco_secret.glb is the rip's dome (_VRsph, radius 90000 u, 555 verts) cleaned to one unskinned
+mesh with no textures (gen_sky237.py), instanced at 1/74.44 in assets/Sms/Sky/SkyRiccoSecret.tscn with no shadow and a custom AABB the camera is always
+inside (in the mesh's own units -- the first run culled the dome whenever the origin left the frame, because the AABB had been written in metres under
+the 1/74.44 parent). **SmsSkyRiccoSecret.gdshader** draws the one material as its TEV reads (bmd_mat_dump): glow sheet (P_casino_glow2mm, texgen 0:
+scale 10, offset (0, -0.06)) x C0 x the 8-bit Mario sheet (B_crasicmario, texgen 1), blend ONE + ONE over black -- the vertex shader re-centres the
+dome on CAMERA_POSITION_WORLD (skip_vertex_transform), the fragment runs sky.btk's 600-frame loop from TIME (the pattern's scale 1.25 for frames 0-299
+then 2.5, its translation stepping 1/16 every 37.5 frames) and sky.brk's C0 (white, then (100, 255, 255) at frame 300: the yellow Mario goes green and
+the red dims for the second half, as the game's does); the maths in the game's gamma space, linearised at the end so the screen shows the game's
+numbers. The textures are the rip's PNGs (I8 as grey + alpha, RGB565 as RGB), imported lossless with mipmaps. His Rico4SecretSkybox dome (a re-creation
+of the same mesh with a Godot material, scale 0.19) and the ProceduralSky (never shown: his background mode was Colour) go. The TSky code also draws a
+blue GX sphere (0, 0x12, 0xEE) behind everything -- the disc's screenshots show BLACK behind both skies (the Ricco dome's darkest pixels are 0, the
+Hillside sky's floor is the dome's own C1 plus the star sheet's haze), so the background is black.
+
+**The intro.** map/camera/startcamera.bck (479 frames at 30 = 16 s): joint 0 is the camera's interest (it starts ON the Shine and ends on Mario's start),
+joint 1 the eye riding it (its y scale 50 = the fovy -- TCameraBck::updateDemo), its rotation the look-at frame itself (no roll). intro_pan keys the
+IntroCamera's position and YXZ rotation every 3 frames (the eye = interest + the eye joint, the rotation from the look direction, the yaw unwrapped),
+fov 50; RESET at frame 0; the iris opens over 0.4 s and the vertical barn door closes over the last 0.47 s as before; spawn_wipe unchanged.
+
+**Verified** (a layout shot drive -- secretshot237.gd, a GDScript SceneTree runner, deleted before the commit -- windowed 1280 x 720, the level loaded,
+its rects and HUD hidden, nine eyes along the course shot twice 9 s apart): the island with the switch and his FLUDD, the sticks, the two blue walls with
+the yellow platform between them, the three rail blocks mid-tumble (RailBlock0 5.4 m along and 60.5 degrees over after 11 s = 0.48 m/s and 5.4
+degrees/s, the game's 1.2 u a frame and 90 per 16.7 s), the nails' platform, the tilted sticks, the end bridge, platform and Shine, the overview
+matching the game's course end to end, the dome's blue dots with the red / yellow Mario (and the green / dim-red second half). The regression drive 68 / 68
+(gi), the shine hud quiet run 8 / 8 (aq), both on the tree with 238. dotnet build 0 errors; the drive, the runner, the logs, the shots and the tasks
+deleted; the save file untouched.
+
+**Knobs:** the sky shader's speed / brightness / texture matrices / tints; SmsRailBlock's rail numbers and SpeedScale; the umaibou's SpinSpeed.
+**Deviations:** the invisible board NPC and the 100-coin Shine are not placed (the port has neither); his 1-up and Shine sprite keep his sizes; the game's
+blue backdrop sphere is left out (see above); his FluddItem and ShineTimer AutoStart are his, kept.
+
+### 238 -- the SECRET COURSES, part 2: the Hillside Cave Secret (assets/secrect_level.tscn) laid out as the game lays it out and under the game's own sky -- every piece at coro_ex1's scene.bin position, rotation and scale, the nineteen shuffling lifts and the five stair blocks on their scene.ral rails (his MovingPlatform fed the rails' speeds and waits), the four EX cubes rolling their loops (SmsRailBlock), the spinning and circling star platforms, the game's start camera as the intro pan, the EXskyDarkTrain sky.bmd with its nine materials, its 8000-frame btk and its brk running in one shader (feature/kingboo-casino, code `cde8cf0`)
+
+**The layout** (gen_level237.py, the same way). The start island stretched 1.5 x along the course (scale (1.5, 1, 1), rot Y -90), two palms (his
+PalmTree.tscn scaled 0.755 to palmNormal's 1290-u height -- a different palm model; the game's palmNormal.bmd is not in the project), the five stair
+blocks (WoodBlockLarge at scale (1, 2.5, 1.5), the game's five tints from (250, 230, 200) down to (210, 150, 120)), the green pillar (WoodBlockLong,
+rot X 90, scale (6, 6, 3), (200, 255, 200)), the nineteen lifts and three fixed blocks (his normal_block.tscn = NormalBlock.bmd at the game's scale 2:
+x 1.0745), the four EX roll cubes (his rotating_block.tscn = EXRollCube.bmd 800 u: x 3.678), the four nails, the two nails' platforms and the long
+dark-green bridge (WoodBlockLarge 5 / 6 / 7, (200, 255, 200) and (10, 80, 10)), the three big spinning stars and the two circling ones (his
+StarPlatform.tscn = normalvariant0.bmd: x 3.96), the two white blocks (WoodBlockLarge 8 / 9), the end platform with the banana tree (his
+banana_tree.tscn at the game's size, x 0.135), the 1-up, the switch and its eight coin spots, the Shine and the red-coin Shine's spot. Mario starts at
+(-6100, 3900, 200) u facing +X. His Mario instance becomes a PlayerSpawner (the character select's way, as Rico4Secret has it) with the ShineTimer and
+TimerHud at the root (his timer had no AutoStart here: kept so); his hidden marioHUD, his papaya (not in the game) and the website sky go.
+
+**The movers** (his MovingPlatform.cs with the rails' numbers). A lift or stair block is a TNormalLift on a two-node rail (flags 0x800): ping-pong between
+the nodes, speed = the node's yaw x 0.01 u a frame (TNormalLift::control), wait = the node's pitch in frames (readRailFlag) -- blk00: 400 u along +Z at
+2 u a frame with 60 frames' rest at each end; the stairs (kaidan0-4): 1000 u across at 4 u a frame, 60 frames' rest, the top one 300 u down at 3 with
+100; the lifts' speeds 1 - 3.5 u a frame and waits 10 - 100 frames, each its own. The two circling stars (S_block00 / 01, four-node loops 141 u a side)
+go round at 0.4 u a frame (Mode Loop, the first leg to the lower-index node as the game picks). The three big stars (rollvariant0 = the star stood on
+edge: Rx(-90) of his flat normalvariant0, so the game's Rz(0) Ry(90) Rx(90) on it is Ry(90) on his, scale 2 x 3.96) spin about the vertical at 0.4
+degrees a frame (TRollBlock about its own Z = world -Y: SpinAxis (0, -1, 0), 12 degrees a second). The four EX cubes are SmsRailBlocks on the closed
+rails: EXCube0 a slide round a rectangle at 4 u a frame (no turn), EXCube1 a rounded rectangle turning 34 then 56 degrees over each corner at 10 and 6 u
+a frame, EXCube2 two cubes half a loop apart (nodes 0 and 3) yawing 60 / 90 as they go at 6 u a frame -- each setting off toward its nearest connected
+node as the game does.
+
+**The sky.** models/Sms/Sky/HillsideSecret/sky_hillside_secret.glb: the rip's sky.bmd (EXskyDarkTrain, 1441 verts, nine materials; the same sky.bmd
+(md5 86302a5c) serves coro_ex0 / ex1 / ex6, rico_ex0 / ex1, mam_ex0) cleaned to one unskinned mesh of nine surfaces, keeping its vertex colours and
+both UV sets; **SmsSkyHillsideSecret.gdshader** draws each surface's TEV (`mode` per material, all added over black, the dome riding with the camera,
+gamma-space maths): 0 the dome _o28 = clamp(gradient x C0 (12, 44, 77)) + C1 (12, 20, 4) x (1 - gradient) + the stars (B_sters on texgen 0, drifting
+(1, 1) over the 8000-frame loop) x the vertex colour, the lot x the vertex alpha (blend SRCALPHA + ONE); 1 the four rail silhouettes (B_exsky_Rail x
+matColor (5, 24, 102) / (47, 43, 14) / (41, 27, 6) / (12, 19, 11), texgen scales (1.25, 0.75) / (1.5, 1) / (1.75, 1), Tx 0 -> 1 over frames 0-4000 then
+still; ONE + INVSRCCLR, which over this dark sky is adding); 2 the train (B_exsky_Train clamped, centre (1, 1), x the vertex colour x C0 / 2, sky.brk's
+1000-frame C0 (16, 40, 83) -> (165, 45, 26) -> (40, 98, 7), Tx -1.333 -> 10 over frames 0-4000 -- one crossing a loop -- and Sy breathing 1 -> 1.15
+every 50 frames); 3 the cloud band (B_exsky_Silen repeating x alpha 133/255, Sx breathing 1 -> 0.9; SRCALPHA + ONE); 4 the aeroplane (B_exsky_Aplane
+clamped x the vertex colour x (24, 73, 36), scale (0.5, 1), Tx -1 -> 10 over frames 0-4000; ONE + ONE); 5 the ground silhouette (B_exsky_Silen clamped
+x (81, 15, 0); ONE + ONE). Nine ShaderMaterials (assets/Sms/Sky/HillsideSecretSky_*.tres) on the surfaces of SkyHillsideSecret.tscn. His testFromWebsite
+dome (the same mesh from a model site with hand-coloured copies of the sheets, static, rotated by SkyboxRotator.cs) goes.
+
+**The intro.** The game's startcamera.bck (479 frames): the Shine held, the sweep back over the course, Mario's island; fovy 50.
+
+**Verified** (the layout shot drive, windowed 1280 x 720, nine eyes twice 9 s apart): the island and palms with the switch, the stairs mid-slide, the
+pillar's two nails, the lift grid shuffling, the cubes rolling the dark-green bridge (RollCube1 112 degrees over after its corners, the EXCube2 pair at
+the same yaw half a loop apart), the stars spinning, the two white blocks and the end platform with the tree and the Shine; the overview from above
+matching the game's course; the sky the disc screenshot's -- the dark green-grey star field with the nebula haze, the blue top rail and the olive
+ones, the stars drifting. The regression drive 68 / 68 (gi), the shine hud quiet run 8 / 8 (aq). dotnet build 0 errors; the drive, the runner, the logs,
+the shots and the tasks deleted; the save file untouched.
+
+**Knobs:** the sky shader's speed / brightness and each material's colours; SmsRailBlock's rail numbers and SpeedScale; every lift's MoveSpeed / WaitTime
+(the rails'). **Deviations:** the palms are his PalmTree at the game's height; his 1-up and Shine sprite keep his sizes; his lift cubes keep his gold
+texture (the game's NormalBlock is orange); the board NPC and the 100-coin Shine are not placed; his papaya is gone.
