@@ -1,4 +1,4 @@
-[gd_scene load_steps=31 format=3 uid="uid://djpog221pfbhd"]
+[gd_scene load_steps=33 format=3 uid="uid://djpog221pfbhd"]
 
 [ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_level"]
 [ext_resource type="Script" uid="uid://bgx50vgdilhgc" path="res://assets/PlayerSpawner.cs" id="2_spawner"]
@@ -13,18 +13,20 @@
 [ext_resource type="PackedScene" uid="uid://c3f2gbtt1spi3" path="res://Font/HudElements/SignPopup.tscn" id="11_signpopup"]
 [ext_resource type="PackedScene" uid="uid://bg77g21t33nld" path="res://red_coin.tscn" id="12_redcoin"]
 [ext_resource type="PackedScene" path="res://assets/Sms/Sky/SkyHillsideSecret.tscn" id="13_skyhillside"]
-[ext_resource type="PackedScene" uid="uid://3i321r0h4sxx" path="res://1_up_mushroom.tscn" id="14_oneup"]
-[ext_resource type="PackedScene" uid="uid://b54pc5peh00fe" path="res://assets/StartingPlatform.tscn" id="15_skyisland"]
-[ext_resource type="PackedScene" path="res://assets/Sms/Map/PalmNormal.tscn" id="16_palm"]
-[ext_resource type="PackedScene" uid="uid://dy7wq3fjb5owj" path="res://banana_tree.tscn" id="17_bananatree"]
-[ext_resource type="PackedScene" uid="uid://75n8tcdc68kl" path="res://normal_block.tscn" id="18_normalblock"]
-[ext_resource type="PackedScene" uid="uid://cr166pmwl5j31" path="res://StarPlatform.tscn" id="19_normalvariant0"]
-[ext_resource type="PackedScene" uid="uid://ce12h7rgk2obv" path="res://Font/HudElements/ending_platofrom.tscn" id="20_normalvariant3"]
-[ext_resource type="Script" path="res://assets/Sms/SmsRailBlock.cs" id="21_railblock"]
-[ext_resource type="PackedScene" uid="uid://cfm7oejwuaw6g" path="res://rotating_block.tscn" id="22_exrollcube"]
-[ext_resource type="PackedScene" uid="uid://cq7lh2ny4cfrk" path="res://nail.tscn" id="23_kugi"]
-[ext_resource type="PackedScene" uid="uid://ciuxr0opwr0bq" path="res://woodblock_wide.tscn" id="24_woodblocklong"]
-[ext_resource type="PackedScene" uid="uid://cfdsmmqe42w7v" path="res://woodblocklong.tscn" id="25_woodblocklarge"]
+[ext_resource type="AudioStreamWAV" path="res://assets/Sms/Sound/Music/MSD_BGM_EXTRA.wav" id="14_bgm_extra"]
+[ext_resource type="Script" path="res://assets/Sms/Sound/SmsStageMusic.cs" id="15_stagemusic"]
+[ext_resource type="PackedScene" uid="uid://3i321r0h4sxx" path="res://1_up_mushroom.tscn" id="16_oneup"]
+[ext_resource type="PackedScene" uid="uid://b54pc5peh00fe" path="res://assets/StartingPlatform.tscn" id="17_skyisland"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Map/PalmNormal.tscn" id="18_palm"]
+[ext_resource type="PackedScene" uid="uid://dy7wq3fjb5owj" path="res://banana_tree.tscn" id="19_bananatree"]
+[ext_resource type="PackedScene" uid="uid://75n8tcdc68kl" path="res://normal_block.tscn" id="20_normalblock"]
+[ext_resource type="PackedScene" uid="uid://cr166pmwl5j31" path="res://StarPlatform.tscn" id="21_normalvariant0"]
+[ext_resource type="PackedScene" uid="uid://ce12h7rgk2obv" path="res://Font/HudElements/ending_platofrom.tscn" id="22_normalvariant3"]
+[ext_resource type="Script" path="res://assets/Sms/SmsRailBlock.cs" id="23_railblock"]
+[ext_resource type="PackedScene" uid="uid://cfm7oejwuaw6g" path="res://rotating_block.tscn" id="24_exrollcube"]
+[ext_resource type="PackedScene" uid="uid://cq7lh2ny4cfrk" path="res://nail.tscn" id="25_kugi"]
+[ext_resource type="PackedScene" uid="uid://ciuxr0opwr0bq" path="res://woodblock_wide.tscn" id="26_woodblocklong"]
+[ext_resource type="PackedScene" uid="uid://cfdsmmqe42w7v" path="res://woodblocklong.tscn" id="27_woodblocklarge"]
 
 [sub_resource type="Environment" id="Environment_level"]
 background_mode = 1
@@ -86,7 +88,7 @@ tracks/3/keys = {
 }
 
 [sub_resource type="Animation" id="Animation_intro_pan"]
-length = 15.93333
+length = 7.966667
 tracks/0/type = "value"
 tracks/0/imported = false
 tracks/0/enabled = true
@@ -94,7 +96,7 @@ tracks/0/path = NodePath("IntroCamera:position")
 tracks/0/interp = 1
 tracks/0/loop_wrap = true
 tracks/0/keys = {
-"times": PackedFloat32Array(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 11, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 12, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 13, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 14, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8, 14.9, 15, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.8, 15.9, 15.93333),
+"times": PackedFloat32Array(0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.85, 2.9, 2.95, 3, 3.05, 3.1, 3.15, 3.2, 3.25, 3.3, 3.35, 3.4, 3.45, 3.5, 3.55, 3.6, 3.65, 3.7, 3.75, 3.8, 3.85, 3.9, 3.95, 4, 4.05, 4.1, 4.15, 4.2, 4.25, 4.3, 4.35, 4.4, 4.45, 4.5, 4.55, 4.6, 4.65, 4.7, 4.75, 4.8, 4.85, 4.9, 4.95, 5, 5.05, 5.1, 5.15, 5.2, 5.25, 5.3, 5.35, 5.4, 5.45, 5.5, 5.55, 5.6, 5.65, 5.7, 5.75, 5.8, 5.85, 5.9, 5.95, 6, 6.05, 6.1, 6.15, 6.2, 6.25, 6.3, 6.35, 6.4, 6.45, 6.5, 6.55, 6.6, 6.65, 6.7, 6.75, 6.8, 6.85, 6.9, 6.95, 7, 7.05, 7.1, 7.15, 7.2, 7.25, 7.3, 7.35, 7.4, 7.45, 7.5, 7.55, 7.6, 7.65, 7.7, 7.75, 7.8, 7.85, 7.9, 7.95, 7.966667),
 "transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
 "update": 0,
 "values": [Vector3(151.7836, 82.25459, 2.301469), Vector3(151.7836, 82.25458, 2.301454), Vector3(151.7836, 82.25455, 2.301415), Vector3(151.7836, 82.2545, 2.301357), Vector3(151.7836, 82.25444, 2.301284), Vector3(151.7837, 82.25437, 2.301204), Vector3(151.7837, 82.2543, 2.30112), Vector3(151.7837, 82.25424, 2.301039), Vector3(151.7838, 82.2542, 2.300966), Vector3(151.7838, 82.25416, 2.300906), Vector3(151.7839, 82.25416, 2.300866), Vector3(151.7839, 82.25417, 2.30085), Vector3(151.7839, 82.25423, 2.300864), Vector3(151.784, 82.25432, 2.300913), Vector3(151.784, 82.25445, 2.301003), Vector3(151.7838, 82.25464, 2.30114), Vector3(151.7677, 82.25711, 2.301329), Vector3(151.7101, 82.2644, 2.301575), Vector3(151.6073, 82.27701, 2.301884), Vector3(151.4554, 82.29539, 2.302261), Vector3(151.2506, 82.32004, 2.302713), Vector3(150.9891, 82.35142, 2.303243), Vector3(150.6669, 82.39002, 2.303858), Vector3(150.2803, 82.4363, 2.304564), Vector3(149.8254, 82.49076, 2.305365), Vector3(149.2983, 82.55385, 2.306268), Vector3(148.6952, 82.62607, 2.307277), Vector3(148.0122, 82.70789, 2.308399), Vector3(147.2456, 82.79979, 2.309638), Vector3(146.3913, 82.90223, 2.311001), Vector3(145.4457, 83.01571, 2.312492), Vector3(144.4048, 83.14069, 2.314117), Vector3(143.2647, 83.27795, 2.315882), Vector3(142.0218, 83.42744, 2.317792), Vector3(140.672, 83.58892, 2.319853), Vector3(139.2113, 83.76345, 2.32207), Vector3(137.6358, 83.95207, 2.324448), Vector3(135.9416, 84.15564, 2.326993), Vector3(134.1262, 84.3739, 2.329711), Vector3(132.1931, 84.60637, 2.332607), Vector3(130.1459, 84.8526, 2.335687), Vector3(127.988, 85.11211, 2.338955), Vector3(125.7228, 85.38446, 2.342418), Vector3(123.3539, 85.66919, 2.346081), Vector3(120.8847, 85.96584, 2.349949), Vector3(118.3185, 86.27405, 2.354025), Vector3(115.6588, 86.59342, 2.358268), Vector3(112.9091, 86.92356, 2.36266), Vector3(110.0728, 87.26405, 2.367196), Vector3(107.1533, 87.6145, 2.371869), Vector3(104.1541, 87.97451, 2.376673), Vector3(101.0786, 88.34368, 2.381603), Vector3(97.93027, 88.72161, 2.386653), Vector3(94.71251, 89.1079, 2.391816), Vector3(91.42877, 89.50215, 2.397088), Vector3(88.08244, 89.90395, 2.402462), Vector3(84.67698, 90.31287, 2.407932), Vector3(81.21592, 90.72848, 2.413493), Vector3(77.7026, 91.15036, 2.419138), Vector3(74.14047, 91.57811, 2.424862), Vector3(70.53297, 92.01131, 2.430658), Vector3(66.88352, 92.44955, 2.436522), Vector3(63.19557, 92.89241, 2.442447), Vector3(59.47255, 93.33949, 2.448427), Vector3(55.7179, 93.79036, 2.454456), Vector3(51.93505, 94.24462, 2.460529), Vector3(48.12745, 94.70186, 2.466639), Vector3(44.29853, 95.16166, 2.472782), Vector3(40.45172, 95.62361, 2.47895), Vector3(36.59047, 96.08729, 2.485138), Vector3(32.7182, 96.55229, 2.49134), Vector3(28.83836, 97.01821, 2.497551), Vector3(24.95438, 97.48462, 2.503764), Vector3(21.0697, 97.95112, 2.509974), Vector3(17.18776, 98.41729, 2.516174), Vector3(13.31199, 98.88272, 2.522359), Vector3(9.445826, 99.347, 2.528523), Vector3(5.592709, 99.80971, 2.53466), Vector3(1.756073, 100.2704, 2.540765), Vector3(-2.060643, 100.7288, 2.546831), Vector3(-5.854005, 101.1843, 2.552865), Vector3(-9.620574, 101.6366, 2.558864), Vector3(-13.35691, 102.0853, 2.564821), Vector3(-17.05959, 102.53, 2.570733), Vector3(-20.72516, 102.9701, 2.576592), Vector3(-24.3502, 103.4055, 2.582394), Vector3(-27.93126, 103.8355, 2.588133), Vector3(-31.46491, 104.2598, 2.593803), Vector3(-34.94771, 104.6781, 2.599399), Vector3(-38.37622, 105.0898, 2.604915), Vector3(-41.74701, 105.4946, 2.610345), Vector3(-45.05665, 105.892, 2.615684), Vector3(-48.30169, 106.2817, 2.620927), Vector3(-51.47869, 106.6632, 2.626068), Vector3(-54.58423, 107.0361, 2.6311), Vector3(-57.61487, 107.4, 2.63602), Vector3(-60.56716, 107.7546, 2.64082), Vector3(-63.43768, 108.0993, 2.645496), Vector3(-66.22298, 108.4337, 2.650041), Vector3(-68.91962, 108.7575, 2.654451), Vector3(-71.52418, 109.0703, 2.658719), Vector3(-74.03322, 109.3716, 2.662841), Vector3(-76.44329, 109.661, 2.66681), Vector3(-78.75097, 109.9381, 2.670621), Vector3(-80.95281, 110.2024, 2.674268), Vector3(-83.04538, 110.4537, 2.677746), Vector3(-85.02524, 110.6914, 2.681049), Vector3(-86.88896, 110.9152, 2.684172), Vector3(-88.63309, 111.1246, 2.687108), Vector3(-90.25421, 111.3192, 2.689853), Vector3(-91.74888, 111.4987, 2.692401), Vector3(-93.11365, 111.6625, 2.694746), Vector3(-94.36246, 111.8136, 2.696882), Vector3(-95.55685, 111.9565, 2.698825), Vector3(-96.70056, 112.0931, 2.700634), Vector3(-97.79125, 112.2241, 2.702318), Vector3(-98.82661, 112.3483, 2.703882), Vector3(-99.80433, 112.4657, 2.705329), Vector3(-100.7221, 112.5758, 2.706662), Vector3(-101.5776, 112.6785, 2.707885), Vector3(-102.3684, 112.7734, 2.709002), Vector3(-103.0924, 112.8603, 2.710017), Vector3(-103.7471, 112.9389, 2.710932), Vector3(-104.3303, 113.0089, 2.711752), Vector3(-104.8396, 113.0701, 2.71248), Vector3(-105.2727, 113.1221, 2.713121), Vector3(-105.6273, 113.1647, 2.713677), Vector3(-105.9011, 113.1977, 2.714152), Vector3(-106.0917, 113.2207, 2.71455), Vector3(-106.1969, 113.2329, 2.714875), Vector3(-106.2193, 113.2358, 2.71513), Vector3(-106.2184, 113.2353, 2.715319), Vector3(-106.2184, 113.2358, 2.715445), Vector3(-106.2183, 113.236, 2.715513), Vector3(-106.2183, 113.2359, 2.715525), Vector3(-106.2183, 113.2359, 2.715489), Vector3(-106.2183, 113.2359, 2.715438), Vector3(-106.2183, 113.2359, 2.715386), Vector3(-106.2184, 113.2359, 2.715331), Vector3(-106.2184, 113.2359, 2.715275), Vector3(-106.2184, 113.2359, 2.715218), Vector3(-106.2184, 113.2359, 2.715162), Vector3(-106.2184, 113.236, 2.715106), Vector3(-106.2184, 113.236, 2.715052), Vector3(-106.2184, 113.236, 2.715), Vector3(-106.2185, 113.236, 2.71495), Vector3(-106.2185, 113.236, 2.714904), Vector3(-106.2185, 113.236, 2.714862), Vector3(-106.2185, 113.236, 2.714825), Vector3(-106.2185, 113.236, 2.714793), Vector3(-106.2185, 113.236, 2.714767), Vector3(-106.2185, 113.236, 2.714748), Vector3(-106.2185, 113.236, 2.714736), Vector3(-106.2185, 113.236, 2.714732), Vector3(-106.2185, 113.236, 2.714729), Vector3(-106.2185, 113.236, 2.714725), Vector3(-106.2185, 113.236, 2.71472), Vector3(-106.2185, 113.236, 2.714716), Vector3(-106.2185, 113.236, 2.714712), Vector3(-106.2185, 113.236, 2.71471), Vector3(-106.2185, 113.236, 2.71471)]
@@ -106,7 +108,7 @@ tracks/1/path = NodePath("IntroCamera:rotation")
 tracks/1/interp = 1
 tracks/1/loop_wrap = true
 tracks/1/keys = {
-"times": PackedFloat32Array(0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 2, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 2.8, 2.9, 3, 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 3.7, 3.8, 3.9, 4, 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.8, 5.9, 6, 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 6.9, 7, 7.1, 7.2, 7.3, 7.4, 7.5, 7.6, 7.7, 7.8, 7.9, 8, 8.1, 8.2, 8.3, 8.4, 8.5, 8.6, 8.7, 8.8, 8.9, 9, 9.1, 9.2, 9.3, 9.4, 9.5, 9.6, 9.7, 9.8, 9.9, 10, 10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 11, 11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 12, 12.1, 12.2, 12.3, 12.4, 12.5, 12.6, 12.7, 12.8, 12.9, 13, 13.1, 13.2, 13.3, 13.4, 13.5, 13.6, 13.7, 13.8, 13.9, 14, 14.1, 14.2, 14.3, 14.4, 14.5, 14.6, 14.7, 14.8, 14.9, 15, 15.1, 15.2, 15.3, 15.4, 15.5, 15.6, 15.7, 15.8, 15.9, 15.93333),
+"times": PackedFloat32Array(0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.55, 0.6, 0.65, 0.7, 0.75, 0.8, 0.85, 0.9, 0.95, 1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.45, 1.5, 1.55, 1.6, 1.65, 1.7, 1.75, 1.8, 1.85, 1.9, 1.95, 2, 2.05, 2.1, 2.15, 2.2, 2.25, 2.3, 2.35, 2.4, 2.45, 2.5, 2.55, 2.6, 2.65, 2.7, 2.75, 2.8, 2.85, 2.9, 2.95, 3, 3.05, 3.1, 3.15, 3.2, 3.25, 3.3, 3.35, 3.4, 3.45, 3.5, 3.55, 3.6, 3.65, 3.7, 3.75, 3.8, 3.85, 3.9, 3.95, 4, 4.05, 4.1, 4.15, 4.2, 4.25, 4.3, 4.35, 4.4, 4.45, 4.5, 4.55, 4.6, 4.65, 4.7, 4.75, 4.8, 4.85, 4.9, 4.95, 5, 5.05, 5.1, 5.15, 5.2, 5.25, 5.3, 5.35, 5.4, 5.45, 5.5, 5.55, 5.6, 5.65, 5.7, 5.75, 5.8, 5.85, 5.9, 5.95, 6, 6.05, 6.1, 6.15, 6.2, 6.25, 6.3, 6.35, 6.4, 6.45, 6.5, 6.55, 6.6, 6.65, 6.7, 6.75, 6.8, 6.85, 6.9, 6.95, 7, 7.05, 7.1, 7.15, 7.2, 7.25, 7.3, 7.35, 7.4, 7.45, 7.5, 7.55, 7.6, 7.65, 7.7, 7.75, 7.8, 7.85, 7.9, 7.95, 7.966667),
 "transitions": PackedFloat32Array(1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1),
 "update": 0,
 "values": [Vector3(-0.6781955, -1.603493, 0), Vector3(-0.6781949, -1.603494, 0), Vector3(-0.6781931, -1.603498, 0), Vector3(-0.6781904, -1.603503, 0), Vector3(-0.6781871, -1.603509, 0), Vector3(-0.6781835, -1.603516, 0), Vector3(-0.67818, -1.603523, 0), Vector3(-0.6781767, -1.60353, 0), Vector3(-0.678174, -1.603536, 0), Vector3(-0.6781721, -1.603541, 0), Vector3(-0.6781714, -1.603545, 0), Vector3(-0.6781722, -1.603546, 0), Vector3(-0.6781746, -1.603545, 0), Vector3(-0.678179, -1.603541, 0), Vector3(-0.6781858, -1.603533, 0), Vector3(-0.6781835, -1.603521, 0), Vector3(-0.6776589, -1.603461, 0), Vector3(-0.6757078, -1.603286, 0), Vector3(-0.6722368, -1.602988, 0), Vector3(-0.6671699, -1.602563, 0), Vector3(-0.6604622, -1.602011, 0), Vector3(-0.6521036, -1.601336, 0), Vector3(-0.6421212, -1.600543, 0), Vector3(-0.6305798, -1.599644, 0), Vector3(-0.6175805, -1.598652, 0), Vector3(-0.603258, -1.597582, 0), Vector3(-0.5877753, -1.59645, 0), Vector3(-0.5713174, -1.595273, 0), Vector3(-0.554084, -1.594068, 0), Vector3(-0.5362815, -1.592851, 0), Vector3(-0.5181153, -1.591637, 0), Vector3(-0.4997829, -1.590437, 0), Vector3(-0.4814794, -1.589263, 0), Vector3(-0.463598, -1.588131, 0), Vector3(-0.4467341, -1.587066, 0), Vector3(-0.4309772, -1.586066, 0), Vector3(-0.4163374, -1.58513, 0), Vector3(-0.4028077, -1.584253, 0), Vector3(-0.3903487, -1.583434, 0), Vector3(-0.3789753, -1.58267, 0), Vector3(-0.3686786, -1.581961, 0), Vector3(-0.359431, -1.581303, 0), Vector3(-0.3511942, -1.580694, 0), Vector3(-0.3439238, -1.580129, 0), Vector3(-0.3375731, -1.579606, 0), Vector3(-0.3320952, -1.579122, 0), Vector3(-0.327445, -1.578673, 0), Vector3(-0.3235801, -1.578258, 0), Vector3(-0.3204618, -1.577874, 0), Vector3(-0.3180556, -1.577518, 0), Vector3(-0.3163314, -1.577188, 0), Vector3(-0.3152635, -1.576882, 0), Vector3(-0.3148311, -1.576597, 0), Vector3(-0.3150176, -1.576333, 0), Vector3(-0.3158115, -1.576087, 0), Vector3(-0.3171778, -1.575858, 0), Vector3(-0.3189502, -1.575642, 0), Vector3(-0.3210425, -1.575437, 0), Vector3(-0.323435, -1.575243, 0), Vector3(-0.3261051, -1.575058, 0), Vector3(-0.3290329, -1.574881, 0), Vector3(-0.3322008, -1.574713, 0), Vector3(-0.3355937, -1.574552, 0), Vector3(-0.339198, -1.574398, 0), Vector3(-0.3430021, -1.57425, 0), Vector3(-0.3469957, -1.574108, 0), Vector3(-0.3511699, -1.573971, 0), Vector3(-0.355517, -1.573839, 0), Vector3(-0.3600305, -1.573712, 0), Vector3(-0.3647045, -1.573589, 0), Vector3(-0.3695345, -1.573471, 0), Vector3(-0.3745165, -1.573356, 0), Vector3(-0.3796473, -1.573245, 0), Vector3(-0.3849247, -1.573138, 0), Vector3(-0.3903468, -1.573033, 0), Vector3(-0.3959125, -1.572932, 0), Vector3(-0.4016213, -1.572833, 0), Vector3(-0.4074734, -1.572737, 0), Vector3(-0.4134695, -1.572644, 0), Vector3(-0.4196108, -1.572553, 0), Vector3(-0.425899, -1.572465, 0), Vector3(-0.4323366, -1.572378, 0), Vector3(-0.4389264, -1.572294, 0), Vector3(-0.4456718, -1.572211, 0), Vector3(-0.452577, -1.572131, 0), Vector3(-0.4596463, -1.572052, 0), Vector3(-0.4668852, -1.571975, 0), Vector3(-0.4742993, -1.5719, 0), Vector3(-0.481895, -1.571826, 0), Vector3(-0.4896796, -1.571754, 0), Vector3(-0.4976608, -1.571683, 0), Vector3(-0.5058472, -1.571614, 0), Vector3(-0.5142481, -1.571546, 0), Vector3(-0.5228738, -1.571479, 0), Vector3(-0.5317353, -1.571413, 0), Vector3(-0.5408448, -1.571348, 0), Vector3(-0.5502153, -1.571285, 0), Vector3(-0.559861, -1.571223, 0), Vector3(-0.5697975, -1.571161, 0), Vector3(-0.5800415, -1.571101, 0), Vector3(-0.590611, -1.571041, 0), Vector3(-0.6015259, -1.570983, 0), Vector3(-0.6128075, -1.570925, 0), Vector3(-0.624479, -1.570868, 0), Vector3(-0.6365655, -1.570812, 0), Vector3(-0.6490945, -1.570757, 0), Vector3(-0.6620956, -1.570702, 0), Vector3(-0.6756011, -1.570648, 0), Vector3(-0.6896462, -1.570595, 0), Vector3(-0.704269, -1.570542, 0), Vector3(-0.7195112, -1.57049, 0), Vector3(-0.7354179, -1.570438, 0), Vector3(-0.7519221, -1.570387, 0), Vector3(-0.7685453, -1.570337, 0), Vector3(-0.785238, -1.570287, 0), Vector3(-0.8019862, -1.570236, 0), Vector3(-0.8187619, -1.570185, 0), Vector3(-0.8355423, -1.570134, 0), Vector3(-0.8523038, -1.570083, 0), Vector3(-0.8690227, -1.570031, 0), Vector3(-0.8856746, -1.569979, 0), Vector3(-0.9022349, -1.569927, 0), Vector3(-0.9186788, -1.569874, 0), Vector3(-0.9349812, -1.569821, 0), Vector3(-0.9511172, -1.569768, 0), Vector3(-0.9670618, -1.569714, 0), Vector3(-0.9827903, -1.56966, 0), Vector3(-0.9982781, -1.569606, 0), Vector3(-1.013501, -1.569551, 0), Vector3(-1.028455, -1.569496, 0), Vector3(-1.043629, -1.569439, 0), Vector3(-1.058599, -1.569382, 0), Vector3(-1.073044, -1.569325, 0), Vector3(-1.086915, -1.56927, 0), Vector3(-1.100152, -1.569215, 0), Vector3(-1.112699, -1.569162, 0), Vector3(-1.124503, -1.569111, 0), Vector3(-1.135508, -1.56906, 0), Vector3(-1.145663, -1.569012, 0), Vector3(-1.154918, -1.568966, 0), Vector3(-1.163223, -1.568923, 0), Vector3(-1.170533, -1.568883, 0), Vector3(-1.176802, -1.568848, 0), Vector3(-1.181989, -1.568819, 0), Vector3(-1.186052, -1.568795, 0), Vector3(-1.188955, -1.568777, 0), Vector3(-1.190661, -1.568767, 0), Vector3(-1.191151, -1.568763, 0), Vector3(-1.191154, -1.568763, 0), Vector3(-1.191154, -1.568762, 0), Vector3(-1.191153, -1.568762, 0), Vector3(-1.19115, -1.568762, 0), Vector3(-1.191148, -1.568762, 0), Vector3(-1.191147, -1.568762, 0), Vector3(-1.191147, -1.568762, 0), Vector3(-1.191147, -1.568762, 0), Vector3(-1.191147, -1.568762, 0), Vector3(-1.191147, -1.568763, 0), Vector3(-1.191147, -1.568763, 0), Vector3(-1.191147, -1.568763, 0), Vector3(-1.191147, -1.568763, 0)]
@@ -130,7 +132,7 @@ tracks/3/path = NodePath("../TransitionLayer/BarnDoorVertical:material:shader_pa
 tracks/3/interp = 1
 tracks/3/loop_wrap = true
 tracks/3/keys = {
-"times": PackedFloat32Array(15.46663, 15.93333),
+"times": PackedFloat32Array(7.499967, 7.966667),
 "transitions": PackedFloat32Array(1, 1),
 "update": 0,
 "values": [1.0, 0.0]
@@ -182,6 +184,12 @@ BarnDoorVerticalRectPath = NodePath("TransitionLayer/BarnDoorVertical")
 BarnDoorHorizontalRectPath = NodePath("TransitionLayer/BarnDoorHorizontal")
 
 [node name="Sky" parent="." instance=ExtResource("13_skyhillside")]
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("14_bgm_extra")
+volume_db = -6.076074
+bus = &"Music"
+script = ExtResource("15_stagemusic")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("Environment_level")
@@ -283,278 +291,278 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 79.25846, 72.54164, 44.331)
 [node name="Spawn08" type="Marker3D" parent="RedCoinSpawns"]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 26.86728, 72.54164, -10.74691)
 
-[node name="OneUp" parent="." instance=ExtResource("14_oneup")]
+[node name="OneUp" parent="." instance=ExtResource("16_oneup")]
 transform = Transform3D(0, 0, -0.31, 0, 0.31, 0, 0.31, 0, 0, 134.3364, 73.88501, 0)
 motion_mode = 1
 
-[node name="SkyIsland" parent="." instance=ExtResource("15_skyisland")]
+[node name="SkyIsland" parent="." instance=ExtResource("17_skyisland")]
 transform = Transform3D(0, 0, -3.409414, 0, 3.409414, 0, 5.114121, 0, 0, -79.25846, 45.67437, 2.686728)
 
-[node name="Palm0" parent="." instance=ExtResource("16_palm")]
+[node name="Palm0" parent="." instance=ExtResource("18_palm")]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -79.25846, 45.67437, -5.373455)
 
-[node name="Palm1" parent="." instance=ExtResource("16_palm")]
+[node name="Palm1" parent="." instance=ExtResource("18_palm")]
 transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -79.25846, 45.67437, 10.74691)
 
-[node name="BananaTree" parent="." instance=ExtResource("17_bananatree")]
+[node name="BananaTree" parent="." instance=ExtResource("19_bananatree")]
 transform = Transform3D(0.1351473, 0, 0, 0, 0.1351473, 0, 0, 0, 0.1351473, 174.6373, 68.51155, 2.686728)
 
-[node name="Lift00" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift00" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 0, 65.82483, 0)
 Waypoints = PackedVector3Array(0, 0, 5.373455)
-MoveSpeed = 0.8060183
-WaitTime = 2
+MoveSpeed = 3.224073
+WaitTime = 0.5
 
-[node name="Lift01" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift01" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 0, 63.1381, -10.74691)
 Waypoints = PackedVector3Array(0, 5.373455, 0)
-MoveSpeed = 1.410532
-WaitTime = 2
+MoveSpeed = 5.642128
+WaitTime = 0.5
 
-[node name="Lift02" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift02" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 5.373455, 65.82483, 0)
 Waypoints = PackedVector3Array(5.373455, 0, 0)
-MoveSpeed = 0.8060183
-WaitTime = 2.5
+MoveSpeed = 3.224073
+WaitTime = 0.625
 
-[node name="Lift03" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift03" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 5.373455, 63.1381, 5.373455)
 Waypoints = PackedVector3Array(0, 6.716819, 0)
-MoveSpeed = 1.209027
-WaitTime = 1
+MoveSpeed = 4.83611
+WaitTime = 0.25
 
-[node name="Lift04" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift04" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 5.373455, 65.82483, -10.74691)
 Waypoints = PackedVector3Array(0, 0, 5.373455)
-MoveSpeed = 0.4030091
-WaitTime = 3.333333
+MoveSpeed = 1.612037
+WaitTime = 0.8333333
 
-[node name="Lift05" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift05" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 10.74691, 65.82483, -5.373455)
 Waypoints = PackedVector3Array(5.373455, 0, 0)
-MoveSpeed = 1.209027
-WaitTime = 2.666667
+MoveSpeed = 4.83611
+WaitTime = 0.6666667
 
-[node name="Lift06" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift06" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 10.74691, 65.82483, 10.74691)
 Waypoints = PackedVector3Array(0, 0, -5.373455)
-MoveSpeed = 0.8060183
-WaitTime = 2
+MoveSpeed = 3.224073
+WaitTime = 0.5
 
-[node name="Lift07" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift07" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 16.12037, 71.19828, 0)
 Waypoints = PackedVector3Array(0, -9.403546, 0)
-MoveSpeed = 1.410532
-WaitTime = 3
+MoveSpeed = 5.642128
+WaitTime = 0.75
 
-[node name="Lift08" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift08" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 16.12037, 60.45137, 5.373455)
 Waypoints = PackedVector3Array(0, 9.403546, 0)
-MoveSpeed = 1.007523
-WaitTime = 2
+MoveSpeed = 4.030091
+WaitTime = 0.5
 
-[node name="Lift09" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift09" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 16.12037, 65.82483, -10.74691)
 Waypoints = PackedVector3Array(-5.373455, 0, 0)
-MoveSpeed = 0.8060183
-WaitTime = 1.5
+MoveSpeed = 3.224073
+WaitTime = 0.375
 
-[node name="Lift10" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift10" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 21.49382, 65.82483, 5.373455)
 Waypoints = PackedVector3Array(5.373455, 0, 0)
-MoveSpeed = 1.410532
-WaitTime = 2.333333
+MoveSpeed = 5.642128
+WaitTime = 0.5833333
 
-[node name="Lift11" parent="." instance=ExtResource("18_normalblock")]
+[node name="Lift11" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 21.49382, 65.82483, 10.74691)
 Waypoints = PackedVector3Array(0, -9.403546, 0)
-MoveSpeed = 1.007523
-WaitTime = 1.333333
-
-[node name="Lift12" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 21.49382, 65.82483, -10.74691)
-Waypoints = PackedVector3Array(0, 0, 5.373455)
-MoveSpeed = 0.6045137
-WaitTime = 3
-
-[node name="Lift13" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 0, 65.82483, 16.12037)
-Waypoints = PackedVector3Array(5.373455, 0, 0)
-MoveSpeed = 1.007523
-WaitTime = 1.666667
-
-[node name="Lift14" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 10.74691, 69.85492, 16.12037)
-Waypoints = PackedVector3Array(0, -9.403546, 0)
-MoveSpeed = 1.410532
-WaitTime = 2
-
-[node name="Lift15" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 16.12037, 65.82483, 16.12037)
-Waypoints = PackedVector3Array(5.373455, 0, 0)
-MoveSpeed = 1.209027
-WaitTime = 2.166667
-
-[node name="Lift16" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 26.86728, 65.82483, 0)
-Waypoints = PackedVector3Array(0, 0, -5.373455)
-MoveSpeed = 1.007523
-WaitTime = 2
-
-[node name="Lift17" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 26.86728, 69.85492, -10.74691)
-Waypoints = PackedVector3Array(0, -8.060183, 0)
-MoveSpeed = 1.209027
-WaitTime = 2
-
-[node name="Lift18" parent="." instance=ExtResource("18_normalblock")]
-transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 26.86728, 63.1381, 16.12037)
-Waypoints = PackedVector3Array(0, 6.716819, 0)
-MoveSpeed = 1.007523
+MoveSpeed = 4.030091
 WaitTime = 0.3333333
 
-[node name="StarLift0" parent="." instance=ExtResource("19_normalvariant0")]
+[node name="Lift12" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 21.49382, 65.82483, -10.74691)
+Waypoints = PackedVector3Array(0, 0, 5.373455)
+MoveSpeed = 2.418055
+WaitTime = 0.75
+
+[node name="Lift13" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 0, 65.82483, 16.12037)
+Waypoints = PackedVector3Array(5.373455, 0, 0)
+MoveSpeed = 4.030091
+WaitTime = 0.4166667
+
+[node name="Lift14" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 10.74691, 69.85492, 16.12037)
+Waypoints = PackedVector3Array(0, -9.403546, 0)
+MoveSpeed = 5.642128
+WaitTime = 0.5
+
+[node name="Lift15" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 16.12037, 65.82483, 16.12037)
+Waypoints = PackedVector3Array(5.373455, 0, 0)
+MoveSpeed = 4.83611
+WaitTime = 0.5416667
+
+[node name="Lift16" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 26.86728, 65.82483, 0)
+Waypoints = PackedVector3Array(0, 0, -5.373455)
+MoveSpeed = 4.030091
+WaitTime = 0.5
+
+[node name="Lift17" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 26.86728, 69.85492, -10.74691)
+Waypoints = PackedVector3Array(0, -8.060183, 0)
+MoveSpeed = 4.83611
+WaitTime = 0.5
+
+[node name="Lift18" parent="." instance=ExtResource("20_normalblock")]
+transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 26.86728, 63.1381, 16.12037)
+Waypoints = PackedVector3Array(0, 6.716819, 0)
+MoveSpeed = 4.030091
+WaitTime = 0.08333333
+
+[node name="StarLift0" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(5.937607, 0, 0, 0, 3.958405, 0, 0, 0, 5.937607, 116.8726, 67.16819, 2.686728)
 Waypoints = PackedVector3Array(-1.343364, 0, -1.343364, -2.686728, 0, 0, -1.343364, 0, 1.343364)
-MoveSpeed = 0.1612037
+MoveSpeed = 0.6448146
 Mode = 1
 
-[node name="StarLift1" parent="." instance=ExtResource("19_normalvariant0")]
+[node name="StarLift1" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(-5.937607, 0, 0, 0, 3.958405, 0, 0, 0, -5.937607, 132.993, 67.16819, 2.686728)
 Waypoints = PackedVector3Array(1.343364, 0, -1.343364, 2.686728, 0, 0, 1.343364, 0, 1.343364)
-MoveSpeed = 0.1612037
+MoveSpeed = 0.6448146
 Mode = 1
 
-[node name="EndPlatform" parent="." instance=ExtResource("20_normalvariant3")]
+[node name="EndPlatform" parent="." instance=ExtResource("22_normalvariant3")]
 transform = Transform3D(2.662277, 0, 0, 0, 2.662277, 0, 0, 0, 2.662277, 163.8904, 68.51155, 2.686728)
 
-[node name="Block0" parent="." instance=ExtResource("18_normalblock")]
+[node name="Block0" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 0, 65.82483, -5.373455)
 
-[node name="Block1" parent="." instance=ExtResource("18_normalblock")]
+[node name="Block1" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 0, 65.82483, 10.74691)
 
-[node name="Block2" parent="." instance=ExtResource("18_normalblock")]
+[node name="Block2" parent="." instance=ExtResource("20_normalblock")]
 transform = Transform3D(1.07448, 0, 0, 0, 1.07448, 0, 0, 0, 1.07448, 16.12037, 65.82483, 10.74691)
 
-[node name="RollCube0" parent="." instance=ExtResource("22_exrollcube")]
+[node name="RollCube0" parent="." instance=ExtResource("24_exrollcube")]
 transform = Transform3D(3.677587, 0, 0, 0, 3.677587, 0, 0, 0, 3.677587, 48.3611, 73.88501, -5.373455)
-script = ExtResource("21_railblock")
+script = ExtResource("23_railblock")
 RailNodes = PackedVector3Array(3600, 5500, -400, 3600, 5500, -300, 3600, 5500, 800, 3600, 4500, 800, 3600, 4500, -400)
 RailTurns = PackedVector3Array(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 RailSpeeds = PackedFloat32Array(4, 4, 4, 4, 4)
 ClosedLoop = true
 StartNode = 0
 
-[node name="RollCube1" parent="." instance=ExtResource("22_exrollcube")]
+[node name="RollCube1" parent="." instance=ExtResource("24_exrollcube")]
 transform = Transform3D(3.677587, 0, 0, 0, 3.677587, 0, 0, 0, 3.677587, 63.1381, 71.19828, 12.09027)
-script = ExtResource("21_railblock")
+script = ExtResource("23_railblock")
 RailNodes = PackedVector3Array(4700, 4500, 900, 4700, 4700, 900, 4700, 5300, 900, 4700, 5500, 900, 4700, 5500, 700, 4700, 5500, -300, 4700, 5500, -500, 4700, 5300, -500, 4700, 4700, -500, 4700, 4500, -500, 4700, 4500, -300, 4700, 4500, 700)
 RailTurns = PackedVector3Array(34, 0, 0, 56, 0, 0, 0, 0, 0, 56, 0, 0, 34, 0, 0, 0, 0, 0, 34, 0, 0, 56, 0, 0, 0, 0, 0, 56, 0, 0, 34, 0, 0, 0, 0, 0)
 RailSpeeds = PackedFloat32Array(10, 6, 6, 6, 10, 10, 10, 6, 6, 6, 10, 10)
 ClosedLoop = true
 StartNode = 2
 
-[node name="RollCube2" parent="." instance=ExtResource("22_exrollcube")]
+[node name="RollCube2" parent="." instance=ExtResource("24_exrollcube")]
 transform = Transform3D(3.677587, 0, 0, 0, 3.677587, 0, 0, 0, 3.677587, 79.25846, 73.88501, -8.060183)
-script = ExtResource("21_railblock")
+script = ExtResource("23_railblock")
 RailNodes = PackedVector3Array(5900, 5500, -600, 5900, 5500, 200, 5900, 5500, 1000, 5900, 4500, 1000, 5900, 4500, 200, 5900, 4500, -600)
 RailTurns = PackedVector3Array(0, 90, 0, 0, 60, 0, 0, 60, 0, 0, 90, 0, 0, 60, 0, 0, 60, 0)
 RailSpeeds = PackedFloat32Array(6, 6, 6, 6, 6, 6)
 ClosedLoop = true
 StartNode = 0
 
-[node name="RollCube3" parent="." instance=ExtResource("22_exrollcube")]
+[node name="RollCube3" parent="." instance=ExtResource("24_exrollcube")]
 transform = Transform3D(3.677587, 0, 0, 0, 3.677587, 0, 0, 0, 3.677587, 79.25846, 60.45137, 13.43364)
-script = ExtResource("21_railblock")
+script = ExtResource("23_railblock")
 RailNodes = PackedVector3Array(5900, 5500, -600, 5900, 5500, 200, 5900, 5500, 1000, 5900, 4500, 1000, 5900, 4500, 200, 5900, 4500, -600)
 RailTurns = PackedVector3Array(0, 90, 0, 0, 60, 0, 0, 60, 0, 0, 90, 0, 0, 60, 0, 0, 60, 0)
 RailSpeeds = PackedFloat32Array(6, 6, 6, 6, 6, 6)
 ClosedLoop = true
 StartNode = 3
 
-[node name="Nail0" parent="." instance=ExtResource("23_kugi")]
+[node name="Nail0" parent="." instance=ExtResource("25_kugi")]
 transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, 34.92746, 68.51155, 0)
 
-[node name="Nail1" parent="." instance=ExtResource("23_kugi")]
+[node name="Nail1" parent="." instance=ExtResource("25_kugi")]
 transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, -10.74691, 68.51155, 8.060183)
 
-[node name="Nail2" parent="." instance=ExtResource("23_kugi")]
+[node name="Nail2" parent="." instance=ExtResource("25_kugi")]
 transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, -10.74691, 68.51155, -2.686728)
 
-[node name="Nail3" parent="." instance=ExtResource("23_kugi")]
+[node name="Nail3" parent="." instance=ExtResource("25_kugi")]
 transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, 34.92746, 68.51155, 5.373455)
 
-[node name="WoodBlockLong" parent="." instance=ExtResource("24_woodblocklong")]
+[node name="WoodBlockLong" parent="." instance=ExtResource("26_woodblocklong")]
 transform = Transform3D(1.40931, 0, 0, 0, 0, -0.7046551, 0, 1.40931, 0, -10.74691, 56.42128, 2.686728)
 TintColor = Color(0.7843137, 1, 0.7843137, 1)
 
-[node name="WoodBlockLarge0" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge0" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 1.002214, 0, 0, 0, 0.6013285, -67.16819, 45.67437, 9.403546)
 Waypoints = PackedVector3Array(0, 0, -13.43364)
-MoveSpeed = 1.612037
-WaitTime = 2
+MoveSpeed = 6.448146
+WaitTime = 0.5
 TintColor = Color(0.9803922, 0.9019608, 0.7843137, 1)
 
-[node name="WoodBlockLarge1" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge1" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 1.002214, 0, 0, 0, 0.6013285, -45.67437, 53.73455, 9.403546)
 Waypoints = PackedVector3Array(0, 0, -13.43364)
-MoveSpeed = 1.612037
-WaitTime = 2
+MoveSpeed = 6.448146
+WaitTime = 0.5
 TintColor = Color(0.9411765, 0.8235294, 0.7058824, 1)
 
-[node name="WoodBlockLarge2" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge2" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 1.002214, 0, 0, 0, 0.6013285, -56.42128, 49.70446, -4.030091)
 Waypoints = PackedVector3Array(0, 0, 13.43364)
-MoveSpeed = 1.612037
-WaitTime = 2
+MoveSpeed = 6.448146
+WaitTime = 0.5
 TintColor = Color(0.9019608, 0.745098, 0.627451, 1)
 
-[node name="WoodBlockLarge3" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge3" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 1.002214, 0, 0, 0, 0.6013285, -34.92746, 57.76464, -4.030091)
 Waypoints = PackedVector3Array(0, 0, 13.43364)
-MoveSpeed = 1.612037
-WaitTime = 2
+MoveSpeed = 6.448146
+WaitTime = 0.5
 TintColor = Color(0.8627451, 0.6666667, 0.5490196, 1)
 
-[node name="WoodBlockLarge4" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge4" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 1.002214, 0, 0, 0, 0.6013285, -24.18055, 61.79473, 2.686728)
 Waypoints = PackedVector3Array(0, -4.030091, 0)
-MoveSpeed = 1.209027
-WaitTime = 3.333333
+MoveSpeed = 4.83611
+WaitTime = 0.8333333
 TintColor = Color(0.8235294, 0.5882353, 0.4705882, 1)
 
-[node name="WoodBlockLarge5" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge5" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 0.4008856, 0, 0, 0, 0.4008856, 34.92746, 67.16819, 2.686728)
 TintColor = Color(0.7843137, 1, 0.7843137, 1)
 
-[node name="WoodBlockLarge6" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge6" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(2.004428, 0, 0, 0, 0.4008856, 0, 0, 0, 0.2004428, 67.16819, 67.16819, 2.686728)
 TintColor = Color(0.03921569, 0.3137255, 0.03921569, 1)
 
-[node name="WoodBlockLarge7" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge7" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0.4008856, 0, 0, 0, 0.4008856, 0, 0, 0, 0.4008856, 99.40892, 67.16819, 2.686728)
 TintColor = Color(0.7843137, 1, 0.7843137, 1)
 
-[node name="WoodBlockLarge8" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge8" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0, 0, 0.4008856, 0, 0.8017713, 0, -0.3006642, 0, 0, 151.8001, 65.82483, 2.686728)
 TintColor = Color(1, 1, 1, 1)
 
-[node name="WoodBlockLarge9" parent="." instance=ExtResource("25_woodblocklarge")]
+[node name="WoodBlockLarge9" parent="." instance=ExtResource("27_woodblocklarge")]
 transform = Transform3D(0, 0, 0.3006642, 0, 0.8017713, 0, -0.3006642, 0, 0, 174.6373, 65.82483, 2.686728)
 TintColor = Color(1, 1, 1, 1)
 
-[node name="RollStar0" parent="." instance=ExtResource("19_normalvariant0")]
+[node name="RollStar0" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(0, 0, 7.916809, 0, 7.916809, 0, -7.916809, 0, 0, 48.3611, 67.16819, 44.331)
 SpinAxis = Vector3(0, -1, 0)
-SpinSpeed = 12
+SpinSpeed = 48
 
-[node name="RollStar1" parent="." instance=ExtResource("19_normalvariant0")]
+[node name="RollStar1" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(0, 0, 7.916809, 0, 7.916809, 0, -7.916809, 0, 0, 63.1381, 67.16819, -36.27082)
 SpinAxis = Vector3(0, -1, 0)
-SpinSpeed = 12
+SpinSpeed = 48
 
-[node name="RollStar2" parent="." instance=ExtResource("19_normalvariant0")]
+[node name="RollStar2" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(0, 0, 7.916809, 0, 7.916809, 0, -7.916809, 0, 0, 79.25846, 67.16819, 44.331)
 SpinAxis = Vector3(0, -1, 0)
-SpinSpeed = 12
+SpinSpeed = 48

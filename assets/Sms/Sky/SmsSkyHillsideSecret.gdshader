@@ -13,7 +13,8 @@ render_mode unshaded, blend_add, cull_disabled, depth_draw_never, skip_vertex_tr
 //   4 _plane     the aeroplane (B_exsky_Aplane) x the vertex colour x C0 (24, 73, 36), crossing once per loop (Tx -1 -> 10 over frames 0-4000) (ONE + ONE)
 //   5 _silen     the ground silhouette (B_exsky_Silen, clamped) x (81, 15, 0) (ONE + ONE)
 // The maths stays in the game's gamma space; the result is linearised at the end so the screen shows the game's numbers.
-// Knobs default to the game's; speed scales the clock, brightness the whole sky.
+// Knobs default to the game's; speed scales the clock, brightness the whole sky. The clock (241): the game steps its material animations
+// (btk / brk) at SMSGetAnmFrameRate() = 2 frames a 30 fps frame -- 60 animation frames a second (MActorAnmEach::setFrameCtrl), not 30 as 237 ran it.
 
 uniform int mode = 0;
 uniform sampler2D tex_a : filter_linear_mipmap, repeat_enable;    // the material's repeating texture (the stars, a rail, the cloud band)
@@ -24,7 +25,7 @@ uniform vec3 mat_color = vec3(1.0, 1.0, 1.0);   // matColor0 for the REG materia
 uniform vec3 color_a = vec3(0.047059, 0.172549, 0.301961);   // _o28 C0
 uniform vec3 color_b = vec3(0.047059, 0.078431, 0.015686);   // _o28 C1
 uniform float mat_alpha = 1.0;              // the cloud's 133 / 255
-uniform float frame_rate = 30.0;
+uniform float frame_rate = 60.0;
 uniform float speed = 1.0;
 uniform float loop_frames = 8000.0;
 uniform float pass_frames = 4000.0;         // the rails / train / plane: their one pass

@@ -149,6 +149,7 @@ public static class SmsMarioSoundTable
     {
         ["MSD_BGM_BOSS"] = new SeInfo(95, 64, true, false, 98.918f, "Music", id: 0x8001000Du),
         ["MSD_BGM_CHUBOSS"] = new SeInfo(127, 64, true, false, 57.204f, "Music", id: 0x8001000Bu),
+        ["MSD_BGM_EXTRA"] = new SeInfo(100, 64, true, false, 171.41f, "Music", id: 0x80010012u),
         ["MSD_BGM_GAMEOVER"] = new SeInfo(110, 64, false, false, 8.194f, "Music", id: 0x80010028u),
         ["MSD_BGM_GET_SHINE"] = new SeInfo(105, 80, false, false, 5.142f, "Music", id: 0x8001000Au),
         ["MSD_BGM_MISS"] = new SeInfo(100, 64, false, false, 4.475f, "Music", id: 0x8001000Cu),

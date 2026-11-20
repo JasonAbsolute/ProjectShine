@@ -6,13 +6,14 @@ render_mode unshaded, blend_add, cull_disabled, depth_draw_never, skip_vertex_tr
 // Mario pattern (B_crasicmario, texgen 1); the blend ONE + ONE. sky.btk (600 frames, looping) drives the pattern's texture matrix: scale 1.25 for
 // frames 0-299 then 2.5, and a translation stepping 1/16 every 37.5 frames; sky.brk drives C0: white for frames 0-299, (100, 255, 255) after.
 // The maths stays in the game's gamma space; the result is linearised at the end so the screen shows the game's numbers.
-// Knobs default to the game's; speed scales the clock, brightness the whole sky.
+// Knobs default to the game's; speed scales the clock, brightness the whole sky. The clock (241): the game steps its material animations
+// (btk / brk) at SMSGetAnmFrameRate() = 2 frames a 30 fps frame -- 60 animation frames a second (MActorAnmEach::setFrameCtrl), not 30 as 237 ran it.
 
 uniform sampler2D glow_tex : filter_linear_mipmap, repeat_enable;      // P_casino_glow2mm (I8)
 uniform sampler2D pattern_tex : filter_linear_mipmap, repeat_enable;   // B_crasicmario (RGB565)
 uniform vec2 glow_scale = vec2(10.0, 10.0);
 uniform vec2 glow_offset = vec2(0.0, -0.06);
-uniform float frame_rate = 30.0;
+uniform float frame_rate = 60.0;
 uniform float speed = 1.0;
 uniform float loop_frames = 600.0;
 uniform float switch_frame = 300.0;

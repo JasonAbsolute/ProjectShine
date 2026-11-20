@@ -266,6 +266,11 @@ public partial class SunshineCamera : Node3D
     public override void _Ready()
     {
         TopLevel = true;
+        // Going top-level bakes this node's CURRENT global transform into its own (Node3D::set_as_top_level), and his _Ready has not
+        // run yet: a spawner authored facing +X (the two secret courses) left this rig turned -90 deg, so the pivot's local yaw -- what
+        // Mario.cs rotates the stick by -- sat 90 deg off the eye's true bearing and the stick felt backwards (241). The rig itself
+        // never turns: Apply() places it and poses the pivot in world terms.
+        Rotation = Vector3.Zero;
         _target = GetNodeOrNull<Node3D>(TargetPath);
         _mario = _target as Mario;
         _armature = GetNodeOrNull<Node3D>(ArmaturePath);

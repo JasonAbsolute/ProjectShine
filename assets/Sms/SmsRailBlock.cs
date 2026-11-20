@@ -3,15 +3,18 @@ using Godot;
 
 /// <summary>
 /// SMS 237: the game's rail block (TRailBlock, MapObjRailBlock.cpp) -- the secret courses' tumbling blocks and rolling cubes. The block walks its rail
-/// node to node; each node carries the speed of the segment that reaches it (TRailNode mSpeed * 0.01 u per frame) and a turn (mPitch / mYaw / mRoll,
-/// degrees) the block performs OVER that segment, spread evenly along it (TRailBlock::control: the angle difference over the segment's frames). The
+/// node to node; each node carries the speed of the segment that reaches it (TRailNode mSpeed * 0.01 u per movement tick) and a turn (mPitch / mYaw /
+/// mRoll, degrees) the block performs OVER that segment, spread evenly along it (TRailBlock::control: the angle difference over the segment's ticks). The
 /// turn is about the WORLD axes: calcRootMatrix is RotRPH(the step so far) * (the turns already made), so a rail that says pitch 90 at every node rolls
 /// the block over and over about world X however it is standing (coro_ex2's railvariant1: 90 per 600 u on R1_1 and R1_2 -- R1_2's "270" is -90 the
 /// short way, MsAngleDiff -- and 100 per 800 u on R1_3, which leaves it 10 degrees off square each pass). coro_ex1's EXRollCube rails are closed
 /// rectangles: EXCube1 turns 34 then 56 at each corner, EXCube2 yaws 60 / 90 while it goes round, EXCube0 only slides.
 /// The route: a dead end sends it back the way it came and a closed loop carries it on (TGraphWeb::getShortestNextIndex: one connection = that one; two
 /// = the one it did not come from; at the start, with nowhere it came from, the NEAREST connected node, the lower index on a tie).
-/// The game's units are the knobs: nodes in u (74.44 to the metre) in the parent's frame, speeds in u per frame (30 a second), turns in degrees.
+/// The game's units are the knobs: nodes in u (74.44 to the metre) in the parent's frame, speeds in u per movement tick, turns in degrees. The tick
+/// (241): TMarDirector::direct runs four 5 ms simulation ticks a 30 fps frame (dt = 600 / 30 = 20) and performs the movement list on every one, and
+/// nothing gates a map object out of any of them (TViewObj::testPerform strips CUE_MOVE only for the CUE_MOVEMENT_GATE bits, which no object sets),
+/// so control() -- and the block's step -- runs 120 times a second. 237-240 stepped it 30 times a second: a quarter of the game's pace.
 /// </summary>
 [Tool]
 public partial class SmsRailBlock : AnimatableBody3D
@@ -22,7 +25,7 @@ public partial class SmsRailBlock : AnimatableBody3D
     /// <summary>Per node: the pitch (x), yaw (y) and roll (z) in degrees turned over the segment that ARRIVES at that node (TRailNode mPitch / mYaw / mRoll).</summary>
     [Export] public Vector3[] RailTurns = Array.Empty<Vector3>();
 
-    /// <summary>Per node: u per frame for the segment that arrives at that node (TRailNode mSpeed * 0.01). 0 = the game's default 2.0.</summary>
+    /// <summary>Per node: u per movement tick for the segment that arrives at that node (TRailNode mSpeed * 0.01). 0 = the game's default 2.0.</summary>
     [Export] public float[] RailSpeeds = Array.Empty<float>();
 
     /// <summary>The last node connects back to the first (the EXCube rails); off = a chain whose ends turn the block round (the R1 rails).</summary>
@@ -35,7 +38,8 @@ public partial class SmsRailBlock : AnimatableBody3D
     [Export] public int StartTowards = -1;
 
     [Export] public float UnitsPerMetre = 74.44f;
-    [Export] public float FramesPerSecond = 30f;
+    /// <summary>The game's movement ticks a second: a speed of 1 u a tick covers this many u a second (120: four ticks a 30 fps frame, none skipped).</summary>
+    [Export] public float TicksPerSecond = 120f;
 
     /// <summary>1 = the game's pace; a multiplier on every segment's speed.</summary>
     [Export] public float SpeedScale = 1f;
@@ -95,7 +99,7 @@ public partial class SmsRailBlock : AnimatableBody3D
         _segEnd = NodeMetres(_next);
         _segLen = (_segEnd - _segStart).Length();
         float u = _next < RailSpeeds.Length && RailSpeeds[_next] > 0f ? RailSpeeds[_next] : 2f;
-        _speed = u * FramesPerSecond / UnitsPerMetre * SpeedScale;
+        _speed = u * TicksPerSecond / UnitsPerMetre * SpeedScale;
         Vector3 t = _next < RailTurns.Length ? RailTurns[_next] : Vector3.Zero;
         _turn = new Vector3(Mathf.Wrap(t.X, -180f, 180f), Mathf.Wrap(t.Y, -180f, 180f), Mathf.Wrap(t.Z, -180f, 180f));   // MsAngleDiff: the short way
         _travelled = 0f;
