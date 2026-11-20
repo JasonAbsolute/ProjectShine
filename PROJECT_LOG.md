@@ -15424,3 +15424,35 @@ and the tasks deleted; the save file untouched.
 **Deviations:** the palm's leaves do not dip when landed on (his PalmLeaf.cs bends the per-leaf bones his own export had; the game's TMapObjTree sways
 them) -- the trunk and the crown are climbable and standable as the game's; the game's twelve per-leaf collision files are joint-space and are replaced
 by the leaves' own triangles.
+
+### 240 -- the SECRET COURSES, part 4: the palm's leaves DIP when Mario lands or stands on them, the game's way -- each of the twelve leaves is its own node on the crown joint the bmd gives it and swings about that joint's X on TMapObjTree's damped spring (new assets/Sms/Map/SmsPalmLeaves.cs: the touch impulse 0.001 rad every frame he is on it, the hip drop's 0.006, stiffness 0.01, damping 0.97, at 30 frames a second), its collision an AnimatableBody3D that turns with it (feature/kingboo-casino, code `adfef9f`)
+
+**Jaysonn** (from the 239 report's options): "Make the palm leaves dip when landed on."
+
+**The game** (MoveBG/MapObjTree.cpp). A palm's leaves are TMapObjLeaf entries, one per leaf joint (mLeafNum 12 for palmNormal: leaf i on joint 12 - i,
+its collision palmNormalLeaf%02d in the joint's frame, moved with it). touchPlayer: while Mario's ground plane is a leaf, that leaf's angular velocity
+takes mLeafTouchImpulse (0.001 rad) every frame, or mLeafHipDropImpulse (0.006) while he is hip-dropping. controlLeaf, every frame: angle += velocity;
+velocity -= angle x mLeafStiffness (0.01); velocity x= mLeafDamping (0.97); the joint's matrix = its rest x Rx(angle). Standing on a leaf sags it toward
+0.1 rad (5.7 degrees, the tip 0.67 m down on a 585-u leaf) with a 2.1-s swing; a hip drop kicks it 3-4 degrees further.
+
+**The model.** palmnormal.glb is rebuilt (gen_pieces239.py's GlbBuilder) as thirteen nodes under the import's root: Trunk, and Leaf01 .. Leaf12 each at
+the bmd's joint (JNT1: translation (0, 975, 0), rotation Ry(the heading: ha_12 -72.95, ha_11 23.49 ... ha_01 -156.03 degrees)) with the leaf's vertices
+re-expressed in that joint's frame (the leaf runs along its +Z, arching 23-305 u above the joint and 585 u out), so Rx(angle) on the node IS the game's
+dip. Every leaf vertex is wholly on its own joint in the rip, so the leaves are rigid as the game's.
+
+**The scene.** `assets/Sms/Map/PalmNormal.tscn`: the trunk body as 239; the single LeafBody becomes a "Leaves" Node3D at the crown (0, 13.10, 0) m
+carrying `SmsPalmLeaves.cs` and twelve AnimatableBody3D children (Leaf01 .. Leaf12, each turned to its heading, sync_to_physics, his leaf layer 4 /
+mask 0) whose ConcavePolygonShape3D is the leaf's own triangles in the joint's frame -- the collision rides the dip and carries Mario. The script joins
+each body to his "palm_leaf_body" group so Mario.cs's landing hook (ILeafBouncer on the body's parent) reaches Bounce: the leaf he landed on (his floor
+contact among the bodies, else the leaf whose heading faces him) takes the touch impulse, or the hip drop's when his state is a ground pound. Every
+1/30 s the spring steps all twelve leaves; with PushWhileStanding (on) the leaf under his floor contact (his slide collisions after MoveAndSlide) takes
+the touch impulse that step, as touchPlayer does; the body's and the model leaf node's bases are their rest x Rx(angle). Knobs on Leaves:
+TouchImpulse, HipDropImpulse, Stiffness, Damping (the game's palmNormal numbers), FramesPerSecond 30, PushWhileStanding.
+
+**Verified** (the layout drive's leaf test, deleted before the commit; windowed 1280 x 720: secrect_level loaded, Palm0's Leaves.Bounce called 30 times
+= 30 frames of standing, the crown shot from the side six times): Leaf01's body and its mesh node agree to 0.01 degree at every sample; the dip 4.9
+degrees at 0.1 s, 14.1 at 0.5 s (the peak of a 0.03 rad/frame start under 0.01 / 0.97), back through 3.4 at 1.0 s, -8.7 at 1.6 s (the overshoot), 4.5 at
+2.5 s, 1.8 at 5 s -- the game's 2.1-s swing decaying; the twelve bodies in the group, each heading its leaf. dotnet build 0 errors. No shared code
+touched (a new class only), so the arena drives were not re-run. The runner, the logs, the shots and the tasks deleted; the save file untouched.
+
+**Deviations:** none in the mechanism; the game's per-leaf collision quads (joint-space) are replaced by each leaf's own triangles on the same joint.
