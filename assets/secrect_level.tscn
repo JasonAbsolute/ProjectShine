@@ -15,7 +15,7 @@
 [ext_resource type="PackedScene" path="res://assets/Sms/Sky/SkyHillsideSecret.tscn" id="13_skyhillside"]
 [ext_resource type="PackedScene" uid="uid://3i321r0h4sxx" path="res://1_up_mushroom.tscn" id="14_oneup"]
 [ext_resource type="PackedScene" uid="uid://b54pc5peh00fe" path="res://assets/StartingPlatform.tscn" id="15_skyisland"]
-[ext_resource type="PackedScene" uid="uid://b2xoduhv2twiv" path="res://Font/HudElements/PalmTree.tscn" id="16_palm"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Map/PalmNormal.tscn" id="16_palm"]
 [ext_resource type="PackedScene" uid="uid://dy7wq3fjb5owj" path="res://banana_tree.tscn" id="17_bananatree"]
 [ext_resource type="PackedScene" uid="uid://75n8tcdc68kl" path="res://normal_block.tscn" id="18_normalblock"]
 [ext_resource type="PackedScene" uid="uid://cr166pmwl5j31" path="res://StarPlatform.tscn" id="19_normalvariant0"]
@@ -291,10 +291,10 @@ motion_mode = 1
 transform = Transform3D(0, 0, -3.409414, 0, 3.409414, 0, 5.114121, 0, 0, -79.25846, 45.67437, 2.686728)
 
 [node name="Palm0" parent="." instance=ExtResource("16_palm")]
-transform = Transform3D(0, 0, 0.7550007, 0, 0.7550007, 0, -0.7550007, 0, 0, -79.25846, 45.67437, -5.373455)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -79.25846, 45.67437, -5.373455)
 
 [node name="Palm1" parent="." instance=ExtResource("16_palm")]
-transform = Transform3D(0, 0, 0.7550007, 0, 0.7550007, 0, -0.7550007, 0, 0, -79.25846, 45.67437, 10.74691)
+transform = Transform3D(0, 0, 1, 0, 1, 0, -1, 0, 0, -79.25846, 45.67437, 10.74691)
 
 [node name="BananaTree" parent="." instance=ExtResource("17_bananatree")]
 transform = Transform3D(0.1351473, 0, 0, 0, 0.1351473, 0, 0, 0, 0.1351473, 174.6373, 68.51155, 2.686728)
