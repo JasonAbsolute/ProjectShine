@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240), updated 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240 + 241), updated 2026-11-20 04:19 PST -- was 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1801,10 +1801,17 @@ camera with their btk / brk in shaders (assets/Sms/Sky/*, models/Sms/Sky/*). SMS
 is the game's NormalBlock glb with its vertex colours, models/Sms/Map/normalblock/) and its palms the game's palmNormal (assets/Sms/Map/PalmNormal.tscn,
 models/Sms/Map/palmnormal/: the trunk, the stand-on quad and the leaves as collision, his PalmTreeGrab climb zone). SMS 240: the palm's leaves DIP when
 Mario lands or stands on them the game's way (TMapObjTree's spring on each leaf's crown joint; assets/Sms/Map/SmsPalmLeaves.cs, PalmNormal.tscn, the
-glb rebuilt with a node per leaf). NOT yet playtested by Jaysonn: push the branch so
+glb rebuilt with a node per leaf). SMS 241: Mario's stick no longer backwards in a level whose spawner is turned (the camera rig no longer
+inherits the spawner's yaw when it goes top-level; assets/SunshineCamera.cs), the Secret Course theme in both courses from the pan's first frame
+(assets/Sms/Sound/SmsStageMusic.cs, Music/MSD_BGM_EXTRA.wav, the table row), and the courses at the game's clocks -- every mover four times
+237-240's pace (the director's 120 movement ticks a second), the pans and skies at 60 animation frames a second (gen_level237.py's scenes,
+SmsRailBlock.cs, SmsPalmLeaves.cs, the two sky shaders). NOT yet playtested by Jaysonn: push the branch so
 it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `adfef9f` ("SMS 240: the palm's leaves DIP when Mario lands or stands on them, the game's way ...";
+- Branch `feature/kingboo-casino` -- code tip `bd2bc4a` ("SMS 241: the secret courses at the GAME'S CLOCKS, with the GAME'S MUSIC, and Mario's stick no longer
+  backwards ..."; assets/SunshineCamera.cs, assets/Sms/Sound/SmsStageMusic.cs, Music/MSD_BGM_EXTRA.wav, SmsMarioSoundTable.cs, assets/Sms/SmsRailBlock.cs,
+  assets/Sms/Map/SmsPalmLeaves.cs, assets/Sms/Sky/SmsSkyRiccoSecret.gdshader, SmsSkyHillsideSecret.gdshader, assets/secrect_level.tscn,
+  Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) on 240's log commit (`15b5721`) on the 240 commit (`adfef9f`, "SMS 240: the palm's leaves DIP when Mario lands or stands on them, the game's way ...";
   assets/Sms/Map/SmsPalmLeaves.cs, PalmNormal.tscn, models/Sms/Map/palmnormal/palmnormal.glb) on 239's log commit (`4936ea6`) on the 239 commit (`077f0bc`,
   "SMS 239: the Hillside Cave Secret's lift cubes ORANGE like the game's and its palms the game's own
   palmNormal ..."; normal_block.tscn, assets/secrect_level.tscn, assets/Sms/Map/PalmNormal.tscn, models/Sms/Map/normalblock/*, models/Sms/Map/palmnormal/*)
@@ -1834,7 +1841,8 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 27 commits since `main`. New files (240): assets/Sms/Map/SmsPalmLeaves.cs (+ .uid). New files (239): assets/Sms/Map/PalmNormal.tscn,
+  the branch tip is this file's own commit on top of them; 29 commits since `main`. New files (241): assets/Sms/Sound/SmsStageMusic.cs (+ .uid),
+  assets/Sms/Sound/Music/MSD_BGM_EXTRA.wav (+ .import). New files (240): assets/Sms/Map/SmsPalmLeaves.cs (+ .uid). New files (239): assets/Sms/Map/PalmNormal.tscn,
   models/Sms/Map/normalblock/normalblock.glb + normalblock.png, models/Sms/Map/palmnormal/palmnormal.glb + palmnormal.png (+ their .import). No new files in 233 / 233b / 233c / 233d / 234 / 235 / 236.
   New files (237 / 238): assets/Sms/SmsRailBlock.cs (+ .uid); assets/Sms/Sky/SmsSkyRiccoSecret.gdshader and SmsSkyHillsideSecret.gdshader (+ .uid),
   SkyRiccoSecret.tscn, SkyHillsideSecret.tscn, RiccoSecretSky_VRsph.tres, the nine HillsideSecretSky_*.tres; models/Sms/Sky/RiccoSecret/
@@ -1843,6 +1851,11 @@ passes re-point this entry's tip.
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 241: play either course (press the editor's Build first: the C# changed). The Secret Course theme starts with the pan and runs on; after
+  the pan (8 s now) push the stick up and Mario goes away from the camera; the lifts, the tumbling blocks, the rolling cubes and the spinning bars
+  move at the game's pace (four times what they did). Knobs: the Music node on each level (Play On Load, Actor Sound Level; SmsActorSound.Music /
+  MusicDb as for the boss themes); Ticks Per Second on a rail block (120) and on a palm's Leaves (120, Touch Every Ticks 4); frame_rate on the sky
+  materials (60).
 - To try 240: in assets/secrect_level.tscn climb a palm (push into the trunk) and drop onto a leaf, or ground-pound one: the leaf sags under you and
   swings back over a couple of seconds, carrying you with it; stand still on it and it settles a little lower. Knobs on the palm's Leaves node
   (Touch Impulse, Hip Drop Impulse, Stiffness, Damping, Push While Standing) default to the game's. Press the editor's Build first: the C# changed.

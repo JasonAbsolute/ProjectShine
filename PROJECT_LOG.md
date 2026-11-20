@@ -15456,3 +15456,57 @@ degrees at 0.1 s, 14.1 at 0.5 s (the peak of a 0.03 rad/frame start under 0.01 /
 touched (a new class only), so the arena drives were not re-run. The runner, the logs, the shots and the tasks deleted; the save file untouched.
 
 **Deviations:** none in the mechanism; the game's per-leaf collision quads (joint-space) are replaced by each leaf's own triangles on the same joint.
+
+### 241 -- the SECRET COURSES, part 5: the courses at the GAME'S CLOCKS, with the GAME'S MUSIC, and Mario's stick no longer backwards -- the camera rig no longer inherits the spawner's -90-degree yaw when it goes top-level (SunshineCamera.cs), so the stick turns by the eye's true bearing; the Secret Course theme (MSD_BGM_EXTRA, k_ex.com) plays from the pan's first frame on into the course (new assets/Sms/Sound/SmsStageMusic.cs + Music/MSD_BGM_EXTRA.wav); every map object steps 120 times a second as the game's director performs it -- four times 237-240's pace -- and the pans and skies run at the game's 60 animation frames a second (feature/kingboo-casino, code `bd2bc4a`)
+
+**Jaysonn** (after 240): "marios controls feel backwards on each one. and can you include the music, the blocks are also seemingly slow."
+
+**The controls.** Mario.cs turns the stick by the body's basis and then by `springArmPivot.Rotation.Y`, the pivot's LOCAL yaw under CamController;
+`SunshineCamera.Apply` poses the pivot in WORLD terms. They agree only while CamController itself has no rotation -- and `SunshineCamera._Ready` sets
+`TopLevel = true` before Mario's own `_Ready` has zeroed his root, and Godot's `set_as_top_level` bakes the node's CURRENT global transform into its
+own: in a level whose PlayerSpawner is authored facing +X (both secret courses: the game's start) the rig came out turned -90 degrees for good, the
+pivot's local yaw sat 90 degrees off its global one, and stick-up sent Mario along -Z while the camera looked down +X (the controls test: pivot local
+yaw 0, global -90, CamController rotation (0, -1.5708, 0); 2 s of stick-up moved him (-2.39, 0, -5.12) against a camera forward of (0.87, -0.50, 0)).
+The fix: `_Ready` zeroes the rig's Rotation right after TopLevel (the rig never turns -- Apply places it and poses the pivot in world terms). No knob.
+
+**The music** (System/MSoundMainSide.cpp, `MSMainProc::setMSoundEnterStage`). Every secret course -- stages 46-51, coro_ex0-5; the Hillside Cave Secret is
+47 (coro_ex1), the Secret of Ricco Tower 48 (coro_ex2) -- has demoBgm = stageBgm = MSD_BGM_EXTRA with flags 0: `startStageEntranceDemo` starts it as
+the start camera's pan begins, the pan's end neither stops nor fades it, and `startStageBGM` does not start it again when Mario takes control -- the one
+play carries on into the course. MSD_BGM_EXTRA is k_ex.com in the game's own table (the decomp's enum names sit one lower than the game's ids
+throughout: its MSD_BGM_DELFINO in those cases IS the game's EXTRA -- 156's off-by-one again). Rendered as the other BGMs (`sms_bgm.py`: 3112 notes on
+the game's instruments, tempo 210 x timebase 120): a 6.84-s intro then an 82.29-s loop, two cycles in the file, the loop in the WAV's smpl chunk
+(2851962-5485104 at 32 kHz), 171.4 s; `level225.py` put it on MSD_BGM_BOSS's normalisation (x0.7281 of the raw mix; the peak -4.76 dBFS) and its row
+joins `SmsMarioSoundTable.Sounds` (volume 100 of 127, loop, id 0x80010012), so it plays at MusicDb -4 + the table's -2.08 = -6.08 dB on the Music bus
+like the boss themes. NEW `assets/Sms/Sound/SmsStageMusic.cs` on an AudioStreamPlayer: the Music bus, the slot level (ActorSoundLevel off = the
+node's own volume_db), Play() at _Ready unless SmsActorSound.Music is off (PlayOnLoad). The miss, the game over and the shine get already cut every
+playing Music-bus player (213's StopAllMusic) and the stage reloads after a miss, so the theme starts over with the course. Both level scenes gain
+the Music node (gen_level237.py).
+
+**The clocks** (System/MarDirectorDirect.cpp, `TMarDirector::direct`). The game's frame is 30 a second and direct() runs dt = 600 / 30 = 20 of
+simulation time per frame in 5-ms ticks: FOUR a frame, 120 a second, the movement list (CUE_MOVE) performed on EVERY tick, CUE_CALC_ANIM on the last.
+The CUE_MOVEMENT_GATE bits that would let an object skip ticks are set by no object in the game, so `TLiveActor::perform -> moveObject -> control`
+runs 120 times a second for every map object: TNormalLift adds its rail speed (yaw x 0.01 u) to mPositionDelta and counts its wait (pitch) down once
+per control; TRailBlock / TRollBlock likewise; TMapObjTree steps its leaf springs on every CUE_MOVE. Only the actor hit check is once a frame
+(`checkActorsHit` when mMoveTickCount & 3 == 0, `clearHitNum` otherwise), so the leaf's standing push lands on one tick in four. Animations:
+`MActorAnmEach::setFrameCtrl` sets every bck / btk / brk to SMSGetAnmFrameRate() = 2 frames per 30 fps frame -- 60 a second; the start camera's bck
+advances by that once a frame (`TCameraBck::updateDemo`; its demo frame count is (end + 1) x 2 at the 120 Hz tick). 237-240 took every one of these
+for 30 a second: the movers at a quarter of the game's pace, the leaves' swing four times too slow, each pan twice too long (16 s), the skies at half
+speed. Now: `gen_level237.py` TICKS = 120 for every rail speed, wait and spin it writes, ANM_FPS = 60 for the start camera's keys -- Hillside's lifts
+1.61-6.45 m/s (yaw 100-400) with 0.08-0.83-s waits (were 0.40-1.61 m/s, 0.33-3.3 s), its star lifts 0.64 m/s, its RollStar spins 48 deg/s, Ricco's
+umaibou 24-42 deg/s, the pans 7.97 s; `SmsRailBlock.cs` FramesPerSecond 30 -> TicksPerSecond 120 (the EX cubes' 4-10 u a tick = 6.4-16.1 m/s, the
+R1 blocks' 1-1.4 u = 1.6-2.3 m/s); `SmsPalmLeaves.cs` TicksPerSecond 120 for the spring (an accumulator over the physics step) and TouchEveryTicks 4
+for the standing push -- a stood-on leaf sags to 1.4 degrees with a 0.5-s swing, a hip drop's kick rings out in a second; the two sky shaders'
+frame_rate 30 -> 60.
+
+**Verified** (the layout runner's controls test on the committed scenes and build, windowed 1280 x 720, both courses): after the 7.97-s pan Mario stands
+at the game's start facing +X, the camera 9.2 m behind him looking +X, pivot local yaw -90 = global -90, CamController rotation (0, 0, 0); 2 s of
+stick-up moves him (3.79, 0, 0.25) -- 3.79 m along the camera's forward: CTRL PASS on both. The music playing from the pan's first frames (-6.08 dB,
+bus Music) and still 9.9 s on, the stream 171.4 s, loop mode Forward 2851962-5485104. The movers against the wall clock over 0.62 s: Ricco's
+Umaibou0 29.9 deg/s (30), RailBlock0 1.93 m/s turning 21.6 deg/s; Hillside's RollStar0 47.9 deg/s (48), StarLift0 0.64 m/s, RollCube0 6.3 m/s along
+its path (4 u a tick), the lifts 1.65-1.74 m/s net of their 0.5-s waits (3.22 while moving). The course shots of both rounds as 237-240's. The
+regression drive 68 / 68 (run gj) and the Shine HUD drive 8 / 8 (run ar) on the build with the camera change; dotnet build 0 errors, the clean
+rebuild 0 errors. The runner, the drive, the logs, the shots and the tasks deleted; the save file untouched.
+
+**Deviations:** Godot's physics runs at 60 Hz, so the movers' per-tick steps are integrated as speeds (the same distance a second) rather than 120
+discrete steps; the leaves' spring does step 120 times a second. Mario's landing push on a leaf lands the frame he lands rather than on the next
+hit-check tick. The game lets START / A / B skip the start camera's pan outside Delfino Plaza; his Level.cs plays it through (as before).
