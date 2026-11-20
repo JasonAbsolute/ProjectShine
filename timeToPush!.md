@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238), updated 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239), updated 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1797,10 +1797,14 @@ them out and under the game's own skies -- the Secret of Ricco Tower (Levels/Ric
 (assets/secrect_level.tscn): every piece at the disc's scene.bin position / rotation / scale with his piece scenes scaled to the game's model sizes, the
 lifts and stairs on their scene.ral rails (his MovingPlatform), the umaibou and stars spinning at the game's rates, the rail blocks and EX cubes on the
 new assets/Sms/SmsRailBlock.cs (the game's TRailBlock), the intro pans the game's startcamera.bck, the skies the game's sky.bmd domes riding with the
-camera with their btk / brk in shaders (assets/Sms/Sky/*, models/Sms/Sky/*). NOT yet playtested by Jaysonn: push the branch so
+camera with their btk / brk in shaders (assets/Sms/Sky/*, models/Sms/Sky/*). SMS 239: Hillside's lift cubes orange like the game's (normal_block.tscn's mesh
+is the game's NormalBlock glb with its vertex colours, models/Sms/Map/normalblock/) and its palms the game's palmNormal (assets/Sms/Map/PalmNormal.tscn,
+models/Sms/Map/palmnormal/: the trunk, the stand-on quad and the leaves as collision, his PalmTreeGrab climb zone). NOT yet playtested by Jaysonn: push the branch so
 it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `cde8cf0` ("SMS 238: the Hillside Cave Secret (secrect_level.tscn) laid out as the game lays it out and under
+- Branch `feature/kingboo-casino` -- code tip `077f0bc` ("SMS 239: the Hillside Cave Secret's lift cubes ORANGE like the game's and its palms the game's own
+  palmNormal ..."; normal_block.tscn, assets/secrect_level.tscn, assets/Sms/Map/PalmNormal.tscn, models/Sms/Map/normalblock/*, models/Sms/Map/palmnormal/*)
+  on 237 + 238's log commit (`7ade9a8`) on the 238 commit (`cde8cf0`, "SMS 238: the Hillside Cave Secret (secrect_level.tscn) laid out as the game lays it out and under
   the game's own sky ..."; assets/secrect_level.tscn, assets/Sms/Sky/SmsSkyHillsideSecret.gdshader, SkyHillsideSecret.tscn, HillsideSecretSky_*.tres,
   models/Sms/Sky/HillsideSecret/*) on the 237 commit (`cfd6c07`, "SMS 237: the Secret of Ricco Tower (Rico4Secret.tscn) laid out as the game lays it out
   and under the game's own sky ..."; Levels/Rico4Secrect/Skybox/Rico4Secret.tscn, assets/Sms/SmsRailBlock.cs, assets/Sms/Sky/SmsSkyRiccoSecret.gdshader,
@@ -1826,7 +1830,8 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 23 commits since `main`. No new files in 233 / 233b / 233c / 233d / 234 / 235 / 236.
+  the branch tip is this file's own commit on top of them; 25 commits since `main`. New files (239): assets/Sms/Map/PalmNormal.tscn,
+  models/Sms/Map/normalblock/normalblock.glb + normalblock.png, models/Sms/Map/palmnormal/palmnormal.glb + palmnormal.png (+ their .import). No new files in 233 / 233b / 233c / 233d / 234 / 235 / 236.
   New files (237 / 238): assets/Sms/SmsRailBlock.cs (+ .uid); assets/Sms/Sky/SmsSkyRiccoSecret.gdshader and SmsSkyHillsideSecret.gdshader (+ .uid),
   SkyRiccoSecret.tscn, SkyHillsideSecret.tscn, RiccoSecretSky_VRsph.tres, the nine HillsideSecretSky_*.tres; models/Sms/Sky/RiccoSecret/
   sky_ricco_secret.glb, P_casino_glow2mm.png, B_crasicmario.png and models/Sms/Sky/HillsideSecret/sky_hillside_secret.glb, B_sters.png, B_sunsetgrade.png,
@@ -1834,6 +1839,8 @@ passes re-point this entry's tip.
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 239: play assets/secrect_level.tscn -- the lift cubes are orange with pale frames (the game's colours) and the two palms on the island are the
+  game's own: climb one (push into the trunk) and stand in its crown; the leaves hold you but do not dip (your PalmTree.tscn is untouched for other levels).
 - To try 237 / 238: open Levels/Rico4Secrect/Skybox/Rico4Secret.tscn or assets/secrect_level.tscn and play it (press the editor's Build first: the C# changed).
   Each course is the game's: the intro is the game's start camera (16 s, skippable), you drop onto the island facing the course, and every piece is
   where the game puts it at the game's size -- Ricco: the sticks turning slowly (the game's 7.5-10.5 degrees a second), the two blue walls with the

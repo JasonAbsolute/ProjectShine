@@ -15395,3 +15395,32 @@ the shots and the tasks deleted; the save file untouched.
 **Knobs:** the sky shader's speed / brightness and each material's colours; SmsRailBlock's rail numbers and SpeedScale; every lift's MoveSpeed / WaitTime
 (the rails'). **Deviations:** the palms are his PalmTree at the game's height; his 1-up and Shine sprite keep his sizes; his lift cubes keep his gold
 texture (the game's NormalBlock is orange); the board NPC and the 100-coin Shine are not placed; his papaya is gone.
+
+### 239 -- the SECRET COURSES, part 3: the Hillside Cave Secret's lift cubes ORANGE like the game's and its palms the game's own palmNormal -- normal_block.tscn's mesh is the rip's NormalBlock.bmd glb with the game's vertex colours (the inset panels (188, 37, 0), the frame (255, 170, 42)) that the TEV multiplies into the gold sheet, which his Blender re-export had lost; the new assets/Sms/Map/PalmNormal.tscn is the game's palm with the trunk, the game's stand-on quad and the leaves as collision and his PalmTreeGrab climb zone (feature/kingboo-casino, code `077f0bc`)
+
+**Jaysonn** (from the 238 report's options): "Make the lift cubes orange like the game, Import the game's palm for Hillside."
+
+**The cubes.** The game's NormalBlock.bmd material (_o3, the rip's shader read back) draws the gold sheet B_nomalBlock2 x the VERTEX COLOUR (plus a lit
+second channel): the inset panels carry (188, 37, 0) and the frame (255, 170, 42), so the cubes come out orange with a pale frame. His normalBlock.glb
+(a Blender re-export) has every vertex colour white -- his material's vertex_color_use_as_albedo had nothing to multiply, and the cubes showed the bare
+gold sheet. `normal_block.tscn` keeps his root (the AnimatableBody3D, MovingPlatform.cs, his collision box, the uid) and swaps the skeleton_root mesh
+for an instance of models/Sms/Map/normalblock/normalblock.glb (the rip's model cleaned to one unskinned mesh, 200 u, at his 0.0250049 so every
+placement's scale holds) with one StandardMaterial3D: the game's sheet, the vertex colours (sRGB), roughness 0.5 as his. Only secrect_level.tscn
+uses the piece.
+
+**The palms.** models/Sms/Map/palmnormal/palmnormal.glb is the rip's palmNormal.bmd (the trunk and twelve leaves, 1290 u, vertex-coloured, the
+leaf sheet alpha-cut at 0.5 as its TEV discards), cleaned to one unskinned mesh. `assets/Sms/Map/PalmNormal.tscn` (new, gen_pieces239.py): a
+metre-space root; the model at 1/74.44 with one material (the sheet x the vertex colours, alpha scissor 0.5, both faces); TrunkBody = a trimesh of
+the trunk's 122 triangles plus the game's own stand-on quad from palmnormal.col (an SMS .col: vertex count / offset, group count / offset; a 150-u
+square at 1118 u = 15.0 m, where the game lets Mario stand in the crown); LeafBody = the leaves' 516 triangles, both faces, on his leaf layer
+(collision_layer 4, mask 0, as his PalmTree); GrabZone = his PalmTreeGrab.cs with the trunk's own numbers (TrunkTopY 14.13 m, LeafLandY 15.02 m,
+TrunkRadiusBottom 1.30 + 0.5 m, TrunkRadiusTop 0.78 + 0.5 m, a cylinder the trunk's height). secrect_level.tscn's two palms are this scene at the
+game's placement (rot Y 90, scale 1); his PalmTree.tscn is untouched (nothing else in the course used it).
+
+**Verified** (the layout shot drive, deleted before the commit; windowed 1280 x 720): the lift grid orange with pale frames -- the disc screenshot's --
+and the two palms on the island with the game's splayed crowns. No C# changed (the arena drives were not re-run). The runner, the logs, the shots
+and the tasks deleted; the save file untouched.
+
+**Deviations:** the palm's leaves do not dip when landed on (his PalmLeaf.cs bends the per-leaf bones his own export had; the game's TMapObjTree sways
+them) -- the trunk and the crown are climbable and standable as the game's; the game's twelve per-leaf collision files are joint-space and are replaced
+by the leaves' own triangles.
