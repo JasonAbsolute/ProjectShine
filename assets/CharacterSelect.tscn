@@ -39,6 +39,7 @@ Characters = [ExtResource("2_mario"), ExtResource("3_luigi"), ExtResource("5_pia
 PosterScene = ExtResource("51_poster")
 SelectHandPath = NodePath("SelectHand")
 SelectHandGap = 16.0
+LevelToLoad = "res://assets/LevelSelect.tscn"
 
 [node name="Background" type="TextureRect" parent="." unique_id=150886938]
 layout_mode = 1

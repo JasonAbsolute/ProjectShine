@@ -100,6 +100,9 @@ public partial class GameData : Node
     /// <summary>SMS pass 157: the stage King Boo's rematch was entered from (the casino's scene path, SmsRematchExit) -- for the arena and a way back;
     /// null = the arena was opened on its own. Not saved -- the run's.</summary>
     public string RematchFrom;
+    /// <summary>SMS 242: the Level Select screen the current level was picked on (its scene path) -- the level's way back: a Shine's exit and
+    /// the pause menu's Exit Area return to it when they have no destination of their own. Null = the level was run on its own. Not saved -- the run's.</summary>
+    public string LevelSelectScene;
 
     /// <summary>The card save's write (TFlagManager::saveSuccess): the pause menu's SAVE, a shine's "Save and ...", a blue coin's "Save and Continue".</summary>
     public void SaveNow() => Save();

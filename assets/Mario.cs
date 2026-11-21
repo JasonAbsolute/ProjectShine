@@ -20401,6 +20401,7 @@ public partial class Mario : CharacterBody3D
         {
             string dest = SmsReturnSpot.ScenePath(shine.ExitScene);   // 119b: the editor saves the File export as uid://, resolved to the path
             if (dest == "") dest = SmsReturnSpot.ScenePath(SmsFluddModel.FindChild<SmsPauseMenu>(this)?.ExitAreaScene);
+            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelSelectScene);   // 242: the Level Select he picked this level on stands in for the stage he would return to
             if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s behind the white: moveStage -> {(dest != "" ? dest : "this level again (the Plaza's decideNextStage)")}");
             EmitSignal(SignalName.SmsShineGetExit, dest);
             if (GameData.Instance != null)

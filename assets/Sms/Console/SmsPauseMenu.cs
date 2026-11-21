@@ -81,6 +81,9 @@ public partial class SmsPauseMenu : CanvasLayer
     [Export] public string PauseAction = "button_start";
     /// <summary>Where EXIT AREA goes. Empty: the item is hidden and the menu has two entries, as in the game's plaza.</summary>
     [Export] public string ExitAreaScene = "";
+    /// <summary>242: where EXIT AREA goes -- the scene's own ExitAreaScene, else the Level Select this level was picked on (GameData.LevelSelectScene);
+    /// "" = no EXIT AREA item, as Delfino Plaza's menu.</summary>
+    public string ExitAreaTarget => ExitAreaScene != "" ? ExitAreaScene : (GameData.Instance?.LevelSelectScene ?? "");
     /// <summary>1 = the blo's 480 lines on the window's height.</summary>
     [Export] public float Size = 1.0f;
     [Export] public AudioStreamPlayer PauseOn, CursorMove, NotNow;
@@ -139,7 +142,7 @@ public partial class SmsPauseMenu : CanvasLayer
         _firstItemRot = Items.Length > 0 ? Items[0].Rotation : 0f;
         _maskAlpha = Mask != null ? Mask.Color.A : 180f / 255f;
         _barAlpha = Stage != null ? Stage.Modulate.A : 1f;
-        _numItems = ExitAreaScene == "" ? 2 : 3; // Delfino Plaza's menu has no EXIT AREA
+        _numItems = ExitAreaTarget == "" ? 2 : 3; // Delfino Plaza's menu has no EXIT AREA
         if (!InputMap.HasAction(PauseAction))
         {
             InputMap.AddAction(PauseAction);
@@ -570,7 +573,7 @@ public partial class SmsPauseMenu : CanvasLayer
         if (Mask != null) Mask.Visible = false;
         GetTree().Paused = false;
         SmsHudLayer.Current?.Standard?.PauseOut(); // the director's resume: the console's pauseOut
-        if (_confirmed && _selected == 2 && ExitAreaScene != "")
+        if (_confirmed && _selected == 2 && ExitAreaTarget != "")
         {
             SmsFader.Current?.StartWipe(SmsFader.Wipe.Circle, 0f); // unkE4 = 2: the iris
             _leaving = true;
@@ -592,7 +595,7 @@ public partial class SmsPauseMenu : CanvasLayer
                 GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
                 GameData.Instance.ReturnWithShine = false;
             }
-            GetTree().ChangeSceneToFile(ExitAreaScene);
+            GetTree().ChangeSceneToFile(SmsReturnSpot.ScenePath(ExitAreaTarget));
         }
     }
 }
