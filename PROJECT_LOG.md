@@ -15510,3 +15510,57 @@ rebuild 0 errors. The runner, the drive, the logs, the shots and the tasks delet
 **Deviations:** Godot's physics runs at 60 Hz, so the movers' per-tick steps are integrated as speeds (the same distance a second) rather than 120
 discrete steps; the leaves' spring does step 120 times a second. Mario's landing push on a leaf lands the frame he lands rather than on the next
 hit-check tick. The game lets START / A / B skip the start camera's pan outside Delfino Plaza; his Level.cs plays it through (as before).
+
+### 242 -- a LEVEL SELECT screen in place of a hub: the Player Select screen again, for levels -- his CharacterSelect.tscn's layout node for node with his CharacterPoster as each level's WANTED poster (the level's picture, its arched name, a Shine stamped on at the pick), the Player Select's pick leading to it, and every level's way back running to it (a Shine's exit and the pause menu's Exit Area with no destination of their own; the two courses' Shines outright) (feature/kingboo-casino, code `9b1e3e4`)
+
+**Jaysonn** (after 241): "ok instead for the hub lets just make a level select like the char select screen"; of the first preview (the raw poster art on a
+blank sheet): "no i said make it like the char select scene this looks nothing like it".
+
+**The screen.** `assets/LevelSelect.tscn` is generated (`tools/projectshine/rematch157/select242/gen_select242.py`) from his `assets/CharacterSelect.tscn`:
+the same Background, the same eight Decor pieces at his offsets, rotations and scales (the six that snap-rotate on his SnapRotate.cs with his angles and
+holds, the left sun with his ArtGradient material), the Title strip with "Level Select" where his reads "Player Select", the Portraits HBoxContainer, the
+SelectHand and the FadeOut rect, all by the shared pieces' own uids. `LevelSelect.cs` is CharacterSelect.cs's flow for levels: one of his CharacterPosters
+per `LevelEntry` (the poster's SetEntry takes a CharacterEntry, so the level's picture goes where the head goes, its name art above, its stamp and colour
+with it), the hand centred under the focused poster, ui_accept -> `GameData.LevelSelectScene` = this scene, the stamp painted (PlayStamp + Stamp Hold
+Seconds), the fade to black, the level; ui_cancel -> the fade, then Back Scene (the Player Select). The arrival fades in from what the way here left on the
+screen: `GameData.FadeInFrom` if a screen set it, the Shine demo's (210, 210, 210) after a Shine's exit (ReturnWithShine), else black; `ReturnFromScene`
+puts the hand on the level just left and is then used up (the next level starts plain, not at 119's return spot). `LevelEntry` (new, a Resource:
+DisplayName, ScenePath, Art, NameArt, Portrait, StrokeArt, PaintColor, Unlocked): adding a level is a .tres under `assets/levels/` and a line in the
+Levels array -- four for the demo: Ricco Tower (`Levels/Rico4Secrect/Skybox/Rico4Secret.tscn`), Hillside Cave (`assets/secrect_level.tscn`), King Boo
+(`assets/Level.tscn`), Rematch (`assets/Sms/Rematch/RematchArena.tscn`).
+
+**The way in and back.** CharacterSelect.tscn's `LevelToLoad` = the Level Select (pick the character, then the level). `GameData.LevelSelectScene` (new,
+the run's, not saved) is set on a pick; Mario.cs's `SmsShineGetFinish` takes it as the Shine exit's last fallback before "this level again" (after the
+shine's own ExitScene and the pause menu's ExitAreaScene); SmsPauseMenu's `ExitAreaTarget` (new) is ExitAreaScene when the scene names one, else
+LevelSelectScene -- EXIT AREA shows and goes there (the third item only when there is somewhere to go, as the Plaza's menu). The two courses' ShineSprite2
+get `ExitLevel` = true, `ExitScene` = the Level Select (Hillside's had no exit; Ricco's went to assets/Level.tscn). His other scenes are untouched: they
+reach the Level Select through the fallbacks.
+
+**The art** (`select242/gen_art242.py`, measured off his sheets). His title is the New Super Mario Font (Mario Party 9) from his Windows fonts -- the
+glyphs line up letter for letter -- with the letters stood 15 % taller than the font draws them (his 'e' 0.96 wide to its height, the font's 1.12), a fill
+from red (250, 40, 30) at a letter's top through orange (255, 108, 37) at its middle back to red at its bottom, a darkening toward every edge, a
+near-black outline 3.6 % of the cap height and a soft shadow (5.7 %, 5.4 %) down-right; his sheet keeps air above and below so the title shows at his size
+in the 92-px strip (the capitals' fill 0.535 of the sheet, the baseline 0.751 down) -- "Level Select" is rendered the same way. His MARIO / LUIGI /
+PIANTISSIMO are the same font in caps on an arc (the middle highest, each letter turned to it: 0.22 radians a letter, his MARIO's; at most 2.2, his
+PIANTISSIMO's), 20 % taller than the font, a pastel fill with a glossy bevel lit from the top-left, a black outline a ninth of the letter height running
+letter into letter, a soft shadow -- RICCO TOWER (sky blue), HILLSIDE CAVE (cube orange), KING BOO (casino violet) and REMATCH (arena red) get the same.
+The pictures are square crops of course shots. The stamp a level's poster takes is a Shine Sprite (`StrokeShine.png`, `bake_stroke_order.py`'s encoding for
+his PaintReveal: eight rays round a disc with the two eye holes, painted round from the top) in the Shine's yellow -- a character's poster takes its
+letter.
+
+**Verified** (a windowed GDScript runner driving the screen as a player would, 1280 x 720, four rounds): the screen loads with the hand under the first
+poster and the black clearing; two ui_right steps put the hand under the third (the focused poster swells as his do); ui_accept paints the Shine, fades
+and loads the level -- King Boo's (6.7 s) and the Ricco course (4.3 s) -- with LevelSelectScene set; coming back as a Shine's exit leaves it, the hand sits
+under the level just left and the fade clears from (0.82, 0.82, 0.82); ui_cancel fades and loads the Player Select. Shots of each step beside his Player
+Select: the same brick, posters, hand and decor, his title size and letter shapes (the first sheet showed at 1.4 x his size and in the font's own
+proportions; measured and re-made). Leaving King Boo's level for the Player Select logs two "Handle is not initialized" from Godot's own
+`ScriptManagerBridge.SwapGCHandleForType` (the RefCounted weak / strong handle swap on a wrapper the GC collected during that level's load) while
+CharacterSelect.tscn instantiates; the screen loads and plays; not seen leaving either course. Regression drive 68 / 68 (run gk), the Shine HUD drive
+8 / 8 (run as); dotnet build 0 errors, the clean rebuild 0 errors. The runner, the drive, the logs, the shots and the tasks deleted; the save untouched.
+
+**Knobs** (all default to the screen as built): on LevelSelect -- Levels, Stamp Hold Seconds 0.45, Fade Seconds 0.7, Arrive Fade Seconds 0.4, Arrive From,
+Shine Exit Color, Back Scene, Select Hand Gap 16; on each LevelEntry -- Display Name, Scene Path, Art, Name Art, Portrait (a whole pre-made poster), Stroke
+Art, Paint Color, Unlocked; on a level's pause menu -- Exit Area Scene (its own destination; empty = the Level Select).
+
+**Deviations:** the game has no level select (its hub is Delfino Plaza); this screen stands in for the starting room for the demo, at his word. The
+pictures are provisional course shots -- any Texture2D in an entry's Art slot replaces one.
