@@ -5,8 +5,10 @@ render_mode unshaded, blend_add, cull_disabled, depth_draw_never, skip_vertex_tr
 // TSunModel keeps the authored sun direction but moves it to 250000 game units from the camera.
 // BTK and BRK clocks run at 60 animation frames a second. All values below come from the disc files.
 uniform int mode = 0;
-uniform sampler2D tex0 : source_color, filter_linear_mipmap, repeat_enable;
-uniform sampler2D tex1 : source_color, filter_linear_mipmap, repeat_enable;
+// 243b: the sheets are sampled RAW (no source_color) -- the maths stays in the game's own colour space and is decoded to linear once at the end
+// (the pow 2.2 below), as every other secret sky does; with source_color the sunset's gradients were decoded twice and came out dark and oversaturated.
+uniform sampler2D tex0 : filter_linear_mipmap, repeat_enable;
+uniform sampler2D tex1 : filter_linear_mipmap, repeat_enable;
 uniform vec3 camera_offset = vec3(0.0);
 uniform vec2 scale0 = vec2(1.0);
 uniform vec2 scale1 = vec2(1.0);
