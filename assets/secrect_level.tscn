@@ -488,6 +488,7 @@ transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, 34.92746
 
 [node name="Nail1" parent="." instance=ExtResource("25_kugi")]
 transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, -10.74691, 68.51155, 8.060183)
+ItemToSpawn = ExtResource("16_oneup")
 
 [node name="Nail2" parent="." instance=ExtResource("25_kugi")]
 transform = Transform3D(1.068264, 0, 0, 0, 1.068264, 0, 0, 0, 1.068264, -10.74691, 68.51155, -2.686728)

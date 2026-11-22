@@ -140,6 +140,7 @@ public partial class SmsActorSound : Node3D
         ["SmsFireballs"] = "fireballs", ["SmsGhostBreath"] = "breath", ["SmsGhostLightning"] = "lightning", ["SmsGhostWind"] = "wind",
         ["SmsBoolossus"] = "boolossus", ["SmsIceBlock"] = "iceblock", ["SmsBooCircle"] = "boocircle", ["SmsBooVolley"] = "volley",
         ["ShineSprite"] = "shine",                                            // 220: the Shine -- its appear (the chime and the fanfare), its hum while it is out, the chime at the touch
+        ["Nail"] = "nail",                                                   // 248: the ground-poundable nail -- Play(se) by name (MSD_SE_OBJ_KUGI_IMPACT at each hit); no slot table
     };
     /// <summary>The script's sound slots and the game sound each stands for (the slot names are the species' own exports).</summary>
     private static readonly Dictionary<string, (string slot, string se)[]> Fill = new()
