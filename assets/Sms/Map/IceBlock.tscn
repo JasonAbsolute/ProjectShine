@@ -1,0 +1,22 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Map/SmsBreakBlock.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Sms/Map/iceblock/iceblock.glb" id="2_model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_solid"]
+size = Vector3(2.686728, 2.686728, 2.686728)
+[sub_resource type="BoxShape3D" id="BoxShape3D_hit"]
+size = Vector3(3.224073, 3.224073, 3.224073)
+
+[node name="IceBlock" type="AnimatableBody3D"]
+script = ExtResource("1_script")
+Rule = 0
+Model = NodePath("Model")
+SolidShape = NodePath("CollisionShape3D")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4777, 0)
+shape = SubResource("BoxShape3D_solid")

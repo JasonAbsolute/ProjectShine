@@ -1,0 +1,27 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="PackedScene" path="res://models/Sms/Map/yoshiblock/yoshiblock.glb" id="1_glb"]
+[ext_resource type="Script" path="res://assets/Sms/Map/SmsYoshiBlock.cs" id="2_script"]
+[ext_resource type="Shader" path="res://assets/Sms/Map/SmsYoshiBlock.gdshader" id="3_shader"]
+[ext_resource type="Texture2D" path="res://models/Sms/Map/yoshiblock/yoshiblock.png" id="4_egg"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_yoshi"]
+size = Vector3(2.686728, 2.686728, 2.686728)
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_egg"]
+shader = ExtResource("3_shader")
+shader_parameter/egg_tex = ExtResource("4_egg")
+shader_parameter/tint = Color(1, 1, 1, 1)
+shader_parameter/brightness = 1.0
+
+[node name="YoshiBlock" type="AnimatableBody3D"]
+script = ExtResource("2_script")
+
+[node name="Model" parent="." instance=ExtResource("1_glb")]
+transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+
+[node name="Mesh" parent="Model" index="0"]
+surface_material_override/0 = SubResource("ShaderMaterial_egg")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("BoxShape3D_yoshi")

@@ -68,6 +68,8 @@ public partial class LevelSelect : Control
             _fadeRect = GetNodeOrNull<ColorRect>(FadeOutPath);
 
         BuildButtons();
+        // 243: the row grows to its posters on the first layout (and on a window resize) -- re-seat the window round the highlighted poster then
+        _portraits.Resized += () => { if (_highlighted >= 0) CallDeferred(nameof(SlideRowTo), _highlighted, false); };
 
         // the poster of the level just left (a Shine's exit, the Exit Area) is the one under the hand; else the first
         int start = 0;
@@ -149,9 +151,54 @@ public partial class LevelSelect : Control
         // Containers lay out on the next frame, so the button's rect isn't final yet on the first call - defer the move rather than reading a stale size.
         if (_selectHand != null)
             CallDeferred(nameof(MoveHandTo), index);
+        CallDeferred(nameof(SlideRowTo), index, _rowShiftKnown);
+        _rowShiftKnown = true;
 
         for (int i = 0; i < _buttons.Count; i++)
             _buttons[i].SetHighlighted(i == index);
+    }
+
+    /// <summary>Seconds the poster row takes to slide a newly picked poster into view (0 = it jumps). With four posters the row never moves.</summary>
+    [Export] public float RowSlideSeconds = 0.18f;
+
+    /// <summary>Width of the poster row's window on the screen, in pixels: the Player Select's row (four posters and their three gaps), centred
+    /// like the authored Portraits container. 0 = the container's own width. The row slides inside this window when it holds more posters than fit.</summary>
+    [Export] public float RowWindowWidth = 952f;
+
+    private bool _rowShiftKnown;
+    private Tween _rowTween;
+
+    /// <summary>243: more posters than the row holds -- the row slides so the highlighted poster sits in the middle of the row's window, the first and
+    /// last posters never leaving its edges. Four posters fill the window exactly, so the Player Select's layout is untouched; twelve scroll. (The
+    /// HBoxContainer grows to its children's width in both directions, so its own Size is the whole row, not the window.)</summary>
+    private void SlideRowTo(int index, bool animate)
+    {
+        if (_portraits == null || index < 0 || index >= _buttons.Count)
+            return;
+        float window = RowWindowWidth > 0f ? RowWindowWidth : _portraits.Size.X;
+        float row = 0f;
+        foreach (var b in _buttons) row = Mathf.Max(row, b.Position.X + b.Size.X);
+        if (row <= window + 0.5f)
+            return;
+        var button = _buttons[index];
+        float centre = button.Position.X + button.Size.X * 0.5f;
+        float shift = Mathf.Clamp(window * 0.5f - centre, window - row, 0f);
+        // the window sits where the authored row sits: centred in the parent
+        float target = (_portraits.GetParentAreaSize().X - window) * 0.5f + shift;
+        _rowTween?.Kill();
+        if (!animate || RowSlideSeconds <= 0f || Mathf.Abs(target - _portraits.Position.X) < 0.5f)
+        {
+            _portraits.Position = new Vector2(target, _portraits.Position.Y);
+            if (_selectHand != null) MoveHandTo(index);
+            return;
+        }
+        _rowTween = CreateTween();
+        _rowTween.TweenMethod(Callable.From<float>(x =>
+        {
+            if (!IsInstanceValid(_portraits)) return;
+            _portraits.Position = new Vector2(x, _portraits.Position.Y);
+            if (_selectHand != null) MoveHandTo(_highlighted);
+        }), _portraits.Position.X, target, RowSlideSeconds).SetTrans(Tween.TransitionType.Sine).SetEase(Tween.EaseType.Out);
     }
 
     /// <summary>Centre the hand under a poster, in the hand's own parent space.</summary>

@@ -1,10 +1,18 @@
-[gd_scene load_steps=21 format=3]
+[gd_scene load_steps=29 format=3]
 
 [ext_resource type="Script" path="res://assets/LevelSelect.cs" id="1_script"]
-[ext_resource type="Resource" path="res://assets/levels/RiccoTowerEntry.tres" id="2_RiccoTowerEntry"]
-[ext_resource type="Resource" path="res://assets/levels/HillsideCaveEntry.tres" id="3_HillsideCaveEntry"]
-[ext_resource type="Resource" path="res://assets/levels/KingBooEntry.tres" id="4_KingBooEntry"]
-[ext_resource type="Resource" path="res://assets/levels/RematchEntry.tres" id="5_RematchEntry"]
+[ext_resource type="Resource" path="res://assets/levels/HillsideCaveEntry.tres" id="2_HillsideCaveEntry"]
+[ext_resource type="Resource" path="res://assets/levels/DirtyLakeEntry.tres" id="3_DirtyLakeEntry"]
+[ext_resource type="Resource" path="res://assets/levels/RiccoTowerEntry.tres" id="4_RiccoTowerEntry"]
+[ext_resource type="Resource" path="res://assets/levels/SandCastleEntry.tres" id="5_SandCastleEntry"]
+[ext_resource type="Resource" path="res://assets/levels/BeachCannonEntry.tres" id="6_BeachCannonEntry"]
+[ext_resource type="Resource" path="res://assets/levels/YoshiGoRoundEntry.tres" id="7_YoshiGoRoundEntry"]
+[ext_resource type="Resource" path="res://assets/levels/HotelLobbyEntry.tres" id="8_HotelLobbyEntry"]
+[ext_resource type="Resource" path="res://assets/levels/CasinoSecretEntry.tres" id="9_CasinoSecretEntry"]
+[ext_resource type="Resource" path="res://assets/levels/ShellSecretEntry.tres" id="10_ShellSecretEntry"]
+[ext_resource type="Resource" path="res://assets/levels/VillageUndersideEntry.tres" id="11_VillageUndersideEntry"]
+[ext_resource type="Resource" path="res://assets/levels/KingBooEntry.tres" id="12_KingBooEntry"]
+[ext_resource type="Resource" path="res://assets/levels/RematchEntry.tres" id="13_RematchEntry"]
 [ext_resource type="PackedScene" uid="uid://bg72dlcmvwypi" path="res://assets/CharacterPoster.tscn" id="6_poster"]
 [ext_resource type="Texture2D" uid="uid://kfyytoolf68u" path="res://Font/CharacterSelect/background.png" id="7_bg"]
 [ext_resource type="Shader" uid="uid://dy4lyx2nlb5pf" path="res://assets/ArtGradient.gdshader" id="8_grad"]
@@ -35,7 +43,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
-Levels = [ExtResource("2_RiccoTowerEntry"), ExtResource("3_HillsideCaveEntry"), ExtResource("4_KingBooEntry"), ExtResource("5_RematchEntry")]
+Levels = [ExtResource("2_HillsideCaveEntry"), ExtResource("3_DirtyLakeEntry"), ExtResource("4_RiccoTowerEntry"), ExtResource("5_SandCastleEntry"), ExtResource("6_BeachCannonEntry"), ExtResource("7_YoshiGoRoundEntry"), ExtResource("8_HotelLobbyEntry"), ExtResource("9_CasinoSecretEntry"), ExtResource("10_ShellSecretEntry"), ExtResource("11_VillageUndersideEntry"), ExtResource("12_KingBooEntry"), ExtResource("13_RematchEntry")]
 PosterScene = ExtResource("6_poster")
 SelectHandPath = NodePath("SelectHand")
 SelectHandGap = 16.0

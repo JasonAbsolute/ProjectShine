@@ -1,0 +1,17 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Map/SmsWoodBlock.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Sms/Map/woodblocktriangle/woodblocktriangle.glb" id="2_model"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_piece"]
+size = Vector3(2.591698, 2.591698, 2.686728)
+
+[node name="WoodBlockTriangle" type="AnimatableBody3D"]
+script = ExtResource("1_script")
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(-0.04751478, -0.04751478, 0)
+shape = SubResource("BoxShape3D_piece")

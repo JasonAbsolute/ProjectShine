@@ -1,0 +1,17 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="PackedScene" path="res://models/Sms/Map/arrowboardlr/arrowboardlr.glb" id="1_glb"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_sign"]
+size = Vector3(0.5587587, 4.653923, 4.158974)
+
+[node name="SignArrowLR" type="StaticBody3D"]
+
+[node name="ModelScale" type="Node3D" parent="."]
+transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+
+[node name="Model" parent="ModelScale" instance=ExtResource("1_glb")]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.849644, 0)
+shape = SubResource("BoxShape3D_sign")

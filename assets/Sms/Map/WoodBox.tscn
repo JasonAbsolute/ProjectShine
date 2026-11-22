@@ -1,0 +1,33 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://assets/Sms/Map/SmsWoodBox.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Sms/Map/kibako/kibako.glb" id="2_whole"]
+[ext_resource type="PackedScene" path="res://models/Sms/Map/kibako/kibako_crash.glb" id="3_broken"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_body"]
+size = Vector3(2.686728, 2.686728, 2.686728)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hit"]
+size = Vector3(2.418055, 1.209027, 2.418055)
+
+[node name="WoodBox" type="StaticBody3D"]
+script = ExtResource("1_script")
+
+[node name="Model" parent="." instance=ExtResource("2_whole")]
+transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+
+[node name="BrokenModel" parent="." instance=ExtResource("3_broken")]
+transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+visible = false
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+position = Vector3(0, 1.343364, 0)
+shape = SubResource("BoxShape3D_body")
+
+[node name="HitZone" type="Area3D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="HitZone"]
+position = Vector3(0, 2.36432, 0)
+shape = SubResource("BoxShape3D_hit")

@@ -1,0 +1,11 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" uid="uid://soejxmdbmib6" path="res://assets/Sms/SmsHiddenCoin.cs" id="1_hidden"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Map/HiddenRedOneUp.tscn" id="2_oneup"]
+
+[node name="WaterHitHideObj" type="StaticBody3D"]
+script = ExtResource("1_hidden")
+HiddenScene = ExtResource("2_oneup")
+AppearSpeed = 110.0
+AppearYSpeed = 25.0
+DisappearTicks = 1200
