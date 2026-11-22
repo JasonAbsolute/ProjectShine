@@ -15783,3 +15783,31 @@ cube exlift09 turns on its outbound leg (its +180 pitch over a -Z run carries Ma
 (run a): the Casino's 8 rolling cubes all TOP AGAINST TRAVEL (16.9 deg per 2.02 m) with the three ride cubes' axes as 246 left them; the Beach
 Cannon's 24 wood blocks moved 0.000 m over 14 s, 23 faded to black (darkest sample 0.00-0.02, alpha 1) and went hidden, the one without a rail static;
 the eight-course rotation census (run f) unchanged from 246.
+
+### 248 -- the nails work as the game's: three instant 50-u drops, a 1-s lockout, the hidden item thrown out of the top, the impact sound; the four courses' nails follow the disc's rewards (feature/kingboo-casino, code `7093902`)
+
+**Jaysonn:** "Make the nails work like the game's" (246 had reported his `Nail.cs`: two pounds of 1.5 m with a 0.18-s tween, the item 1.5 m up with its own bounce).
+
+**The game's nail** (`TMapObjNail::receiveMessage`, MapObjEx.cpp; `kugi.bmd`): on HIT_MESSAGE_HIP_DROP, if the state timer is not running and fewer than
+three hits: `mPosition.y -= 50`, the map collision rebuilt where it stands, MSD_SE_OBJ_KUGI_IMPACT, `mStateTimer = 120`, the hit counted; on the third
+hit the hidden object (the scene data's event: 100 a coin, 2000 a 1-Up, -1 none) is thrown with `throwObjToFront(obj, 200, mAppearSpeed, mAppearYSpeed)`:
+it appears 200 u over the nail's (sunk) position = 50 u over its start, with velocity (facing x appear speed, appear y speed) -- `loadHideObjInfo` gives
+appear speed 0 and appear y speed 17 u/tick for all 38 secret-course nails, a coin's life 1200 ticks.
+
+**`assets/Nail.cs`** keeps Jaysonn's class, scene layout and knob names; the defaults are the game's: RequiredHits 3, HitDropDistance 50/74.44 m,
+DropDuration 0 (instant; above 0 the old tween), ItemSpawnYOffset 50/74.44 m over the REST position, LockoutTicks 120 at TicksPerSecond 120,
+ItemAppearYSpeedUnitsPerTick 17, ItemAppearSpeedUnitsPerTick 0, ItemLifeTicks 1200, UseGameItemThrow (SmsDropTable.Launch: a coin flies with the game's
+item physics and life, a 1-Up body hops BodyItemPopMetresPerSecond 6; off = the item's own LaunchAsDrop), ImpactSound. The hit is a Mario in his
+ground-pound fall or landing inside the hit zone over the head, tested every movement tick (the game tests when his hip drop lands on the nail's
+collision); the super hip drop counts too. `HitCount()` / `HasSpawned()` for drives.
+
+**The sound:** `assets/Sms/Sound/Enemy/MSD_SE_OBJ_KUGI_IMPACT.wav` baked from the game's data (`sms_audio.py bake`, 0.94 s); `SmsActorSound.ActorOf["Nail"]`
+added so `Attach` hands the nail a sound node (211's lesson: an unknown type got null).
+
+**The courses** (`secret243/patch_nails248.py`, every nail matched to its scene.bin nail by position): Hillside's Nail1 and the Yoshi-Go-Round's Nail0
+now throw the 1-Up their event says (they gave coins); the Sand Castle's and the Shell's nails lose their per-instance restatements of the defaults (the
+Shell's item height was 200 u over the REST position, 2.15 m too high); the Shell's ten event -1 nails are empty, its two 1-Ups explicit.
+
+**Verified:** build 0 errors; `nailtest248.gd` (run b, the Shell's Secret, windowed) through the real path -- a jump, then L in the air over the head:
+Nail00 (coin), Nail01 (empty), Nail19 (1-Up) each drop 0.672 m at once per landing, sink 2.015 m after three, ignore a fourth; the impact sound plays at
+the nail; the coin / 1-Up appears 0.67 m over the rest position and rises, the empty nail throws nothing; the 120-tick lockout on Nail02's receive path.
