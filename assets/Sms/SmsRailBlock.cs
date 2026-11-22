@@ -15,6 +15,8 @@ using Godot;
 /// (241): TMarDirector::direct runs four 5 ms simulation ticks a 30 fps frame (dt = 600 / 30 = 20) and performs the movement list on every one, and
 /// nothing gates a map object out of any of them (TViewObj::testPerform strips CUE_MOVE only for the CUE_MOVEMENT_GATE bits, which no object sets),
 /// so control() -- and the block's step -- runs 120 times a second. 237-240 stepped it 30 times a second: a quarter of the game's pace.
+/// 243c: RollWithTravel, a deviation Jaysonn asked for -- a block whose rail gives it no turn (the Casino's field cubes) rolls like a die as it
+/// travels, a quarter turn per side length, so it still lands flat at every node. Off by default: the game's.
 /// </summary>
 [Tool]
 public partial class SmsRailBlock : AnimatableBody3D
@@ -46,11 +48,23 @@ public partial class SmsRailBlock : AnimatableBody3D
 
     [Export] public bool Active = true;
 
+    /// <summary>243c, Jaysonn's call over the game's: the block also ROLLS as it travels, like a die across a floor -- about the level axis across
+    /// its path, a quarter turn per side length (RollSideUnits), so it lands flat at every node whose segment is a whole number of sides (the Casino's
+    /// are: 800 u per field segment, 1600 across the start). The game turns a rail block only by its rail's node angles, and the Casino's exlift00,
+    /// 01 and 03-08 carry none (they slide, MarioWiki: "push" and "squish"). Off = the game. Added on top of any rail turn, so leave it off where the
+    /// rail already turns the block (exlift02, 09, 10).</summary>
+    [Export] public bool RollWithTravel = false;
+
+    /// <summary>The rolling block's side in game units as placed (EXRollCube 800; 1600 at scale 2): one quarter turn per this much travel.</summary>
+    [Export] public float RollSideUnits = 800f;
+
     private Basis _accum = Basis.Identity;   // the turns already made (the game's unk174), the placement's rotation inside it
     private Vector3 _scale = Vector3.One;    // the authored scale, kept out of the rotation
     private int _cur, _next, _dir = 1;
     private Vector3 _segStart, _segEnd, _turn;
     private float _segLen, _speed, _travelled;
+    private Vector3 _rollAxis = Vector3.Zero; // RollWithTravel: the level axis across this segment's path (up x direction: a forward roll)
+    private float _rollAngle;                 // RollWithTravel: the radians rolled over the whole segment
 
     private Vector3 NodeMetres(int i) => RailNodes[i] / UnitsPerMetre;
 
@@ -103,7 +117,20 @@ public partial class SmsRailBlock : AnimatableBody3D
         Vector3 t = _next < RailTurns.Length ? RailTurns[_next] : Vector3.Zero;
         _turn = new Vector3(Mathf.Wrap(t.X, -180f, 180f), Mathf.Wrap(t.Y, -180f, 180f), Mathf.Wrap(t.Z, -180f, 180f));   // MsAngleDiff: the short way
         _travelled = 0f;
+        _rollAxis = Vector3.Zero; _rollAngle = 0f;
+        if (RollWithTravel && RollSideUnits > 0f)
+        {
+            Vector3 flat = new Vector3(_segEnd.X - _segStart.X, 0f, _segEnd.Z - _segStart.Z);   // the path across the level, the parent's frame
+            if (flat.LengthSquared() > 1e-8f)
+            {
+                _rollAxis = Vector3.Up.Cross(flat.Normalized());                                   // the level axis across the path: the top rolls forward
+                _rollAngle = _segLen / (RollSideUnits / UnitsPerMetre) * (Mathf.Pi / 2f);         // a quarter turn per side length
+            }
+        }
     }
+
+    /// <summary>RollWithTravel: the roll made over the fraction f of this segment (identity when the roll is off or the segment is vertical).</summary>
+    private Basis Roll(float f) => _rollAxis == Vector3.Zero ? Basis.Identity : new Basis(_rollAxis, _rollAngle * f);
 
     /// <summary>MsMtxSetRotRPH: Rz(roll) * Ry(yaw) * Rx(pitch), degrees.</summary>
     private static Basis RotRPH(Vector3 deg)
@@ -119,7 +146,7 @@ public partial class SmsRailBlock : AnimatableBody3D
         if (_travelled >= _segLen || _segLen <= 1e-6f)
         {
             pos = _segEnd;
-            _accum = RotRPH(_turn) * _accum;   // the turn banked (TRailBlock::control at a node: unk174 = RotRPH(unk168) * unk174)
+            _accum = Roll(1f) * RotRPH(_turn) * _accum;   // the turn banked (TRailBlock::control at a node: unk174 = RotRPH(unk168) * unk174), the roll with it
             rot = _accum;
             _cur = _next;
             int n = RailNodes.Length;
@@ -136,7 +163,7 @@ public partial class SmsRailBlock : AnimatableBody3D
         {
             float f = _travelled / _segLen;
             pos = _segStart.Lerp(_segEnd, f);
-            rot = RotRPH(_turn * f) * _accum;
+            rot = Roll(f) * RotRPH(_turn * f) * _accum;
         }
         Basis rigid = new Basis(rot.X * _scale.X, rot.Y * _scale.Y, rot.Z * _scale.Z);
         Transform = new Transform3D(rigid, pos);
