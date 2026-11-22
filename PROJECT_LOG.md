@@ -15665,3 +15665,20 @@ pitch + roll) make a half turn every segment here as there. The Dirty Lake's sev
 fell in a flat stretch of their rails (60-degree pitches on the 100-u segments, none on the 400-u ones: a full turn per traverse, flat wherever
 Mario stands). Which platform Jaysonn saw standing still is asked in the report; if whole pieces sat still, the editor's Build is the first thing
 to check (243's new C# scripts -- the uirou, the kamaboko, the Yoshi blocks -- load only after it).
+
+### 243c -- the Casino's field cubes ROLL, Jaysonn's call over the game's data: the eight EXRollCubes whose rails carry no turn now roll like dice as they travel (a quarter turn per side length, flat at every node), a `RollWithTravel` knob on `SmsRailBlock` (off = the game) set on those eight in `CasinoSecret.tscn` (feature/kingboo-casino, code `0f5a976`)
+
+**Jaysonn** (after 243b's census found eight of the Casino's eleven cubes sliding): "The Casino cubes should still roll, make them"
+
+**The game.** `TRailBlock::control` turns a rail block over each segment by the angles of the node it heads for, banked on arrival; `exrollcube` has no
+`.bck`, so the rail is its only turn, and `sirena_ex0`'s `exlift00`, `01`, `03`-`08` give it none (every node (0, 0, 0)). The census measured those
+eight at 0.0 deg over 1.5-4.0 m; MarioWiki's course text has the first two cubes push Mario off and the field's push or squish him, with only the
+final "large, rotating cube" turning. So in the game they slide. **A logged deviation**, then: `SmsRailBlock.RollWithTravel` (off by default) rolls
+the block about the level axis across its path, the top forward, `RollSideUnits` (800, the cube's side at scale 1) per quarter turn -- the field's
+800-u segments are one side and the start's 1600-u crossings two, so every cube lands flat at every node; a dead-end reversal rolls it back; the roll
+sits outside the rail's own turn (`Roll(f) * RotRPH(turn * f) * accumulated`) and is banked with it. `CasinoSecret.tscn`: `RollWithTravel = true`
+on `RollCube00`, `01`, `03`-`08` (eight instance overrides; nothing else changed). `02`, `09`, `10` keep the game's 180-degree turns.
+
+**Verified:** the Casino census (run b): all eleven turn -- the eight at 33.8 deg over 4.03 m (a quarter turn per 10.75-m side, exactly), 25.1 over
+3.00 m; 02 / 09 / 10 unchanged; "rail blocks 11 (sliding 0)". Course shots (run h, two rounds 9 s apart) show the start's two cubes and the field's
+mid-roll. The all-course census (run c) after it: the other courses' rail blocks as in 243b (the knob is off everywhere but the Casino). Build 0 errors.
