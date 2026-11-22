@@ -15753,3 +15753,33 @@ and the Casino map's ORANGE: `map.bmd` lights the wood by the stage's warm set (
 register); a plain tint drew it red and a gain pale yellow (run n), so the committed material stays until a lit-material pass like 243b's skies.
 
 **Verified:** build 0 errors; rotation census run e as 243c; sheets run m (Casino, Village, Hotel Lobby, Beach Cannon, Shell).
+
+### 247 -- Jaysonn's second playtest of the secret courses: the Shell's Secret gets its COURSE MAP, the Beach Cannon's wood blocks stand still and fade to black, the Yoshi blocks' egg pattern, the Casino's rolling cubes turn the other way (feature/kingboo-casino, code `3c7b49c`)
+
+**Jaysonn:** "ok again the cubes in hotel secrect is not rotating the right way. in the sunset style one. and yoshi style blocks still look curriuptyed.
+shell secrect also is missing tons of platofrms with vertex colors missing. beach cannon secrect dissapeaering platforms are mving? they should be still
+and the effect should be black. please make these correct"
+
+**The Shell map.** 243 shipped the Shell's Secret with its placed pieces only; the course's platforms, frames, pegs, glass walls and arrow panel are
+the stage's `map/map/map.bmd`. New `assets/Sms/Map/ShellSecretMap.tscn` + `models/Sms/Map/ShellSecret/map.glb` (+ 4 PNGs), built by
+`secret243/gen_shellmap247.py` the way the Casino's map was: the rip's glb cleaned to one unskinned mesh, materials, textures and vertex colours kept,
+metallic 0, the two glass materials translucent as `map.bmd` blends them ((62, 22, 85) at 76/255; a faint sheen), the disc's `map.col` (466 triangles)
+as the collision; instanced as `CourseMap` in `ShellSecret.tscn`.
+
+**The wood blocks** (`SmsWoodBlock.cs`). `TNormalLift::control` runs the hidden countdown, then the wait, then the recycle, and steps along the rail
+only when none of those is pending; every Beach Cannon wood block's rail node carries both the wait flag (0x800) and the recycle flag (0x1000), and
+arriving there (at load, and after every reset) re-arms both -- so the game never walks the block to its rail's other node. The cycle is now: wait
+(pitch ticks) -> fade to BLACK over 180 ticks (`TWoodBlock::calcRecycle` scales the TEV register; the material is opaque) -> hidden (roll ticks) ->
+back at full tint. 243-246 walked them down 200 u and back before each fade and faded the alpha. `WalkTheRail` (off) keeps the old walk as a knob.
+
+**The Yoshi blocks** (`SmsYoshiBlock.gdshader`): sampled CLAMPED (`yoshiblock.bmd`: wrapS 0, wrapT 0). The mesh's UVs run -1.414..1 / -1.664..1 (its
+VTX1 block): the spot polygons are sent below v = 0 (the sheet's top row, inside the spot) and the white polygons left of u = 0 (the left column), with
+the soft edge from the 0..1 quadrant; `repeat_enable` tiled the quarter-spot over them and cut it into crescents.
+
+**The Casino's roll** (`SmsRailBlock.cs`): `RollTopForward` knob, default off -- the top of the block moves AGAINST its travel, as the game's own ride
+cube exlift09 turns on its outbound leg (its +180 pitch over a -Z run carries Mario backwards); on = 243c's die roll.
+
+**Verified:** build 0 errors; the map imported; sheets of the Shell, the Beach Cannon and the Casino (run p, two rounds 9 s apart); `check247.gd`
+(run a): the Casino's 8 rolling cubes all TOP AGAINST TRAVEL (16.9 deg per 2.02 m) with the three ride cubes' axes as 246 left them; the Beach
+Cannon's 24 wood blocks moved 0.000 m over 14 s, 23 faded to black (darkest sample 0.00-0.02, alpha 1) and went hidden, the one without a rail static;
+the eight-course rotation census (run f) unchanged from 246.

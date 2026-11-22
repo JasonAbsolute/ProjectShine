@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240 + 241 + 242 + 243 + 243b + 243c + 244 + 245 + 246), updated 2026-11-22 01:33 PST -- was 2026-11-22 00:14 PST -- was 2026-11-21 23:29 PST -- was 2026-11-21 21:33 PST -- was 2026-11-21 21:01 PST -- was 2026-11-21 17:22 PST -- was 2026-11-21 04:02 PST -- was 2026-11-20 04:19 PST -- was 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240 + 241 + 242 + 243 + 243b + 243c + 244 + 245 + 246 + 247), updated 2026-11-22 02:45 PST -- was 2026-11-22 01:33 PST -- was 2026-11-22 00:14 PST -- was 2026-11-21 23:29 PST -- was 2026-11-21 21:33 PST -- was 2026-11-21 21:01 PST -- was 2026-11-21 17:22 PST -- was 2026-11-21 04:02 PST -- was 2026-11-20 04:19 PST -- was 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1822,10 +1822,13 @@ game's sliding; SmsRailBlock.RollWithTravel, off = the game; assets/Sms/SmsRailB
 MoveSpeedMetresPerSecond, the rail drawn in the editor; assets/Sms/SmsRailBlock.cs) and the drop-in assets/Sms/Map/RailCube.tscn. SMS 245: the real textures
 for the brick, watermelon, crate and arrow-board models (eight PNGs under models/Sms/Map/, from the disc's .bmt files). SMS 246: the review's fixes -- the
 rail block's half turns the game's way (SmsRailBlock ShortWay), the ice block, the kamaboko descent, the wood blocks' first step and .col
-collisions, the Village's lights and tints, Ricco's Shine spawn scale (assets/Sms/SmsRailBlock.cs, assets/Sms/Map/*, Levels/Secret/VillageUnderside, Levels/Rico4Secrect). NOT yet playtested by Jaysonn: push the branch so
+collisions, the Village's lights and tints, Ricco's Shine spawn scale (assets/Sms/SmsRailBlock.cs, assets/Sms/Map/*, Levels/Secret/VillageUnderside, Levels/Rico4Secrect).
+SMS 247: the Shell's course map (new assets/Sms/Map/ShellSecretMap.tscn, models/Sms/Map/ShellSecret/), the Beach Cannon's wood blocks still + fading to black
+(SmsWoodBlock.cs), the Yoshi blocks' egg pattern (SmsYoshiBlock.gdshader clamped), the Casino's roll sense (SmsRailBlock RollTopForward). NOT yet playtested by Jaysonn: push the branch so
 it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `9a7b57c` ("SMS 246: the secret-course REVIEW ..."; assets/Sms/SmsRailBlock.cs, 13 files under assets/Sms/Map/, Levels/Secret/VillageUnderside/VillageUnderside.tscn,
+- Branch `feature/kingboo-casino` -- code tip `3c7b49c` ("SMS 247: Jaysonn's second playtest of the secret courses ..."; Levels/Secret/ShellSecret/ShellSecret.tscn, assets/Sms/Map/ShellSecretMap.tscn,
+  models/Sms/Map/ShellSecret/, assets/Sms/SmsRailBlock.cs, assets/Sms/Map/SmsWoodBlock.cs, SmsYoshiBlock.gdshader) on 246's log commit (`6b7895c`) on the 246 commit (`9a7b57c`, "SMS 246: the secret-course REVIEW ..."; assets/Sms/SmsRailBlock.cs, 13 files under assets/Sms/Map/, Levels/Secret/VillageUnderside/VillageUnderside.tscn,
   Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) on 245's log commit (`bf56070`) on the 245 commit (`bdec8d4`, "SMS 245: the breakable blocks, the crates and the sign boards get their REAL textures ..."; eight PNGs under models/Sms/Map/)
   on 244's log commit (`03aa58c`) on the 244 commit (`8bb9a21`, "SMS 244: the rail block AUTHORED like Jaysonn's MovingPlatform ..."; assets/Sms/SmsRailBlock.cs, new assets/Sms/Map/RailCube.tscn)
   on 243c's log commit (`9a0a7a9`) on the 243c commit (`0f5a976`, "SMS 243c: the Casino's field cubes ROLL ..."; assets/Sms/SmsRailBlock.cs, Levels/Secret/CasinoSecret/CasinoSecret.tscn)
@@ -1868,7 +1871,7 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 43 commits since `main`. New file (246): assets/Sms/Map/SmsIceBlock.gdshader. No new files in 245 (eight PNGs replaced). New file (244): assets/Sms/Map/RailCube.tscn. No new files in 243b or 243c. New files (243): Levels/Secret/{DirtyLake,SandCastle,BeachCannon,
+  the branch tip is this file's own commit on top of them; 45 commits since `main`. New files (247): assets/Sms/Map/ShellSecretMap.tscn, models/Sms/Map/ShellSecret/{map.glb, map_0..3.png}, assets/Sms/Map/SmsIceBlock.gdshader.uid. New file (246): assets/Sms/Map/SmsIceBlock.gdshader. No new files in 245 (eight PNGs replaced). New file (244): assets/Sms/Map/RailCube.tscn. No new files in 243b or 243c. New files (243): Levels/Secret/{DirtyLake,SandCastle,BeachCannon,
   YoshiGoRound,HotelLobby,CasinoSecret,VillageUnderside,ShellSecret}/*.tscn; assets/Sms/Map/ -- SandBlock, YoshiBlock, WoodBlockCube, WoodBlockL,
   WoodBlockTriangle, WoodBlockBridge, WoodBox, IceBlock, WatermelonBlock, BrickBlock, RideCloud, Uirou, Kamaboko, GetaGreen, GetaOrange, RailBlockB,
   RailBlockR, RollBlockB, RollBlockY, Pile, SignRiccoArrow, SignArrowUp, SignArrowLR, CasinoSecretMap, WaterHitHideObj, HiddenRedOneUp (.tscn) and
@@ -1888,6 +1891,8 @@ passes re-point this entry's tip.
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 247: press the editor's Build first (C# changed), open the Shell's Secret (the course's platforms are there), the Beach Cannon's Secret (the wood
+  blocks stand still and go black before they vanish; the Yoshi blocks are white with coloured spots) and the Casino (the cubes roll the other way).
 - To try 246: press the editor's Build first (C# changed), open the Secret of Casino Delfino -- the cube that carries Mario forward at the start, and the two later
   ones, now flip the game's way. The Village is lit cyan like the game's night.
 - To try 245: open the Hotel Lobby's Secret -- brown bricks and green watermelons; the Beach Cannon's crates are wood. No Build needed (textures only).
