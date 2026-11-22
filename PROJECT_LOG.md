@@ -15682,3 +15682,25 @@ on `RollCube00`, `01`, `03`-`08` (eight instance overrides; nothing else changed
 **Verified:** the Casino census (run b): all eleven turn -- the eight at 33.8 deg over 4.03 m (a quarter turn per 10.75-m side, exactly), 25.1 over
 3.00 m; 02 / 09 / 10 unchanged; "rail blocks 11 (sliding 0)". Course shots (run h, two rounds 9 s apart) show the start's two cubes and the field's
 mid-roll. The all-course census (run c) after it: the other courses' rail blocks as in 243b (the knob is off everywhere but the Casino). Build 0 errors.
+
+### 244 -- the rail block AUTHORED like Jaysonn's `MovingPlatform`, for his custom levels: the same three inspector buttons, a metres-per-second speed knob, the rail drawn in the editor, grouped knobs, and a drop-in `RailCube.tscn` (feature/kingboo-casino, code `8bb9a21`)
+
+**Jaysonn:** "i did have a rail system implemented to spin the platforms. did you use that?" -- his `MovingPlatform.cs` drives every spinner and lift
+(the umaibou, the stars, the geta, the Yoshi-Go-Round's rolling boards, Hillside's lifts); `SmsRailBlock.cs` (237) drives the rail blocks and cubes
+(Ricco's 3, Hillside's 4, the Casino's 11, the Dirty Lake's 2 cubes + 17 boards, the Hotel Lobby's 1), because the game's rail block turns by a set
+angle per segment spread along the travel about the world axes with a speed per node, which his constant spin and his 80%-trigger `WaypointRotations`
+do not express. His condition: "as long as the moving platforms are easy to make in other levels when i start doing custom its fine".
+
+**What changed** (`assets/Sms/SmsRailBlock.cs`): his workflow on the rail block -- "Set Origin Here" (the block's spot becomes node 0 and the whole
+rail moves with it; makes the rail if there is none), "Add Node At Current Location" (the dragged spot becomes the next node, in game units in the
+parent's frame, a zero turn and the default speed padded in, the block snapped back to its start node), "Remove Last Node"; `MoveSpeedMetresPerSecond`
+(0 = the rail's own per-node speeds, the game's; above 0 = one speed for every segment); the rail drawn in the editor (`_Process` under
+`Engine.IsEditorHint` only, `SetProcess(false)` at run time): a yellow line along the segments, an orange cross at each node, the start node green, an
+UNOWNED `RailPreview` child the editor never saves, freed with the node; knobs in groups "Authoring", "Rail (the game's units)", "Pace", "Roll".
+New `assets/Sms/Map/RailCube.tscn`: his `rotating_block.tscn` with the rail script and `RollWithTravel` on -- drop it in, drag, click. No placed rail
+block runs differently (the knob defaults are the 243c values).
+
+**Verified:** `authortest244.gd` (run b) PASS -- the buttons' functions called as the inspector calls them: origin at 10 m -> node (0, 744.4, 0); a
+10.747-m drag + Add Node -> (800.0, 744.4, 0) with the block back home; padding to 3 / removal to 2; the editor line 14 vertices, unowned; the authored
+rail run at 2 m/s for 2 s: 3.97 m, 33.2 deg of die-roll. The rotation census of the eight courses (run d) as in 243c. Build 0 errors. Note: a running
+`AnimatableBody3D` with `sync_to_physics` reverts a transform set outside the physics step (the editor skips that guard), so the test drags with sync off.
