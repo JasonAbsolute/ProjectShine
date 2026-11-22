@@ -15704,3 +15704,18 @@ block runs differently (the knob defaults are the 243c values).
 10.747-m drag + Add Node -> (800.0, 744.4, 0) with the block back home; padding to 3 / removal to 2; the editor line 14 vertices, unowned; the authored
 rail run at 2 m/s for 2 s: 3.97 m, 33.2 deg of die-roll. The rotation census of the eight courses (run d) as in 243c. Build 0 errors. Note: a running
 `AnimatableBody3D` with `sync_to_physics` reverts a transform set outside the physics step (the editor skips that guard), so the test drags with sync off.
+
+### 245 -- the breakable blocks, the crates and the sign boards get their REAL textures: 243 shipped 8x8 placeholder PNGs for eight models (the rip exported the .bmd's dummy; the game's textures live in the .bmt beside it), so the Hotel Lobby's bricks and watermelons, the Beach Cannon's crates and both courses' arrow signs drew white with a grey speckle (feature/kingboo-casino, code `bdec8d4`)
+
+**Jaysonn:** "ok the breakable blocks are a white mess you can see them in your own ref photots can you please fix it?"
+
+**The cause.** `brickblock.bmd`, `watermelonblock.bmd`, `kibako.bmd`, `arrowboardup/lr.bmd` and the two break models carry only an 8x8 dummy in their
+own texture block (`B_dummy`, `J_kibako_dammy`, `K_name_dummy`); the game applies the material table `<model>.bmt` beside each, which holds the real
+sheets (`B_rengaBLOCK` 128x64, `B_suikaBLOCK` 128x128, `J_kibako` 128x256, `K_yajirushiBoard` 64x32). The rip exports the .bmd's texture, so the
+agents shipped 95-byte stubs. **The fix:** the eight PNGs (`models/Sms/Map/{brickblock,brickblockbreak,watermelonblock,watermelonblockbreak,kibako
+(+ kibako_crash),arrowboardup,arrowboardlr}`) replaced by the .bmt textures (pulled with `bmd_tex153.py` from the disc files in `secret243/van/`),
+same file names, so no scene or glb changed; the glbs' wrap modes already match the .bmt's (brick / watermelon repeat, crate / board clamp). The
+IceBlock had its real `B_IceBlock` already.
+
+**Verified:** run k sheets of the Hotel Lobby, the Beach Cannon and the Village Underside: brown bricks with the game's mortar, green-striped
+watermelons, wooden crates with the label, pink sign boards (the sign's ARROW graphic is in neither file -- for the 246 review). Import clean. No C#.
