@@ -77,6 +77,11 @@ public partial class SmsRailBlock : AnimatableBody3D
     /// <summary>The rolling block's side in game units as placed (EXRollCube 800; 1600 at scale 2): one quarter turn per this much travel.</summary>
     [Export] public float RollSideUnits = 800f;
 
+    /// <summary>247: which way the roll turns. Off (the default) = the top of the block moves AGAINST its travel, the way the game's own Casino ride
+    /// cubes turn on their outbound leg (exlift09's +180 pitch over a -Z run carries Mario backwards, so he walks to keep up); on = the top moves
+    /// with the travel, like a die rolling across a floor (243c's look, which Jaysonn called the wrong way).</summary>
+    [Export] public bool RollTopForward = false;
+
     private Basis _accum = Basis.Identity;   // the turns already made (the game's unk174), the placement's rotation inside it
     private Vector3 _scale = Vector3.One;    // the authored scale, kept out of the rotation
     private int _cur, _next, _dir = 1;
@@ -143,7 +148,8 @@ public partial class SmsRailBlock : AnimatableBody3D
             Vector3 flat = new Vector3(_segEnd.X - _segStart.X, 0f, _segEnd.Z - _segStart.Z);   // the path across the level, the parent's frame
             if (flat.LengthSquared() > 1e-8f)
             {
-                _rollAxis = Vector3.Up.Cross(flat.Normalized());                                   // the level axis across the path: the top rolls forward
+                Vector3 dir = flat.Normalized();
+                _rollAxis = RollTopForward ? Vector3.Up.Cross(dir) : dir.Cross(Vector3.Up);       // the level axis across the path; the sign picks which way the top goes
                 _rollAngle = _segLen / (RollSideUnits / UnitsPerMetre) * (Mathf.Pi / 2f);         // a quarter turn per side length
             }
         }

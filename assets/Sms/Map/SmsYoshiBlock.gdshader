@@ -6,7 +6,11 @@ render_mode cull_back, depth_draw_opaque;
 // GX_TEVREG0), c = TEXC, d = C0 gives  out = C0 + (tex.bgr24 > C0.bgr24 ? tex : 0), clamped. So the white body of the sheet stays WHITE and only
 // the dark spots take the tint (slightly lightened by the spot's own grey). Stage 1 multiplies the lit vertex colour in, which Godot's lighting does.
 // Pass 243; the game's blocks are white with coloured spots (MarioWiki's Yoshi-Go-Round screenshot), not a tinted grey.
-uniform sampler2D egg_tex : filter_linear_mipmap, repeat_enable;
+// 247: the sheet is sampled CLAMPED (yoshiblock.bmd's texture header: wrapS 0, wrapT 0). The mesh's UVs run from -1.4 to 1 and the pattern is
+// built from that: polygons sent below v = 0 land on the sheet's top row (inside the spot: the tint), polygons sent left of u = 0 land on its
+// left column (white), and only the polygons inside 0..1 see the spot's soft edge. 243-246 sampled with repeat, which tiled the quarter-spot
+// over those polygons and cut it into crescents ("corrupted").
+uniform sampler2D egg_tex : filter_linear_mipmap, repeat_disable;
 uniform vec4 tint : source_color = vec4(1.0);
 uniform float brightness = 1.0;
 
