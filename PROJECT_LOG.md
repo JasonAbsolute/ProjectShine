@@ -15719,3 +15719,37 @@ IceBlock had its real `B_IceBlock` already.
 
 **Verified:** run k sheets of the Hotel Lobby, the Beach Cannon and the Village Underside: brown bricks with the game's mortar, green-striped
 watermelons, wooden crates with the label, pink sign boards (the sign's ARROW graphic is in neither file -- for the 246 review). Import clean. No C#.
+
+### 246 -- the secret-course REVIEW: ten agents, one per course, checked every placed piece against the disc data, the decomp and the models' material files; the one real wrong-way bug (the rail block's half turns) fixed, plus nine smaller fixes they shipped (feature/kingboo-casino, code `9a7b57c`)
+
+**Jaysonn:** "some blocks are still spinning the wrong way. have agents go clean up the levels and double check the work"
+
+**Method.** The committed tree pulled from the PC (`secret243/cur246/`); `secret243/BRIEF246.md` with the verified conventions (the `.tscn`
+`Transform3D` stores the basis ROWS; a placement is `Rz(roll) Ry(yaw) Rx(pitch)` with the standard right-handed matrices, `MsMtxSetXYZRPH`; TRollBlock
+spins about its local +Z by +speed, `MsMtxSetRotZ`; TRailBlock turns by the arriving node's angles about the world axes; TNormalLift's yaw field = speed,
+pitch = wait; 245's `.bmt` texture lesson). Every agent wrote a `check246.py` (scene vs scene.bin at 1e-3) and a `REPORT246.md`
+(`secret243/<stage>/`, Hillside `coro_ex1_hillside/`, Ricco `coro_ex2_ricco/`). **All ten checkers pass with 0 placement failures**: every position,
+rotation, scale, spin axis and sense, rail start node, first direction and speed is the game's; each report lists every mover's world-space sense.
+
+**The wrong-way bug.** `MsAngleDiff` keeps a half turn as +180 (its range is (-180, 180]); Godot's `Mathf.Wrap(180, -180, 180)` gives -180, so
+`SmsRailBlock` turned every 180-degree rail segment the other way: the Casino's exlift02 (yaw; the cube Mario rides forward at the start), exlift09
+(pitch; the one before the uirou) and exlift10 (pitch + roll; the big cube to the Shine) -- the cubes a player stands on. `ShortWay()` fixes it; the
+sense check (`signcheck246.gd`, run b): 02 about world +Y, 09 about +X, 10 about a positive X/Z blend. No other course has a 180 in its rails.
+
+**The other fixes merged** (the agents' `fix246/` trees): the Dirty Lake's triangle boards fade to BLACK on recycle (`TWoodBlock::calcRecycle` scales the TEV colour; the material is opaque) instead of going
+see-through; the Yoshi-Go-Round's lift honours its rail's `0x100` stop and flashes while recycling (`SmsYoshiBlock`); the Beach Cannon's wood blocks
+make TNormalLift's 1-u/tick first outbound step (`SmsWoodBlock`) and `WoodBlockTriangle`, `WoodBlockL`, `WoodBox`, `Pile`, `SignRiccoArrow` take the
+game's `.col` geometry for collision (the triangle's empty half was standable); the Shell's kamaboko make TNormalLift's initial 50-u descent and return
+to the right height (`SmsKamaboko`); the Hotel Lobby's ice block keeps melting through its tail and draws saturated and opaque like the game's I8
+material (`SmsBreakBlock`, `IceBlock.tscn`, new `SmsIceBlock.gdshader`); the Village takes `monte_ex0`'s cyan object-light set (ambient (0, 50, 50),
+sun (50, 170, 200), a grey sub light) in place of a generic warm light, its six tinted wood blocks get their tint (`Tint` was a misspelling of
+`TintColor`), its LR sign the game's hit cylinder; Ricco's red-coin Shine spawn the game's (1, 1, 0.75) scale.
+
+**Left for Jaysonn (not applied):** FLUDD -- the game's secret courses have none, the port's have it (`Level.HasFludd` defaults true; only the
+Yoshi-Go-Round sets it false; his placed `FluddItem` in Ricco has no scene.bin object); his `Nail.cs` (2 hits, a 1.5-m tween) against the game's
+TNail (3 hits of 50 u, instant, a 120-tick lockout). Also reported, not done: the arrow SIGNS' arrow graphic (in neither arrowboard file -- the Beach
+Cannon report's finding), the Ricco arrow's second (environment) TEV stage, the ride cloud's two-register lighting, the umaibou's 52-triangle `.col`,
+and the Casino map's ORANGE: `map.bmd` lights the wood by the stage's warm set (ambient (100, 80, 50), white sun) and multiplies by (1 + the (255, 63, 15)
+register); a plain tint drew it red and a gain pale yellow (run n), so the committed material stays until a lit-material pass like 243b's skies.
+
+**Verified:** build 0 errors; rotation census run e as 243c; sheets run m (Casino, Village, Hotel Lobby, Beach Cannon, Shell).
