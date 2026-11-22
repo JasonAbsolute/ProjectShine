@@ -1,4 +1,4 @@
-[gd_scene load_steps=3 format=3 uid="uid://dq7v3k2m8rail"]
+[gd_scene format=3 uid="uid://dq7v3k2m8rail"]
 
 [ext_resource type="PackedScene" uid="uid://cfm7oejwuaw6g" path="res://rotating_block.tscn" id="1_cube"]
 [ext_resource type="Script" path="res://assets/Sms/SmsRailBlock.cs" id="2_rail"]
