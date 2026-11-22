@@ -15564,3 +15564,71 @@ Art, Paint Color, Unlocked; on a level's pause menu -- Exit Area Scene (its own 
 
 **Deviations:** the game has no level select (its hub is Delfino Plaza); this screen stands in for the starting room for the demo, at his word. The
 pictures are provisional course shots -- any Texture2D in an entry's Art slot replaces one.
+
+### 243 -- the EIGHT remaining SECRET COURSES, each laid out as the game lays it out and built from the game's own pieces: The Secret of the Dirty Lake (coro_ex0), The Dune Bud Sand Castle Secret (mam_ex0), The Beach Cannon's Secret (coro_ex4), The Yoshi-Go-Round's Secret (sirena_ex1), The Hotel Lobby's Secret (coro_ex5), The Secret of Casino Delfino (sirena_ex0), The Secret of the Village Underside (monte_ex0), The Shell's Secret (rico_ex1); the Level Select grown to twelve posters (feature/kingboo-casino, code `0ed6e65`)
+
+**Jaysonn** (after 242): "can you go ahead and make the rest of the secret levels by spinning up agents for each one? and then coming back and iterating
+on what the agents do? i think i want every secret level in the demo. so go ahead and spin up agents to implement the remaining platforms and secret
+levels with their sky boxes and everything and then report back to me with all of it done."
+
+**The work.** Eight agents, one course each, from the game's own data pulled to the Mac (the vanilla `scene.bin` / `scene.ral` of each stage, the rip's
+models and skies, the decomp's MoveBG / Map sources) under one brief (`tools/projectshine/rematch157/secret243/BRIEF.md`): the game's layout at 1/74.44,
+Mario at the game's start, the start-camera pan, the game's pieces with their behaviour from the decomp, reuse where 237 mapped a piece already, the
+right sky, the Secret Course theme, a Level Select entry; shared piece types with one owner (the Beach Cannon's agent the wood blocks, signs and pile; the
+Yoshi-Go-Round's the Yoshi blocks and the yellow roll block; the Sand Castle's the sand block; the Hotel Lobby's the ice / watermelon / brick blocks).
+Their trees merged (`merge243.py`), then the iteration on the PC: 26 piece models whose glTF default metallic 1 drew them pitch black under a black sky
+made non-metal (`fix_metal243.py`); the Beach Cannon sky's four textures set to repeat (the shader clamped them, so every layer past UV 1 sampled a
+transparent edge and was cut away); the Yoshi blocks' white-with-spots look (the material's TEV colour now multiplied in); the moving bridge's body;
+the bridge's mesh moved up to be the `Model` child its script looks for (it sat under an extra node, so it loaded with an error and never tinted or
+cycled); the Level Select patched to the twelve courses in the game's course order (`patch_select243.py`) and its row made to slide (`LevelSelect.cs`:
+`RowWindowWidth` 952 = the Player Select's four posters and three gaps, the highlighted poster kept in the middle of that window, the first and last
+posters never leaving its edges, `RowSlideSeconds` 0.18, the seat re-taken when the row resizes -- four posters fill the window exactly, so the Player
+Select's layout is untouched).
+
+**The courses** (`Levels/Secret/<Name>/<Name>.tscn`, every count the game's): DirtyLake -- 10 blue and 7 red rail boards on `scene.ral`, 4 ride clouds,
+2 EX cubes, wood blocks, a normal lift, a roll block, the palm and banana tree, the switch and 8 red coins, 3 Shines, 2 1-ups; SandCastle -- 180 sand
+blocks, 29 lift cubes, 6 nails, 2 wood blocks, the start island; BeachCannon -- 16 wood cubes, 6 L-blocks, 2 triangles, 10 Yoshi blocks, 4 lifts, 3
+crates, 2 launchers, the pile, the arrow boards; YoshiGoRound -- 22 Yoshi blocks on their rails, 3 yellow and 3 blue roll blocks, 31 lift cubes, 14 long
+wood blocks, 11 wood cubes, an ice, a watermelon and a brick block, 3 nails; HotelLobby -- 73 sand blocks, 9 lift cubes, 4 ice, 16 watermelon and 44
+brick blocks, 7 coins, 4 Strollin' Stus and 3 winged ones, wood blocks, a rail block; CasinoSecret -- the course map, 11 EX cubes on their rails, 4 uirou
+lifts, an umaibou; VillageUnderside -- 13 large and 8 long wood blocks, triangles, cubes, an L, the bridge, 9 left-right and 3 up signs, the pile, 4
+launchers, 12 Piantas (11 Chucksters, one burning passer-by), 7 coins; ShellSecret -- 2 piles, 25 nails, 3 umaibou, 3 kamaboko, 3 green and 1 orange
+geta, 2 roll blocks, 2 wood cubes, the hidden red 1-up.
+
+**New pieces** (`assets/Sms/Map/`): `SandBlock.tscn` + `SmsSandBlock.cs` (TSandBlock: waits under Mario, sinks and shrinks, gone, restores);
+`YoshiBlock.tscn` + `SmsYoshiBlock.cs` + `.gdshader` (the rail orbit, hidden ticks, the recycle fade); `WoodBlockCube` / `WoodBlockL` /
+`WoodBlockTriangle` / `WoodBlockBridge.tscn` + `SmsWoodBlock.cs` (the recycling wood blocks: low, high, wait, fade); `WoodBox.tscn` + `SmsWoodBox.cs` (the
+crate a hip drop breaks, the chain within 2.8 m); `IceBlock` / `WatermelonBlock` / `BrickBlock.tscn` + `SmsBreakBlock.cs` (melt by water, break by hip
+drop or head hit); `RideCloud.tscn` + `SmsRideCloud.cs` (the cushion that grows wet and shrinks dry); `Uirou.tscn` + `SmsUirou.cs` (the rail lift that
+reverses at its ends); `Kamaboko.tscn` + `SmsKamaboko.cs`; `GetaGreen` / `GetaOrange.tscn` (on `MovingPlatform.cs`); `RailBlockB` / `RailBlockR` /
+`RollBlockB` / `RollBlockY.tscn`; `Pile.tscn`; `SignRiccoArrow` / `SignArrowUp` / `SignArrowLR.tscn`; `CasinoSecretMap.tscn`; `WaterHitHideObj.tscn` +
+`HiddenRedOneUp.tscn` (on the committed `SmsHiddenCoin.cs`); `SmsDirtyLakeWoodBlock.cs`; `assets/Sms/Npc/SmsChuckster.cs` (on `Pianta.tscn`: the throw,
+the burning one). **Skies** (`assets/Sms/Sky/`): `SkyBeachCannon` (the sunflower hills), `SkyYoshiGoRound` (the sunflowers), `SkyCasinoSecret` (the sunset:
+the clouds' 15000-frame btk, the rays' 4000, the glow's 30-frame brk), `SkyVillageUnderside` (the night: stars, moon, ring, cloud on a 4000-frame
+scroll), each a camera-followed dome with its shader and material `.tres`; the Dirty Lake, Sand Castle and Shell share `SkyHillsideSecret` and the
+Hotel Lobby `SkyRiccoSecret` (the same `sky.bmd` on the disc, byte for byte). Models under `models/Sms/Map/<piece>/` and `models/Sms/Sky/<sky>/`
+(the rip's glbs, textures pinned lossless, `pin243.py`). **Level Select**: `assets/levels/<Name>Entry.tres` x 8, `Font/LevelSelect/art_*` and `name_*`
+x 8 (the names in 242's arched lettering; the pictures provisional course shots cut by `art243.py`), `assets/LevelSelect.tscn` (twelve entries),
+`assets/LevelSelect.cs`.
+
+**Verified** (on the PC): every course loads with no errors and its piece census matches the game's counts (`piececheck243.gd`); eight shot sheets
+(`secretshot243.gd`: the start, four points along the course, the end, overhead, the sky, twice 3 s apart) reviewed after the fixes; the Level Select
+drive (`selectshot243.gd`, run d) 24 / 24: twelve posters, the hand under posters 0, 5, 11 and 3 with each inside the window and the row never leaving
+its edges, the pick loaded the Sand Castle in 4.6 s with `LevelSelectScene` set, the return put the hand on the Sand Castle, the cancel loaded the Player
+Select; dotnet build 0 errors. No shared C# changed besides `LevelSelect.cs`, so the arena drives were not re-run. The runners, drives, logs, shots and
+tasks deleted; Jaysonn's uncommitted files and the save untouched.
+
+**Knobs** (all default to the game's): on every piece its own -- the sand block's Wait Ticks / Fall Scale Per Tick / Minimum Scale / Gone Ticks /
+Restore Scale Per Tick; the Yoshi block's Rail Nodes / Node Speeds / Node Wait Ticks / Node Hidden Ticks / Recycle Fade Ticks / Speed Scale; the wood
+blocks' Low Offset / Move Speed / Visible Wait Ticks / Hidden Wait Ticks / Fade Ticks / Recycles / Tint; the crate's Break Duration / Chain Radius; the
+breakable blocks' Melt Per Water Hit / Auto Melt Threshold / Rule / Break Duration; the cloud's cushion length and speed, water duration and growth; the
+rail pieces' Rail Nodes / Rail Turns / Rail Speeds / Closed Loop / Start Node / Ticks Per Second; the Chuckster's throw speed, angle and outfit; every
+sky material's `speed`, `brightness` and `frame_rate`; the Level Select's Row Window Width and Row Slide Seconds.
+
+**Deviations** (the agents' lists, kept): the 100-coin Shines and the sign boards (NPCBoard) are not placed in any course; no break particles or sounds
+yet on the sand, wood, crate and breakable blocks; the Dirty Lake's EX cubes ignore flag 0x100 and its cloud is an Area3D; the Sand Castle's nail lacks
+the 120-tick cooldown and the 17 u/tick launch; the crate's chain is a 2.8-m radius not the game's four probes; the Yoshi-Go-Round's HasFludd = false has
+no post-clear branch; the Hotel Lobby's winged Stus use the existing enemy scenes; the Casino's seagulls and shimmer are absent and its cloud blend is
+additive; the Village has 11 Chucksters and one non-thrower (the vanilla data's twelfth is the burning passer-by) and its signs use a bounds box; the
+Shell's nail drops take 0.18 s and its hidden 1-up lacks the game's launch; the Village Underside's and Casino's skies were not GPU-compared against the
+game. The poster pictures are provisional course shots (an entry's Art slot replaces one).
