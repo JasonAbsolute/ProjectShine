@@ -15632,3 +15632,36 @@ no post-clear branch; the Hotel Lobby's winged Stus use the existing enemy scene
 additive; the Village has 11 Chucksters and one non-thrower (the vanilla data's twelfth is the burning passer-by) and its signs use a bounds box; the
 Shell's nail drops take 0.18 s and its hidden 1-up lacks the game's launch; the Village Underside's and Casino's skies were not GPU-compared against the
 game. The poster pictures are provisional course shots (an entry's Art slot replaces one).
+
+### 243b -- the two sunflower skies LIT the game's way: the Beach Cannon's and the Yoshi-Go-Round's sky materials carry lighting in sky.bmd, which 243 skipped, so their sheets showed at full brightness with a double gamma decode (a yellow-green grid, a saturated blue maze); now the stage's object light set lights each vertex as TLightCommon::setLight loads it, and the colour is decoded once (feature/kingboo-casino, code `525b99d`)
+
+**Jaysonn** (after 243): "ok do another pass some skyboxes look wierd and some platofrms are not rotating."
+
+**The skies.** Against the game's screenshots (`secret243/ref/`): the Beach Cannon's sky is (127, 126, 95) in the game where its dome sheet
+`B_EXskyYc` is (246, 248, 184) -- the sheet at 0.51; the Yoshi-Go-Round's is (16, 66, 102) on average where its sheet `B_EXenkeicanb` is (5, 158, 229)
+and the dome's vertex colour 0.82. Both skies' `sky.bmd` materials (the dome, the trees, the hedge, the sunflowers, the clouds) have `colorChan`
+lighting 1, matSrc vertex, ambSrc register, litMask 3, DF_CLAMP -- the only lit skies among the ten secret courses (the other eight are lighting 0).
+243's shaders drew the raw sheets and decoded the colour twice (`source_color` and a `pow 2.2`), which bent the pale yellow to (234, 240, 123) and the
+blue to (0, 70, 165) and made each sheet's fine weave read as a grid. The stage's lights come from `scene.bin`'s AmbAry / LightAry (`lights243.py`: the
+object set's ambient (128, 128, 128), its sun (255, 255, 255) at (200000, 500000, 200000), a sub sun (50, 50, 50) opposite, a shadow (80, 80, 80),
+a specular); `LightUtil.cpp`'s `TLightCommon::setLight` loads GX light 0 with the set's sun (the shadow draw buffer's with the shadow light) and no
+attenuation, and GX light 1 only while an effect light burns -- so the dome sees ambient + max(0, N . L) x the sun, with its inward normals: 0.502 flat
+wherever the sun is behind the surface (the game's khaki, the game's deep blue), brightening in the quadrant opposite the sun's azimuth.
+`SmsSkyBeachCannon.gdshader` and `SmsSkyYoshiGoRound.gdshader` now light per vertex in the model frame before the camera follow (knobs `stage_lit`,
+`ambient_light`, `sun_color`, `sun_position`), sample the sheets raw and decode once (`srgb_to_linear`); `SmsSkyCasinoSecret.gdshader` samples raw too
+(the 237 convention; its tones barely moved -- its top clouds (226, 127, 42) sit against the game's (225, 142, 41), its purple band (124, 42, 96)
+against (117, 80, 116)).
+
+**Verified:** rounds f and g shot (`run_sky243.bat`, `run_sky243g.bat`): the Beach Cannon's horizon sky (123, 124, 92) against the game's (127, 126, 95),
+its tree canopy (79, 77, 32) against (61, 62, 18); the Yoshi-Go-Round's sky (2, 78, 113) against (16, 66, 102); sheets reviewed. No C# changed.
+
+**The platforms.** A rotation census of all eight courses (`rotcheck243.gd`: every MovingPlatform spinner, rail block, Yoshi block, uirou, kamaboko
+and wood block measured over one second) finds every piece the game turns turning at the game's rate: the Shell's umaibou 36 / 72 / 48 deg/s, its
+geta 36-42, its roll blocks 30 / 36; the Yoshi-Go-Round's six rolling boards 24-84; the Casino's umaibou 48; the Dirty Lake's star 72 and its blue
+rail boards tumbling 85-135 deg in the second. Eight of the Casino's eleven glass cubes travel without turning because the game's rails give them
+no turn: `TRailBlock::control` turns a block over each segment by the angles of the node it is heading for (banked on arrival), and every node of
+`exlift00`, `01`, `03`-`08` carries (0, 0, 0), so in the game they slide too; the three whose nodes carry 180s (`exlift02` yaw, `09` pitch, `10`
+pitch + roll) make a half turn every segment here as there. The Dirty Lake's seven red boards showed no turn in the census second only because it
+fell in a flat stretch of their rails (60-degree pitches on the 100-u segments, none on the 400-u ones: a full turn per traverse, flat wherever
+Mario stands). Which platform Jaysonn saw standing still is asked in the report; if whole pieces sat still, the editor's Build is the first thing
+to check (243's new C# scripts -- the uirou, the kamaboko, the Yoshi blocks -- load only after it).

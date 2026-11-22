@@ -1755,7 +1755,7 @@ both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
 
-### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240 + 241 + 242 + 243), updated 2026-11-21 17:22 PST -- was 2026-11-21 04:02 PST -- was 2026-11-20 04:19 PST -- was 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+### #19 -- PENDING -- queued 2026-11-17 03:41 PST (Kiro) -- PUSH ONLY, no PR yet (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240 + 241 + 242 + 243 + 243b), updated 2026-11-21 21:01 PST -- was 2026-11-21 17:22 PST -- was 2026-11-21 04:02 PST -- was 2026-11-20 04:19 PST -- was 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
 Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
 "#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
 it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
@@ -1815,10 +1815,13 @@ COURSES, each laid out as the game lays it out and built from the game's own pie
 Yoshi-Go-Round, the Hotel Lobby, Casino Delfino, the Village Underside and the Shell (Levels/Secret/<Name>/<Name>.tscn; the new pieces under
 assets/Sms/Map/ with their scripts, the Chuckster under assets/Sms/Npc/, four new skies under assets/Sms/Sky/, the models under models/Sms/Map/
 and models/Sms/Sky/), and the Level Select grown to twelve posters in the game's course order with a sliding row (assets/LevelSelect.tscn,
-LevelSelect.cs, assets/levels/*Entry.tres, Font/LevelSelect/art_* and name_*). NOT yet playtested by Jaysonn: push the branch so
+LevelSelect.cs, assets/levels/*Entry.tres, Font/LevelSelect/art_* and name_*). SMS 243b: the Beach Cannon's and the Yoshi-Go-Round's skies lit the
+game's way (their sky.bmd materials carry lighting; the stage's object light set per vertex, the colour decoded once; assets/Sms/Sky/SmsSkyBeachCannon.gdshader,
+SmsSkyYoshiGoRound.gdshader, SmsSkyCasinoSecret.gdshader). NOT yet playtested by Jaysonn: push the branch so
 it is on GitHub; do NOT open a PR until he says these touch-ups are done (more passes follow on this branch). Further
 passes re-point this entry's tip.
-- Branch `feature/kingboo-casino` -- code tip `0ed6e65` ("SMS 243: the EIGHT remaining SECRET COURSES, each laid out as the game lays it out and built from the game's own pieces ...";
+- Branch `feature/kingboo-casino` -- code tip `525b99d` ("SMS 243b: the two sunflower skies LIT the game's way ..."; assets/Sms/Sky/SmsSkyBeachCannon.gdshader,
+  SmsSkyYoshiGoRound.gdshader, SmsSkyCasinoSecret.gdshader) on 243's log commit (`7a41d27`) on the 243 commit (`0ed6e65`, "SMS 243: the EIGHT remaining SECRET COURSES, each laid out as the game lays it out and built from the game's own pieces ...";
   Levels/Secret/*, assets/Sms/Map/*, assets/Sms/Npc/SmsChuckster.cs, assets/Sms/Sky/*, models/Sms/Map/*, models/Sms/Sky/*, assets/levels/*Entry.tres,
   Font/LevelSelect/*, assets/LevelSelect.tscn, assets/LevelSelect.cs) on 242's log commit (`f44ea8e`) on the 242 commit (`9b1e3e4`, "SMS 242: a LEVEL SELECT screen in place of a hub -- the Player Select screen again, for levels ...";
   assets/LevelSelect.tscn, LevelSelect.cs, LevelEntry.cs, assets/levels/RiccoTowerEntry.tres, HillsideCaveEntry.tres, KingBooEntry.tres, RematchEntry.tres,
@@ -1856,7 +1859,7 @@ passes re-point this entry's tip.
   comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
   finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
   and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
-  the branch tip is this file's own commit on top of them; 33 commits since `main`. New files (243): Levels/Secret/{DirtyLake,SandCastle,BeachCannon,
+  the branch tip is this file's own commit on top of them; 35 commits since `main`. No new files in 243b. New files (243): Levels/Secret/{DirtyLake,SandCastle,BeachCannon,
   YoshiGoRound,HotelLobby,CasinoSecret,VillageUnderside,ShellSecret}/*.tscn; assets/Sms/Map/ -- SandBlock, YoshiBlock, WoodBlockCube, WoodBlockL,
   WoodBlockTriangle, WoodBlockBridge, WoodBox, IceBlock, WatermelonBlock, BrickBlock, RideCloud, Uirou, Kamaboko, GetaGreen, GetaOrange, RailBlockB,
   RailBlockR, RollBlockB, RollBlockY, Pile, SignRiccoArrow, SignArrowUp, SignArrowLR, CasinoSecretMap, WaterHitHideObj, HiddenRedOneUp (.tscn) and
@@ -1876,6 +1879,8 @@ passes re-point this entry's tip.
   OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
   N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
   SmsHiddenCoin.cs, the .tres and .import churn).
+- To try 243b: open the Beach Cannon's Secret and the Yoshi-Go-Round's Secret -- the sky is the game's khaki and its deep blue, no grid. No Build
+  needed (shaders only).
 - To try 243: press the editor's Build first (the C# changed), run the project, pick a character: the Level Select now shows twelve WANTED posters in
   the game's course order (Hillside Cave, Dirty Lake, Ricco Tower, Sand Castle, Beach Cannon, Yoshi-Go-Round, Hotel Lobby, Casino Secret, Shell Secret,
   Village Underside, King Boo, Rematch); the row slides as the hand moves. Each new course opens with the game's start-camera pan and the Secret Course
