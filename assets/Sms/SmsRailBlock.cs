@@ -17,10 +17,25 @@ using Godot;
 /// so control() -- and the block's step -- runs 120 times a second. 237-240 stepped it 30 times a second: a quarter of the game's pace.
 /// 243c: RollWithTravel, a deviation Jaysonn asked for -- a block whose rail gives it no turn (the Casino's field cubes) rolls like a die as it
 /// travels, a quarter turn per side length, so it still lands flat at every node. Off by default: the game's.
+/// 244: authored like MovingPlatform -- drag the block in the editor to where the next stop is and click "Add Node At Current Location" (the node is
+/// written in game units in the parent's frame and the block snaps back home), "Set Origin Here" moves the whole rail with node 0, "Remove Last Node";
+/// MoveSpeedMetresPerSecond for a custom rail with one speed; the rail drawn in the editor as a line (nodes as crosses, the start node brighter), an
+/// unowned child that is never saved and never exists at run time.
 /// </summary>
 [Tool]
 public partial class SmsRailBlock : AnimatableBody3D
 {
+    [ExportGroup("Authoring (drag the block, then click)")]
+    /// <summary>Makes the block's current spot node 0 and moves the whole rail with it (the nodes keep their offsets); creates the rail if there is none.</summary>
+    [ExportToolButton("Set Origin Here")] public Callable SetOriginHereButton => Callable.From(SetOriginHere);
+    /// <summary>Adds the block's current spot as the next node (a zero turn, the rail's default speed) and snaps the block back to its start node.</summary>
+    [ExportToolButton("Add Node At Current Location")] public Callable AddNodeHereButton => Callable.From(AddNodeHere);
+    [ExportToolButton("Remove Last Node")] public Callable RemoveLastNodeButton => Callable.From(RemoveLastNode);
+
+    /// <summary>0 = the rail's own speeds (RailSpeeds, else the game's 2 u a tick = 3.22 m/s); above 0 = this many metres a second on every segment.</summary>
+    [Export] public float MoveSpeedMetresPerSecond = 0f;
+
+    [ExportGroup("Rail (the game's units: 74.44 to the metre)")]
     /// <summary>The rail's nodes (scene.ral), game units, in this node's parent's frame -- the block is set ON node StartNode at _Ready.</summary>
     [Export] public Vector3[] RailNodes = Array.Empty<Vector3>();
 
@@ -39,7 +54,10 @@ public partial class SmsRailBlock : AnimatableBody3D
     /// <summary>The first node it walks to; -1 = the game's pick (the nearest connected node, the lower index on a tie).</summary>
     [Export] public int StartTowards = -1;
 
+    /// <summary>Game units to the metre for RailNodes and RailSpeeds (74.44, the game's; 1 = author the nodes in metres).</summary>
     [Export] public float UnitsPerMetre = 74.44f;
+
+    [ExportGroup("Pace")]
     /// <summary>The game's movement ticks a second: a speed of 1 u a tick covers this many u a second (120: four ticks a 30 fps frame, none skipped).</summary>
     [Export] public float TicksPerSecond = 120f;
 
@@ -48,6 +66,7 @@ public partial class SmsRailBlock : AnimatableBody3D
 
     [Export] public bool Active = true;
 
+    [ExportGroup("Roll")]
     /// <summary>243c, Jaysonn's call over the game's: the block also ROLLS as it travels, like a die across a floor -- about the level axis across
     /// its path, a quarter turn per side length (RollSideUnits), so it lands flat at every node whose segment is a whole number of sides (the Casino's
     /// are: 800 u per field segment, 1600 across the start). The game turns a rail block only by its rail's node angles, and the Casino's exlift00,
@@ -73,6 +92,7 @@ public partial class SmsRailBlock : AnimatableBody3D
         _accum = Transform.Basis.Orthonormalized();
         _scale = Transform.Basis.Scale;
         SyncToPhysics = true;
+        if (!Engine.IsEditorHint()) SetProcess(false);   // _Process only draws the editor's rail line
         if (Engine.IsEditorHint() || RailNodes.Length < 2) return;
         _cur = Mathf.Clamp(StartNode, 0, RailNodes.Length - 1);
         Position = NodeMetres(_cur);
@@ -113,7 +133,7 @@ public partial class SmsRailBlock : AnimatableBody3D
         _segEnd = NodeMetres(_next);
         _segLen = (_segEnd - _segStart).Length();
         float u = _next < RailSpeeds.Length && RailSpeeds[_next] > 0f ? RailSpeeds[_next] : 2f;
-        _speed = u * TicksPerSecond / UnitsPerMetre * SpeedScale;
+        _speed = MoveSpeedMetresPerSecond > 0f ? MoveSpeedMetresPerSecond * SpeedScale : u * TicksPerSecond / UnitsPerMetre * SpeedScale;
         Vector3 t = _next < RailTurns.Length ? RailTurns[_next] : Vector3.Zero;
         _turn = new Vector3(Mathf.Wrap(t.X, -180f, 180f), Mathf.Wrap(t.Y, -180f, 180f), Mathf.Wrap(t.Z, -180f, 180f));   // MsAngleDiff: the short way
         _travelled = 0f;
@@ -168,4 +188,116 @@ public partial class SmsRailBlock : AnimatableBody3D
         Basis rigid = new Basis(rot.X * _scale.X, rot.Y * _scale.Y, rot.Z * _scale.Z);
         Transform = new Transform3D(rigid, pos);
     }
+
+    // ---- 244: authoring -- the three buttons (MovingPlatform's workflow) and the editor's rail line ----------------------------------------------
+
+    /// <summary>The block's current spot as a rail node: its local position (the parent's frame) in game units.</summary>
+    private Vector3 HereUnits() => Position * UnitsPerMetre;
+
+    /// <summary>Keeps RailTurns and RailSpeeds as long as RailNodes (a zero turn and the default speed for any node without an entry).</summary>
+    private void PadRailArrays()
+    {
+        int n = RailNodes.Length;
+        if (RailTurns.Length < n) { int o = RailTurns.Length; Array.Resize(ref RailTurns, n); for (int i = o; i < n; i++) RailTurns[i] = Vector3.Zero; }
+        if (RailSpeeds.Length < n) Array.Resize(ref RailSpeeds, n);
+    }
+
+    public void SetOriginHere()
+    {
+        Vector3 here = HereUnits();
+        if (RailNodes.Length == 0) RailNodes = new[] { here };
+        else
+        {
+            Vector3 shift = here - RailNodes[0];
+            for (int i = 0; i < RailNodes.Length; i++) RailNodes[i] += shift;
+        }
+        PadRailArrays();
+        StartNode = 0;
+        NotifyPropertyListChanged();
+        _previewStamp = null;
+    }
+
+    public void AddNodeHere()
+    {
+        if (RailNodes.Length == 0) { SetOriginHere(); return; }
+        Array.Resize(ref RailNodes, RailNodes.Length + 1);
+        RailNodes[^1] = HereUnits();
+        PadRailArrays();
+        Position = NodeMetres(Mathf.Clamp(StartNode, 0, RailNodes.Length - 1));   // back home: the block keeps standing where it starts
+        NotifyPropertyListChanged();
+        _previewStamp = null;
+    }
+
+    public void RemoveLastNode()
+    {
+        if (RailNodes.Length == 0) return;
+        int n = RailNodes.Length - 1;
+        Array.Resize(ref RailNodes, n);
+        if (RailTurns.Length > n) Array.Resize(ref RailTurns, n);
+        if (RailSpeeds.Length > n) Array.Resize(ref RailSpeeds, n);
+        StartNode = Mathf.Clamp(StartNode, 0, Math.Max(0, n - 1));
+        NotifyPropertyListChanged();
+        _previewStamp = null;
+    }
+
+    private MeshInstance3D _preview;   // the editor's rail line: unowned (never saved), rebuilt when the rail changes, absent at run time
+    private string _previewStamp;
+
+    public override void _Process(double delta)
+    {
+        if (!Engine.IsEditorHint()) return;
+        UpdatePreview();
+    }
+
+    public override void _ExitTree()
+    {
+        if (_preview != null && IsInstanceValid(_preview)) _preview.QueueFree();
+        _preview = null; _previewStamp = null;
+    }
+
+    /// <summary>Draws the rail in the parent's frame: the segments as lines, each node a cross, the start node brighter; a closed loop closes the line.</summary>
+    public void UpdatePreview()
+    {
+        if (RailNodes.Length == 0)
+        {
+            if (_preview != null && IsInstanceValid(_preview)) _preview.QueueFree();
+            _preview = null; _previewStamp = null;
+            return;
+        }
+        if (_preview == null || !IsInstanceValid(_preview))
+        {
+            _preview = new MeshInstance3D { Name = "RailPreview", TopLevel = true, CastShadow = GeometryInstance3D.ShadowCastingSetting.Off };
+            _preview.MaterialOverride = new StandardMaterial3D
+            {
+                ShadingMode = BaseMaterial3D.ShadingModeEnum.Unshaded, VertexColorUseAsAlbedo = true,
+                NoDepthTest = true, RenderPriority = 100
+            };
+            AddChild(_preview);   // no owner: the editor never saves it
+            _previewStamp = null;
+        }
+        // The nodes are in the parent's frame, so the line lives there: its own transform is the parent's (top level, so this node's does not add).
+        _preview.GlobalTransform = GetParent() is Node3D p ? p.GlobalTransform : Transform3D.Identity;
+        string stamp = $"{UnitsPerMetre}|{ClosedLoop}|{StartNode}|" + string.Join(";", RailNodes);
+        if (stamp == _previewStamp) return;
+        _previewStamp = stamp;
+        var im = new ImmediateMesh();
+        Color line = new Color(1f, 0.85f, 0.2f), cross = new Color(1f, 0.5f, 0.1f), start = new Color(0.3f, 1f, 0.4f);
+        im.SurfaceBegin(Mesh.PrimitiveType.Lines);
+        int n = RailNodes.Length;
+        for (int i = 0; i + 1 < n; i++) { im.SurfaceSetColor(line); im.SurfaceAddVertex(NodeMetres(i)); im.SurfaceSetColor(line); im.SurfaceAddVertex(NodeMetres(i + 1)); }
+        if (ClosedLoop && n > 2) { im.SurfaceSetColor(line); im.SurfaceAddVertex(NodeMetres(n - 1)); im.SurfaceSetColor(line); im.SurfaceAddVertex(NodeMetres(0)); }
+        float h = 0.6f;
+        for (int i = 0; i < n; i++)
+        {
+            Vector3 c = NodeMetres(i); Color k = i == Mathf.Clamp(StartNode, 0, n - 1) ? start : cross;
+            im.SurfaceSetColor(k); im.SurfaceAddVertex(c + Vector3.Left * h); im.SurfaceSetColor(k); im.SurfaceAddVertex(c + Vector3.Right * h);
+            im.SurfaceSetColor(k); im.SurfaceAddVertex(c + Vector3.Down * h); im.SurfaceSetColor(k); im.SurfaceAddVertex(c + Vector3.Up * h);
+            im.SurfaceSetColor(k); im.SurfaceAddVertex(c + Vector3.Forward * h); im.SurfaceSetColor(k); im.SurfaceAddVertex(c + Vector3.Back * h);
+        }
+        im.SurfaceEnd();
+        _preview.Mesh = im;
+    }
+
+    /// <summary>For a test: the preview's line vertex count (0 with no preview).</summary>
+    public int PreviewVertexCount() => _preview != null && IsInstanceValid(_preview) && _preview.Mesh is ImmediateMesh m && m.GetSurfaceCount() > 0 ? m.SurfaceGetArrays(0)[(int)Mesh.ArrayType.Vertex].AsVector3Array().Length : 0;
 }
