@@ -7,6 +7,8 @@ using Godot;
 /// texture by the RGB tint loaded after the rail name, waits where a rail node has flag 0x800, and uses
 /// TWoodBlock::calcRecycle when a node has flag 0x1000: fade for 180 ticks, reset, wait the node's roll ticks
 /// while hidden, then reappear. Rail positions remain in game units so generated scenes preserve scene.ral.
+/// The same script can drive TNormalLift instances; those use TRailMapObj's flashing recycle instead of the
+/// TWoodBlock colour fade and honor the rail's one-shot stop flag 0x100 after an arrival or recycle reset.
 /// </summary>
 public partial class SmsYoshiBlock : AnimatableBody3D
 {
@@ -19,7 +21,7 @@ public partial class SmsYoshiBlock : AnimatableBody3D
     /// <summary>Wait at each node, in game movement ticks. TNormalLift reads this from pitch when flag 0x800 is set.</summary>
     [Export] public int[] NodeWaitTicks = Array.Empty<int>();
 
-    /// <summary>Raw scene.ral flags. Flag 0x1000 starts TWoodBlock's fade, reset, and hidden-delay cycle.</summary>
+    /// <summary>Raw scene.ral flags. Flag 0x100 stops after arrival; 0x1000 starts the recycle cycle.</summary>
     [Export] public int[] NodeFlags = Array.Empty<int>();
 
     /// <summary>Hidden delay after a 0x1000 reset, in movement ticks. TNormalLift reads this from the node's roll.</summary>
@@ -34,7 +36,7 @@ public partial class SmsYoshiBlock : AnimatableBody3D
     /// <summary>The first destination node. Minus one makes the game-style nearest-connected choice.</summary>
     [Export] public int StartTowards = -1;
 
-    /// <summary>The scene.bin RGB values divided by 255, multiplied into the imported texture.</summary>
+    /// <summary>The scene.bin RGB values divided by 255, handed to the Yoshi block's TEV shader.</summary>
     [Export] public Color TintColor = Colors.White;
 
     /// <summary>Game units per metre used by ProjectShine.</summary>
@@ -43,7 +45,7 @@ public partial class SmsYoshiBlock : AnimatableBody3D
     /// <summary>The game's movement clock. TMarDirector performs map-object control 120 times per second.</summary>
     [Export] public float TicksPerSecond = 120f;
 
-    /// <summary>TWoodBlock::calcRecycle fade length. The game uses 180 movement ticks, or 1.5 seconds.</summary>
+    /// <summary>The game uses 180 movement ticks for either recycle presentation.</summary>
     [Export] public int RecycleFadeTicks = 180;
 
     /// <summary>One preserves the game's speed; this multiplier is exposed for play-test tuning.</summary>
@@ -60,7 +62,10 @@ public partial class SmsYoshiBlock : AnimatableBody3D
     private float _waitSeconds;
     private float _fadeSeconds;
     private float _hiddenSeconds;
+    private float _movementTicks;
     private bool _fadePending;
+    private bool _stopped;
+    private bool _woodBlockRecycle;
     private int _pendingHiddenTicks;
     private bool _firstSegment = true;
     private uint _savedCollisionLayer;
@@ -72,6 +77,7 @@ public partial class SmsYoshiBlock : AnimatableBody3D
         _savedCollisionLayer = CollisionLayer;
         _savedCollisionMask = CollisionMask;
         ApplyTint(this);
+        _woodBlockRecycle = HasYoshiTintShader(this);
         SetTransparency(this, 0f);
 
         if (Engine.IsEditorHint() || RailNodes.Length < 2)
@@ -129,11 +135,24 @@ public partial class SmsYoshiBlock : AnimatableBody3D
             return;
 
         float dt = (float)delta;
+        _movementTicks += dt * TicksPerSecond;
         if (_fadeSeconds > 0f)
         {
             _fadeSeconds = Mathf.Max(0f, _fadeSeconds - dt);
             float duration = Mathf.Max(1, RecycleFadeTicks) / TicksPerSecond;
-            SetTransparency(this, 1f - _fadeSeconds / duration);
+            if (_woodBlockRecycle)
+            {
+                SetTransparency(this, 1f - _fadeSeconds / duration);
+            }
+            else
+            {
+                // TRailMapObj::calcRecycle displays three of every four 4-tick groups for the first half,
+                // then alternating 4-tick groups for the second half. Rendering changes; collision remains.
+                float ticksRemaining = _fadeSeconds * TicksPerSecond;
+                int group = (int)MathF.Floor(_movementTicks / 4f);
+                bool visible = ticksRemaining < RecycleFadeTicks / 2f ? group % 2 != 0 : group % 4 != 0;
+                SetTransparency(this, visible ? 0f : 1f);
+            }
             if (_fadeSeconds <= 0f)
                 ResetAfterFade();
             return;
@@ -156,6 +175,8 @@ public partial class SmsYoshiBlock : AnimatableBody3D
             _fadeSeconds = Mathf.Max(1, RecycleFadeTicks) / TicksPerSecond;
             return;
         }
+        if (_stopped)
+            return;
 
         Vector3 target = NodeMetres(_next);
         float step = SegmentSpeed() * dt;
@@ -177,6 +198,7 @@ public partial class SmsYoshiBlock : AnimatableBody3D
         int flags = _current < NodeFlags.Length ? NodeFlags[_current] : 0;
         int waitTicks = _current < NodeWaitTicks.Length ? NodeWaitTicks[_current] : 0;
         _waitSeconds = waitTicks / TicksPerSecond;
+        _stopped = (flags & 0x100) != 0;
 
         if ((flags & 0x1000) != 0)
         {
@@ -184,7 +206,8 @@ public partial class SmsYoshiBlock : AnimatableBody3D
             _fadePending = true;
             return;
         }
-        AdvanceDestination();
+        if (!_stopped)
+            AdvanceDestination();
     }
 
     private void AdvanceDestination()
@@ -216,6 +239,11 @@ public partial class SmsYoshiBlock : AnimatableBody3D
         Position = NodeMetres(_current);
         SetDirection(_current, _next);
         _firstSegment = true;
+        int initialFlags = _current < NodeFlags.Length ? NodeFlags[_current] : 0;
+        _stopped = (initialFlags & 0x100) != 0;
+        _waitSeconds = (initialFlags & 0x800) != 0 && _current < NodeWaitTicks.Length
+            ? NodeWaitTicks[_current] / TicksPerSecond
+            : 0f;
         _hiddenSeconds = _pendingHiddenTicks / TicksPerSecond;
         _pendingHiddenTicks = 0;
         if (_hiddenSeconds <= 0f)
@@ -255,6 +283,25 @@ public partial class SmsYoshiBlock : AnimatableBody3D
         }
         foreach (Node child in node.GetChildren())
             ApplyTint(child);
+    }
+
+    private static bool HasYoshiTintShader(Node node)
+    {
+        if (node is MeshInstance3D mesh && mesh.Mesh != null)
+        {
+            for (int surface = 0; surface < mesh.Mesh.GetSurfaceCount(); surface++)
+            {
+                if (mesh.GetActiveMaterial(surface) is ShaderMaterial shader && shader.Shader != null
+                    && shader.Shader.ResourcePath.EndsWith("/SmsYoshiBlock.gdshader", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        foreach (Node child in node.GetChildren())
+        {
+            if (HasYoshiTintShader(child))
+                return true;
+        }
+        return false;
     }
 
     private static void SetTransparency(Node node, float amount)

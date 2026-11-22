@@ -1,7 +1,14 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://assets/Sms/Map/SmsBreakBlock.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Sms/Map/iceblock/iceblock.glb" id="2_model"]
+[ext_resource type="Shader" path="res://assets/Sms/Map/SmsIceBlock.gdshader" id="3_shader"]
+[ext_resource type="Texture2D" path="res://models/Sms/Map/iceblock/iceblock_1.png" id="4_ice"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ice"]
+shader = ExtResource("3_shader")
+shader_parameter/ice_texture = ExtResource("4_ice")
+shader_parameter/raster_tint = Vector3(1, 0.968627, 1)
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_solid"]
 size = Vector3(2.686728, 2.686728, 2.686728)
@@ -16,6 +23,7 @@ SolidShape = NodePath("CollisionShape3D")
 
 [node name="Model" parent="." instance=ExtResource("2_model")]
 transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)
+surface_material_override/1 = SubResource("ShaderMaterial_ice")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4777, 0)

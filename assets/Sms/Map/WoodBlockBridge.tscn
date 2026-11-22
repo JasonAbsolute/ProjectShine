@@ -9,7 +9,7 @@ data = PackedVector3Array(1.343364, 1.343364, 6.716819, 1.343364, -1.343364, 6.7
 
 [node name="WoodBlockBridge" type="AnimatableBody3D"]
 script = ExtResource("2_script")
-Tint = Color(1, 1, 1, 1)
+TintColor = Color(1, 1, 1, 1)
 
 [node name="Model" parent="." instance=ExtResource("1_glb")]
 transform = Transform3D(0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0, 0.01343364, 0, 0, 0)

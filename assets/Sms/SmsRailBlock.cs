@@ -135,7 +135,7 @@ public partial class SmsRailBlock : AnimatableBody3D
         float u = _next < RailSpeeds.Length && RailSpeeds[_next] > 0f ? RailSpeeds[_next] : 2f;
         _speed = MoveSpeedMetresPerSecond > 0f ? MoveSpeedMetresPerSecond * SpeedScale : u * TicksPerSecond / UnitsPerMetre * SpeedScale;
         Vector3 t = _next < RailTurns.Length ? RailTurns[_next] : Vector3.Zero;
-        _turn = new Vector3(Mathf.Wrap(t.X, -180f, 180f), Mathf.Wrap(t.Y, -180f, 180f), Mathf.Wrap(t.Z, -180f, 180f));   // MsAngleDiff: the short way
+        _turn = new Vector3(ShortWay(t.X), ShortWay(t.Y), ShortWay(t.Z));
         _travelled = 0f;
         _rollAxis = Vector3.Zero; _rollAngle = 0f;
         if (RollWithTravel && RollSideUnits > 0f)
@@ -151,6 +151,14 @@ public partial class SmsRailBlock : AnimatableBody3D
 
     /// <summary>RollWithTravel: the roll made over the fraction f of this segment (identity when the roll is off or the segment is vertical).</summary>
     private Basis Roll(float f) => _rollAxis == Vector3.Zero ? Basis.Identity : new Basis(_rollAxis, _rollAngle * f);
+
+    /// <summary>MsAngleDiff(angle, 0): the short way round, in the game's range (-180, 180] -- a node angle of exactly 180 turns +180 (the Casino's
+    /// three half-turn cubes, exlift02 / 09 / 10). 237-245 used Godot's Wrap, whose range is [-180, 180), so those three turned the other way (246).</summary>
+    private static float ShortWay(float deg)
+    {
+        float w = Mathf.Wrap(deg, -180f, 180f);
+        return Mathf.IsEqualApprox(w, -180f) ? 180f : w;
+    }
 
     /// <summary>MsMtxSetRotRPH: Rz(roll) * Ry(yaw) * Rx(pitch), degrees.</summary>
     private static Basis RotRPH(Vector3 deg)

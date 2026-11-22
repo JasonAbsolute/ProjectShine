@@ -99,14 +99,16 @@ public partial class SmsDirtyLakeWoodBlock : AnimatableBody3D
                 break;
 
             case Phase.FadeAtEnd:
-                _ticksRemaining--;
-                ApplyTint(Mathf.Clamp((float)_ticksRemaining / Mathf.Max(1, FadeTicks), 0f, 1f));
-                if (_ticksRemaining <= 0)
+                if (_ticksRemaining > 0)
                 {
-                    Position = _homePosition;
-                    ApplyTint(1f);
-                    ChangePhase(Phase.ResetDelay, ResetDelayTicks);
+                    _ticksRemaining--;
+                    ApplyTint(Mathf.Clamp((float)_ticksRemaining / Mathf.Max(1, FadeTicks), 0f, 1f));
+                    return;
                 }
+
+                Position = _homePosition;
+                ApplyTint(1f);
+                ChangePhase(Phase.ResetDelay, ResetDelayTicks);
                 break;
 
             case Phase.ResetDelay:
@@ -137,7 +139,6 @@ public partial class SmsDirtyLakeWoodBlock : AnimatableBody3D
                 if (mesh.GetActiveMaterial(i) is not StandardMaterial3D source)
                     continue;
                 var material = (StandardMaterial3D)source.Duplicate();
-                material.Transparency = BaseMaterial3D.TransparencyEnum.Alpha;
                 mesh.SetSurfaceOverrideMaterial(i, material);
                 _materials.Add(material);
             }
@@ -147,9 +148,10 @@ public partial class SmsDirtyLakeWoodBlock : AnimatableBody3D
             CollectMaterials(child);
     }
 
-    private void ApplyTint(float alpha)
+    private void ApplyTint(float multiplier)
     {
-        var color = new Color(TintColor.R, TintColor.G, TintColor.B, Mathf.Clamp(alpha, 0f, 1f));
+        multiplier = Mathf.Clamp(multiplier, 0f, 1f);
+        var color = new Color(TintColor.R * multiplier, TintColor.G * multiplier, TintColor.B * multiplier, 1f);
         foreach (StandardMaterial3D material in _materials)
             material.AlbedoColor = color;
     }

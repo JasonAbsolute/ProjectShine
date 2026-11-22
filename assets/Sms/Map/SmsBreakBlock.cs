@@ -24,7 +24,7 @@ public partial class SmsBreakBlock : AnimatableBody3D, ISmsSprayTarget
     [Export] public Node3D Model;
     /// <summary>The animated WatermelonBlockBreak or BrickBlockBreak model. Ice has no break model.</summary>
     [Export] public Node3D BreakModel;
-    /// <summary>The solid shape disabled as soon as the block breaks or finishes melting.</summary>
+    /// <summary>The solid shape disabled as soon as the block breaks or starts automatic melting.</summary>
     [Export] public CollisionShape3D SolidShape;
     /// <summary>The overlap zone used for Mario's hip-drop or rising head hit.</summary>
     [Export] public Area3D HitZone;
@@ -42,6 +42,7 @@ public partial class SmsBreakBlock : AnimatableBody3D, ISmsSprayTarget
     private Vector3 _scale;
     private float _tickAccum;
     private float _brokenFor;
+    private bool _collisionDisabled;
     private bool _broken;
 
     public bool Broken => _broken;
@@ -70,7 +71,11 @@ public partial class SmsBreakBlock : AnimatableBody3D, ISmsSprayTarget
             int ticks = (int)_tickAccum;
             _tickAccum -= ticks;
             if (_scale.Y < _initialScale.Y * AutoMeltThreshold)
+            {
+                // TIceBlock::control removes map collision as soon as the automatic tail starts.
+                DisableCollision();
                 for (int i = 0; i < ticks && !_broken; i++) Melt(AutoMeltPerTick, true);
+            }
             return;
         }
         if (HitZone == null) return;
@@ -124,12 +129,19 @@ public partial class SmsBreakBlock : AnimatableBody3D, ISmsSprayTarget
         Transform = new Transform3D(scaled, Transform.Origin);
     }
 
+    private void DisableCollision()
+    {
+        if (_collisionDisabled) return;
+        _collisionDisabled = true;
+        if (SolidShape != null) SolidShape.SetDeferred(CollisionShape3D.PropertyName.Disabled, true);
+    }
+
     /// <summary>TBreakHideObj::kill / TBrickBlock::kill: collision off, whole model hidden, break animation and optional effects started.</summary>
     public void BreakNow()
     {
         if (_broken) return;
         _broken = true;
-        if (SolidShape != null) SolidShape.SetDeferred(CollisionShape3D.PropertyName.Disabled, true);
+        DisableCollision();
         if (HitZone != null) HitZone.SetDeferred(Area3D.PropertyName.Monitoring, false);
         if (Model != null) Model.Visible = false;
         if (BreakModel != null)

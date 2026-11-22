@@ -14,8 +14,10 @@ public partial class SmsWoodBlock : AnimatableBody3D
     [Export(PropertyHint.ColorNoAlpha)] public Color TintColor = Colors.White;
     /// <summary>The lower rail node relative to the placed upper node, in project metres.</summary>
     [Export] public Vector3 LowOffsetMeters = Vector3.Zero;
-    /// <summary>The rail yaw value times 0.01 units per tick, converted to metres per second.</summary>
+    /// <summary>The rail yaw speed used after the first node arrival, converted to metres per second.</summary>
     [Export] public float MoveSpeedMetersPerSecond = 9.672219f;
+    /// <summary>TNormalLift's constructor speed for the first outbound segment: one game unit per tick.</summary>
+    [Export] public float InitialMoveSpeedMetersPerSecond = 120f / 74.44f;
     /// <summary>The upper rail node's pitch value: fully visible movement ticks before fading.</summary>
     [Export] public int VisibleWaitTicks;
     /// <summary>The upper rail node's roll value: movement ticks spent absent after recycling.</summary>
@@ -34,6 +36,7 @@ public partial class SmsWoodBlock : AnimatableBody3D
     private Phase _phase;
     private int _ticks;
     private float _accumulator;
+    private bool _firstOutbound = true;
 
     public override void _Ready()
     {
@@ -67,10 +70,15 @@ public partial class SmsWoodBlock : AnimatableBody3D
         switch (_phase)
         {
             case Phase.MoveLow:
-                if (MoveTo(_home + LowOffsetMeters)) Change(Phase.MoveHigh, 0);
+                float outboundSpeed = _firstOutbound ? InitialMoveSpeedMetersPerSecond : MoveSpeedMetersPerSecond;
+                if (MoveTo(_home + LowOffsetMeters, outboundSpeed))
+                {
+                    _firstOutbound = false;
+                    Change(Phase.MoveHigh, 0);
+                }
                 break;
             case Phase.MoveHigh:
-                if (MoveTo(_home)) Change(Phase.WaitVisible, VisibleWaitTicks);
+                if (MoveTo(_home, MoveSpeedMetersPerSecond)) Change(Phase.WaitVisible, VisibleWaitTicks);
                 break;
             case Phase.WaitVisible:
                 if (_ticks-- <= 0) Change(Phase.Fade, Mathf.Max(1, FadeTicks));
@@ -96,9 +104,9 @@ public partial class SmsWoodBlock : AnimatableBody3D
         }
     }
 
-    private bool MoveTo(Vector3 target)
+    private bool MoveTo(Vector3 target, float speedMetersPerSecond)
     {
-        float step = Mathf.Max(0f, MoveSpeedMetersPerSecond) / 120f;
+        float step = Mathf.Max(0f, speedMetersPerSecond) / 120f;
         Position = Position.MoveToward(target, step);
         return Position.IsEqualApprox(target);
     }

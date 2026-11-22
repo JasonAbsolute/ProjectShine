@@ -1,64 +1,113 @@
 using Godot;
 
 /// <summary>
-/// The Shell's Secret sliding board. TNormalLift::control in MapObjRailBlock.cpp moves it along a three-node rail at the node's yaw times 0.01 game units per 120 Hz tick, waits for the endpoint pitch count, and reverses at a dead end.
+/// The Shell's Secret sliding board. TNormalLift first approaches the nearest rail node at its
+/// default 1 unit/tick, then follows the chain at each destination node's yaw speed, waits at
+/// endpoint flag 0x800, and reverses at dead ends.
 /// </summary>
 public partial class SmsKamaboko : AnimatableBody3D
 {
-    /// <summary>Stops after the authored start, as offsets in metres.</summary>
+    /// <summary>Stops after the nearest rail node, as offsets from the authored placement in metres.</summary>
     [Export] public Vector3[] Waypoints = System.Array.Empty<Vector3>();
-    /// <summary>Travel speed in metres per second. The course rails use 3.5 units per tick, or 5.642128 m/s.</summary>
+    /// <summary>Travel speed after reaching the rail. This course uses 3.5 units/tick.</summary>
     [Export] public float MoveSpeed = 5.642128f;
-    /// <summary>Waits for each Waypoints stop in 120 Hz movement ticks; rico_ex1's rail endpoints use 20 and its middle uses 0.</summary>
+    /// <summary>Waits for each Waypoints stop in 120 Hz movement ticks.</summary>
     [Export] public int[] WaitTicks = System.Array.Empty<int>();
-    /// <summary>Wait at the authored home stop in 120 Hz movement ticks.</summary>
+    /// <summary>Wait at the nearest rail node in 120 Hz movement ticks.</summary>
     [Export] public int HomeWaitTicks = 20;
-    /// <summary>Loops through the listed stop sequence. Used when a board begins at the middle node so both dead ends remain endpoints.</summary>
+    /// <summary>Cycles the listed route. Used for the board that starts at the middle node.</summary>
     [Export] public bool Loop = false;
     /// <summary>The game's movement tick rate.</summary>
     [Export] public float TicksPerSecond = 120f;
     /// <summary>Disables movement while retaining the authored placement.</summary>
     [Export] public bool Active = true;
 
-    private Vector3 _home;
-    private int _target = 0;
+    // All three rico_ex1 boards are authored 50 game units above their nearest rail node.
+    // TRailMapObj starts with unk144 = 1.0, so this first approach is slower than rail travel.
+    [Export] public Vector3 InitialRailOffset = new Vector3(0f, -50f / 74.44f, 0f);
+    [Export] public float InitialMoveSpeed = 120f / 74.44f;
+
+    private Vector3 _authoredPosition;
+    private Vector3 _railStart;
+    private int _target;
     private int _direction = 1;
     private float _wait;
+    private bool _initialApproach = true;
 
     public override void _Ready()
     {
-        _home = Position;
+        _authoredPosition = Position;
+        _railStart = _authoredPosition + InitialRailOffset;
         SyncToPhysics = true;
     }
 
-    private Vector3 Stop(int index) => index == 0 ? _home : _home + Waypoints[index - 1];
+    private Vector3 Stop(int index) => index == 0 ? _railStart : _authoredPosition + Waypoints[index - 1];
 
     public override void _PhysicsProcess(double delta)
     {
-        if (Engine.IsEditorHint() || !Active || Waypoints.Length == 0) return;
+        if (Engine.IsEditorHint() || !Active || Waypoints.Length == 0)
+            return;
+
         float dt = (float)delta;
-        if (_wait > 0f) { _wait = Mathf.Max(0f, _wait - dt); return; }
+        if (_wait > 0f)
+        {
+            _wait = Mathf.Max(0f, _wait - dt);
+            return;
+        }
+
+        if (_initialApproach)
+        {
+            if (MoveTo(Stop(0), InitialMoveSpeed, dt))
+            {
+                _initialApproach = false;
+                _target = 0;
+                SetWait(HomeWaitTicks);
+            }
+            return;
+        }
+
         int stopCount = Waypoints.Length + 1;
         int next;
         if (Loop)
+        {
             next = (_target + 1) % stopCount;
+        }
         else
         {
             next = _target + _direction;
-            if (next < 0 || next >= stopCount) { _direction = -_direction; next = _target + _direction; }
+            if (next < 0 || next >= stopCount)
+            {
+                _direction = -_direction;
+                next = _target + _direction;
+            }
         }
-        Vector3 target = Stop(next);
-        Vector3 travel = target - Position;
-        float step = MoveSpeed * dt;
-        if (travel.Length() <= step)
+
+        if (MoveTo(Stop(next), MoveSpeed, dt))
         {
-            Position = target;
             _target = next;
-            int waitTicks = _target == 0 ? HomeWaitTicks : (_target - 1 < WaitTicks.Length ? WaitTicks[_target - 1] : 0);
-            if (waitTicks > 0)
-                _wait = waitTicks / Mathf.Max(1f, TicksPerSecond);
+            int waitTicks = _target == 0
+                ? HomeWaitTicks
+                : (_target - 1 < WaitTicks.Length ? WaitTicks[_target - 1] : 0);
+            SetWait(waitTicks);
         }
-        else
+    }
+
+    private bool MoveTo(Vector3 target, float speed, float delta)
+    {
+        Vector3 travel = target - Position;
+        float step = Mathf.Max(0f, speed) * delta;
+        if (travel.Length() > step)
+        {
             Position += travel.Normalized() * step;
+            return false;
+        }
+        Position = target;
+        return true;
+    }
+
+    private void SetWait(int ticks)
+    {
+        if (ticks > 0)
+            _wait = ticks / Mathf.Max(1f, TicksPerSecond);
     }
 }
