@@ -15918,3 +15918,11 @@ GetNodeOrNull convention is used.
 (2.20 s -> 4.96 s: no restart); two posters, the hand on Ricco Tower, a right step to Hillside Cave; the pick loads `assets/secrect_level.tscn`, the keeper
 is gone 1.5 s in and the course's own MSD_BGM_EXTRA plays. `soundshot251b.gd` run b: the two players on the Sfx bus at 0 / -6.51 dB, nothing on the first
 highlight, a right step plays Move, a left step again, a step at the row's start moves nothing and plays nothing, A plays Confirm, the pick loads Ricco.
+
+**251c** (code `ff07c28`) -- Jaysonn: "no not that sound for the pick it should be the sound the text box makes when it appears not the text showing on the
+screen. make sense?, Give the Player Select the same two sounds". The pick sound on both screens is now `MSD_SE_SY_TALK_MODE_IN` (0x4804: the sound
+`MSound::talkModeIn` plays the moment a talk begins -- the box coming up); TALK_OBI was the balloon's bands rolling out line by line, i.e. the text showing.
+The Player Select gets the Level Select's wiring (`CharacterSelect.cs`: MoveSoundPath / ConfirmSoundPath / SoundsAtGameLevel; the Sfx node in its scene)
+-- the yes / no cursor click on the hand's move between characters, the talk box on A. `MSD_SE_SY_2D_IN.wav` (the save card's window coming in) joins
+System/ and the table as the other "a box appears" sound for the knob. Verified on both screens by `soundshot251c.gd`: the players on the Sfx bus at
+0 / -2.08 dB (127 / 100 of 127), nothing on the first highlight, each step clicks, A plays the box as the pick begins, both picks load.
