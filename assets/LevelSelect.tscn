@@ -1,4 +1,4 @@
-[gd_scene load_steps=29 format=3]
+[gd_scene load_steps=36 format=3]
 
 [ext_resource type="Script" path="res://assets/LevelSelect.cs" id="1_script"]
 [ext_resource type="Resource" path="res://assets/levels/HillsideCaveEntry.tres" id="2_HillsideCaveEntry"]
@@ -27,6 +27,10 @@
 [ext_resource type="Texture2D" uid="uid://ffhg2psc0fxh" path="res://Font/CharacterSelect/MenuGraphic2.png" id="17_fishb"]
 [ext_resource type="Texture2D" uid="uid://drj2axgfyejce" path="res://Font/CharacterSelect/MenuGraphic1.png" id="18_pinkblob"]
 [ext_resource type="Texture2D" uid="uid://iwld5brm4v6n" path="res://Font/CharacterSelect/MenuGraphic10.png" id="19_pianta"]
+[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_big_on.png" id="20_bigon"]
+[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_big_off.png" id="21_bigoff"]
+[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_small_on.png" id="22_smallon"]
+[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_small_off.png" id="23_smalloff"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
 shader = ExtResource("8_grad")
@@ -34,6 +38,69 @@ shader_parameter/color_a = Color(1, 0.847, 0.263, 1)
 shader_parameter/color_b = Color(0.937, 0.404, 0.031, 1)
 shader_parameter/radial = true
 shader_parameter/bias = 0.85
+
+[sub_resource type="Animation" id="Animation_RESET"]
+length = 0.001
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("FigureBig:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("20_bigon")]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("FigureSmall:texture")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0),
+"transitions": PackedFloat32Array(1),
+"update": 1,
+"values": [ExtResource("22_smallon")]
+}
+
+[sub_resource type="Animation" id="Animation_blink"]
+resource_name = "blink"
+length = 1.5
+loop_mode = 1
+step = 0.1
+tracks/0/type = "value"
+tracks/0/imported = false
+tracks/0/enabled = true
+tracks/0/path = NodePath("FigureBig:texture")
+tracks/0/interp = 1
+tracks/0/loop_wrap = true
+tracks/0/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [ExtResource("20_bigon"), ExtResource("21_bigoff")]
+}
+tracks/1/type = "value"
+tracks/1/imported = false
+tracks/1/enabled = true
+tracks/1/path = NodePath("FigureSmall:texture")
+tracks/1/interp = 1
+tracks/1/loop_wrap = true
+tracks/1/keys = {
+"times": PackedFloat32Array(0, 1),
+"transitions": PackedFloat32Array(1, 1),
+"update": 1,
+"values": [ExtResource("22_smallon"), ExtResource("23_smalloff")]
+}
+
+[sub_resource type="AnimationLibrary" id="AnimationLibrary_blink"]
+_data = {
+&"RESET": SubResource("Animation_RESET"),
+&"blink": SubResource("Animation_blink")
+}
 
 [node name="LevelSelect" type="Control"]
 layout_mode = 3
@@ -181,6 +248,39 @@ stretch_mode = 5
 script = ExtResource("14_snap")
 AngleDegrees = -15.0
 HoldSeconds = 0.5
+
+[node name="FigureBig" type="TextureRect" parent="Decor"]
+layout_mode = 0
+offset_left = 536.0
+offset_top = 554.0
+offset_right = 630.0
+offset_bottom = 641.0
+rotation = 0.08
+mouse_filter = 2
+texture = ExtResource("20_bigon")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("14_snap")
+AngleDegrees = -15.0
+HoldSeconds = 0.5
+
+[node name="FigureSmall" type="TextureRect" parent="Decor"]
+layout_mode = 0
+offset_left = 642.0
+offset_top = 581.0
+offset_right = 713.0
+offset_bottom = 647.0
+rotation = -0.1
+mouse_filter = 2
+texture = ExtResource("22_smallon")
+expand_mode = 1
+stretch_mode = 5
+script = ExtResource("14_snap")
+HoldSeconds = 0.5
+
+[node name="FigureBlink" type="AnimationPlayer" parent="Decor"]
+libraries/ = SubResource("AnimationLibrary_blink")
+autoplay = "blink"
 
 [node name="Title" type="TextureRect" parent="."]
 layout_mode = 1
