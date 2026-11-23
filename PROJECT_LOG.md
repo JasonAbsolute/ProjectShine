@@ -15837,3 +15837,52 @@ centred poster, i.e. over the big figure for posters 2-9; it ends 6 px above the
 textures and his SnapRotate; FigureBlink playing `blink` (1.5 s, loops); both inside the screen under the poster row, between the GreenBlob and the
 Sunflower, feet within 2 px; 3.3 s sampled -- both twins shown, the two in step on every frame, lit 1.04 s / dark 0.50 s, 15-deg flips every 0.5 s; the hand
 at poster 2 ends above both figures; twelve posters; cancel loads the Player Select. Shots lit / dark / with the hand. No C# changed (no Build needed).
+
+### 250 -- Jaysonn's third playtest of the secret courses: the Dirty Lake's course map, the inside-out collision of his end platform / rail block / star platform made two-sided (the Village's "platform you fall into and cant leave"), the Secret Course theme without its Yoshi track (feature/kingboo-casino, code `5eda59a`)
+
+**Jaysonn:** "levels like dirty lake are missing platforms and the village underside has a platform you fall into and cant leave. please fix all
+the stages this is crazy how many details are missing. also the music is playing the yoshi version i think we just want the normal secrect level music."
+
+**The Dirty Lake's map** (`assets/Sms/Map/DirtyLakeMap.tscn`, `models/Sms/Map/DirtyLake/`; `secret250/gen_dirtylakemap250.py`, the Shell's 247
+recipe): coro_ex0's `map/map/map.bmd` is 95 KB -- the stage's white bolted block platforms (`_blo` unlit vertex colour, `_neji` the bolts, `_o17`
+lit) -- and its `map.col` has 152 triangles (the platforms up to y 15300 u and the fall surfaces); the 243 agent built the course from its placed
+pieces only, as the Shell's had. The rip's glb cleaned to one unskinned mesh, metallic 0; the col as a two-sided ConcavePolygonShape3D at 1/74.44;
+`DirtyLake.tscn` gains the CourseMap after its Sky. Checked: the other six courses' `map.bmd` are the 1824-byte sand plane (map.col 192 bytes),
+so this was the last course without its map. The `.import` the open editor wrote for the glb carried 11.7 MB of `importer_defaults`
+`_subresources` (Mario's animation settings); replaced by the lean form the headless imports write.
+
+**The collision** -- an audit of all ten courses, headless (`secret250/trapscan250.gd`: shape sweeps and probe bodies, which disagreed with Mario on
+kinematic movers; then `mariodrop250.gd` with MARIO HIMSELF: for every CollisionShape3D on his mask, the faces' world signed volume, a 1-m drop at
+the shape's top, a jump out). Five scenes had INSIDE-OUT faces (negative signed volume) with `backface_collision` off: one-sided faces whose fronts
+face inward let a body in and then hold it. Made two-sided with `backface_collision = true` (the geometry untouched; a closed shape is then solid
+from every side): his `Font/HudElements/ending_platofrom.tscn` (the end platform of the Village, Hotel Lobby, Beach Cannon and his Ricco and
+Hillside; 364 triangles, 13.43 m wide x 8.06 m tall at his 2.662 scale = the game's normalvariant3.col extents exactly; its top faces were right,
+its walls inverted -- in the Village the pedestal's wall stands on WoodBlockLong05's top (84.6), so Mario walking into it sank in and stayed), his
+`Levels/Rico4Secrect/Skybox/railvariant1.tscn` (all 320 triangles inverted; the Hotel Lobby's GearRailBlock, the Shell's RollBlock0, his Ricco rail
+blocks -- Mario fell into their tumbled faces, TRAPPED in the audit) and his `StarPlatform.tscn` (the Dirty Lake's RollStar, his Hillside stars).
+Left alone: his banana tree's leaf sheets (BananaLeafBounce.cs builds them one-sided; open surfaces, Mario landed on them in every drop).
+
+The audit's other fall-throughs were its own artefact, understood before anything was changed: a drop sampled on the LOWER block of a stack starts
+its ray inside the upper block (a ray does not report the shape it starts in), so Mario was set inside the upper block, pushed out through its
+bottom and left embedded; a riding Mario then snaps back from every later teleport, so a whole tower read TRAPPED (`check250.gd` frame by frame:
+NormalBlock13, the Yoshi-Go-Round tower's top, lands at -0.01 m; NormalBlock12 under it reads -1.82 from frame 0). The umaibou and the Casino's
+rolling cubes read the same way across their turning arms and faces; whether Mario rides a turning body cleanly is not something this audit can
+tell from a teleport, and he has not reported it.
+
+**The music** (`sound154/sms_bgm.py`: `Bgm.render(yoshi_drums=False)` leaves out every track that is child 15 of its parent; `--yoshi-drums`
+keeps it): `MSound::setParameterSeqSync` case 0 sets `mMute` on the track that is its parent's child 15 when the sequence syncs, and
+`MSBgm::setStageBgmYoshiPercussion` (Yoshi.cpp, mount / dismount) un-mutes and re-mutes it for BGMs whose switch has MSBgmSwBit_YoshiPercussion
+-- the Yoshi percussion part. k_ex.com's track 15: 537 notes on program 120 (241 rendered them in -- the "Yoshi version"); t_boss.com's: 6 notes
+on program 103; t_chuboss.com and the jingles have none. `MSD_BGM_EXTRA.wav` re-rendered (171.4 s, the same 6.84-s intro and 82.29-s loop,
+loop 2851962-5485104; level225 x0.7281 of the raw mix as before, so the remaining tracks keep their level; peak -5.09 dBFS) and
+`MSD_BGM_BOSS.wav` (98.9 s, loop 133806-3165384, x0.7281; the drums-kept render is byte-identical to the shipped file, so those six notes are
+the only change).
+
+**Verified:** `check250.gd` (windowed) -- CourseMap/StaticBody3D with the disc's 152 two-sided triangles and the mesh; Mario stands on the map's
+three highest platforms (205.53); the Village end platform's wall pushes a straddling Mario back out (z -89.8 -> -89.52 against the wall at -90.0)
+and he stands on its top (91.16); the Yoshi-Go-Round tower's top block lands him clean. `mariodrop250.gd` run c over the five courses that
+carry the fixed scenes: no one-sided inside-out shape left but the banana leaves. No C# changed (no Build needed).
+
+**Not in this pass:** the Shell's climbable PoleNormal (no pole mechanic in the project), the 100-coin Shines, the Casino's seagulls and shimmer,
+the invisible NPC boards -- all as the 243 reports listed them. Jaysonn moved the Level Select's GreenBlob, Sunflower and the two 249 figures in
+the editor while this pass ran; that edit is his, uncommitted in his tree.
