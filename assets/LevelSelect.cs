@@ -47,6 +47,22 @@ public partial class LevelSelect : Control
     /// <summary>Cancel (B / Escape) goes back to this scene; empty = no way back from here.</summary>
     [Export(PropertyHint.File, "*.tscn")] public string BackScene = "res://assets/CharacterSelect.tscn";
 
+    /// <summary>251b (Jaysonn: "the sound of when you pick yes or no for dialog option box as the sound it makes picking the levels"): the player that
+    /// clicks when the hand moves to another level -- the talk balloon's yes / no cursor, MSD_SE_SY_E3_MENU_CURSOR (Sfx/Move). Swap its stream for
+    /// another System sound (SELECT_COMMON is the yes / no pick itself). Empty = silent.</summary>
+    [Export] public NodePath MoveSoundPath = "Sfx/Move";
+
+    /// <summary>251b ("when you press A it plays the sound of a text box opening"): the player for the pick -- the talk balloon's band rolling open,
+    /// MSD_SE_SY_TALK_OBI (Sfx/Confirm). TALK_MODE_IN (the sound as talk mode begins) is the other candidate. Empty = silent.</summary>
+    [Export] public NodePath ConfirmSoundPath = "Sfx/Confirm";
+
+    private AudioStreamPlayer MoveSound, ConfirmSound;
+
+    /// <summary>Put the two players on the Sfx bus at the game's volume for their sound (SmsActorSound.LevelDb by the stream's file name); off = as set on the nodes.</summary>
+    [Export] public bool SoundsAtGameLevel = true;
+    /// <summary>A build marker for the drives (read in the built DLL before a run).</summary>
+    public const string BuildMarker = "SMS251B_SELECT_SOUNDS_B";
+
     private Container _portraits;
     private Control _selectHand;
     private ColorRect _fadeRect;
@@ -70,6 +86,16 @@ public partial class LevelSelect : Control
         BuildButtons();
         // 243: the row grows to its posters on the first layout (and on a window resize) -- re-seat the window round the highlighted poster then
         _portraits.Resized += () => { if (_highlighted >= 0) CallDeferred(nameof(SlideRowTo), _highlighted, false); };
+
+        // 251b: the two sounds on the Sfx bus at the game's volume for them (the sound table's volume of 127 for the yes / no cursor, 60 for the band)
+        MoveSound = MoveSoundPath.IsEmpty ? null : GetNodeOrNull<AudioStreamPlayer>(MoveSoundPath);
+        ConfirmSound = ConfirmSoundPath.IsEmpty ? null : GetNodeOrNull<AudioStreamPlayer>(ConfirmSoundPath);
+        foreach (var p in new[] { MoveSound, ConfirmSound })
+        {
+            if (p == null) continue;
+            p.Bus = SmsActorSound.SfxBus;
+            if (SoundsAtGameLevel && p.Stream != null) p.VolumeDb = SmsActorSound.LevelDb(System.IO.Path.GetFileNameWithoutExtension(p.Stream.ResourcePath));
+        }
 
         // the poster of the level just left (a Shine's exit, the Exit Area) is the one under the hand; else the first
         int start = 0;
@@ -146,6 +172,8 @@ public partial class LevelSelect : Control
     {
         if (index < 0 || index >= Levels.Length)
             return;
+        if (_highlighted >= 0 && _highlighted != index && MoveSound != null && MoveSound.Stream != null)
+            MoveSound.Play();                                   // 251b: the hand moves to another level -- the yes / no cursor's click (not on the first highlight)
         _highlighted = index;
 
         // Containers lay out on the next frame, so the button's rect isn't final yet on the first call - defer the move rather than reading a stale size.
@@ -233,6 +261,7 @@ public partial class LevelSelect : Control
 
         if (GameData.Instance != null)
             GameData.Instance.LevelSelectScene = SceneFilePath;   // the level's way back: a Shine's exit / the Exit Area with no destination of their own
+        if (ConfirmSound != null && ConfirmSound.Stream != null) ConfirmSound.Play();   // 251b: A -- the talk window's band rolls open
         GD.Print($"LevelSelect: {entry.DisplayName} -> {dest}");
 
         // Let the stamp finish painting before the level swallows the screen.

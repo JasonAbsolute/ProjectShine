@@ -23,6 +23,8 @@
 [ext_resource type="Texture2D" uid="uid://5pdmp7aygr4q" path="res://Font/LevelSelect/decor_small_off.png" id="23_smalloff"]
 [ext_resource type="Script" path="res://assets/Sms/Sound/SmsMenuMusic.cs" id="24_menumusic"]
 [ext_resource type="AudioStream" path="res://assets/Sms/Sound/Music/LevelCharSelectMusic.mp3" id="25_song"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_E3_MENU_CURSOR.wav" id="26_cursor"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_TALK_OBI.wav" id="27_obi"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
 shader = ExtResource("8_grad")
@@ -105,6 +107,8 @@ script = ExtResource("1_script")
 Levels = [ExtResource("4_RiccoTowerEntry"), ExtResource("2_HillsideCaveEntry")]
 PosterScene = ExtResource("6_poster")
 SelectHandPath = NodePath("SelectHand")
+MoveSoundPath = NodePath("Sfx/Move")
+ConfirmSoundPath = NodePath("Sfx/Confirm")
 SelectHandGap = 16.0
 
 [node name="Background" type="TextureRect" parent="." unique_id=1741321007]
@@ -327,3 +331,11 @@ color = Color(0, 0, 0, 0)
 [node name="Music" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("25_song")
 script = ExtResource("24_menumusic")
+
+[node name="Sfx" type="Node" parent="."]
+
+[node name="Move" type="AudioStreamPlayer" parent="Sfx"]
+stream = ExtResource("26_cursor")
+
+[node name="Confirm" type="AudioStreamPlayer" parent="Sfx"]
+stream = ExtResource("27_obi")
