@@ -36,6 +36,21 @@ public partial class CharacterSelect : Control
     private int _highlighted = -1;
     private readonly System.Collections.Generic.List<CharacterPoster> _buttons = new();
 
+    /// <summary>251c (Jaysonn: "Give the Player Select the same two sounds"): the player that clicks when the hand moves to another character -- the talk
+    /// balloon's yes / no cursor, MSD_SE_SY_E3_MENU_CURSOR (Sfx/Move). Swap its stream for another System sound (SELECT_COMMON is the yes / no pick). Empty = silent.</summary>
+    [Export] public NodePath MoveSoundPath = "Sfx/Move";
+
+    /// <summary>251c: the player for the pick -- the sound as a talk box comes up, MSD_SE_SY_TALK_MODE_IN (Sfx/Confirm). TALK_OBI (the bands rolling
+    /// out, the text showing) and SY_2D_IN (the save card's window) are in System/ for the knob. Empty = silent.</summary>
+    [Export] public NodePath ConfirmSoundPath = "Sfx/Confirm";
+
+    /// <summary>Put the two players on the Sfx bus at the game's volume for their sound (SmsActorSound.LevelDb by the stream's file name); off = as set on the nodes.</summary>
+    [Export] public bool SoundsAtGameLevel = true;
+    /// <summary>A build marker for the drives (read in the built DLL before a run).</summary>
+    public const string BuildMarker = "SMS251C_PLAYER_SELECT_SOUNDS";
+
+    private AudioStreamPlayer MoveSound, ConfirmSound;
+
     public override void _Ready()
     {
         _portraits = GetNodeOrNull<Container>(PortraitsContainerPath);
@@ -50,6 +65,16 @@ public partial class CharacterSelect : Control
             _fadeRect = GetNodeOrNull<ColorRect>(FadeOutPath);
 
         BuildButtons();
+
+        // 251c: the two sounds on the Sfx bus at the game's volume for them (the sound table: 127 for the yes / no cursor, 100 for talk mode's start)
+        MoveSound = MoveSoundPath.IsEmpty ? null : GetNodeOrNull<AudioStreamPlayer>(MoveSoundPath);
+        ConfirmSound = ConfirmSoundPath.IsEmpty ? null : GetNodeOrNull<AudioStreamPlayer>(ConfirmSoundPath);
+        foreach (var p in new[] { MoveSound, ConfirmSound })
+        {
+            if (p == null) continue;
+            p.Bus = SmsActorSound.SfxBus;
+            if (SoundsAtGameLevel && p.Stream != null) p.VolumeDb = SmsActorSound.LevelDb(System.IO.Path.GetFileNameWithoutExtension(p.Stream.ResourcePath));
+        }
 
         if (_buttons.Count > 0)
         {
@@ -127,6 +152,8 @@ public partial class CharacterSelect : Control
     {
         if (index < 0 || index >= Characters.Length)
             return;
+        if (_highlighted >= 0 && _highlighted != index && MoveSound != null && MoveSound.Stream != null)
+            MoveSound.Play();                                   // 251c: the hand moves to another character -- the yes / no cursor's click (not on the first highlight)
         _highlighted = index;
 
         // Containers lay out on the next frame, so the button's rect isn't final
@@ -177,6 +204,7 @@ public partial class CharacterSelect : Control
         GameData.Instance.SelectedCharacter = entry;
         // SMS pass 127: through an M gate the destination is the gate's stage (GameData.PendingStage), not this screen's own level
         string dest = GameData.Instance.PendingStage != null && GameData.Instance.PendingStage.ScenePath != "" ? GameData.Instance.PendingStage.ScenePath : LevelToLoad;
+        if (ConfirmSound != null && ConfirmSound.Stream != null) ConfirmSound.Play();   // 251c: A -- a talk box comes up (TALK_MODE_IN)
         GD.Print($"CharacterSelect: {entry.DisplayName} -> {dest}");
 
         // Let the stamp finish painting before the level swallows the screen.

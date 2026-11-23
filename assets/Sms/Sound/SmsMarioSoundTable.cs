@@ -513,7 +513,8 @@ public static class SmsMarioSoundTable
         ["MSD_SE_SY_E3_MENU_CURSOR"] = new SeInfo(127, 64, false, true, 0.187f, "System", id: 0x481Eu),     // 251b: the talk balloon's yes / no cursor; the Level Select's hand
         ["MSD_SE_SY_SELECT_COMMON"] = new SeInfo(127, 69, false, true, 0.343f, "System", id: 0x481Cu),      // 251b: the yes / no pick (an alternative for the Level Select's knobs)
         ["MSD_SE_SY_TALK_OBI"] = new SeInfo(60, 160, false, true, 0.755f, "System", id: 0x4827u),           // 251b: the talk window's band rolling open; the Level Select's A
-        ["MSD_SE_SY_TALK_MODE_IN"] = new SeInfo(100, 128, false, true, 0.707f, "System", id: 0x4804u),      // 251b: talk mode begins (an alternative)
+        ["MSD_SE_SY_TALK_MODE_IN"] = new SeInfo(100, 128, false, true, 0.707f, "System", id: 0x4804u),      // 251b / 251c: talk mode begins (a talk box comes up); the selects' A
+        ["MSD_SE_SY_2D_IN"] = new SeInfo(127, 48, false, true, 0.659f, "System", id: 0x4819u),              // 251c: the save card's window coming in (an alternative for A)
         ["MSD_SE_SY_GET_SHINE"] = new SeInfo(110, 255, false, true, 3.067f, "Object", id: 0x4814u),
         ["MSD_SE_SY_HP_RECOVER"] = new SeInfo(100, 208, false, true, 0.596f, id: 0x4801u),
         ["MSD_SE_SY_NEWP_AIR_TAME"] = new SeInfo(90, 208, true, false, 3.219f, id: 0x4022u),

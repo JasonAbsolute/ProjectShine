@@ -52,8 +52,10 @@ public partial class LevelSelect : Control
     /// another System sound (SELECT_COMMON is the yes / no pick itself). Empty = silent.</summary>
     [Export] public NodePath MoveSoundPath = "Sfx/Move";
 
-    /// <summary>251b ("when you press A it plays the sound of a text box opening"): the player for the pick -- the talk balloon's band rolling open,
-    /// MSD_SE_SY_TALK_OBI (Sfx/Confirm). TALK_MODE_IN (the sound as talk mode begins) is the other candidate. Empty = silent.</summary>
+    /// <summary>251b / 251c ("when you press A it plays the sound of a text box opening ... the sound the text box makes when it appears, not the text
+    /// showing on the screen"): the player for the pick -- the sound as a talk box comes up, MSD_SE_SY_TALK_MODE_IN (MSound::talkModeIn plays it the moment
+    /// a talk begins; Sfx/Confirm). TALK_OBI is the balloon's bands rolling out line by line (the text showing), SY_2D_IN the save card's window
+    /// coming in -- both in System/ for the knob. Empty = silent.</summary>
     [Export] public NodePath ConfirmSoundPath = "Sfx/Confirm";
 
     private AudioStreamPlayer MoveSound, ConfirmSound;
@@ -61,7 +63,7 @@ public partial class LevelSelect : Control
     /// <summary>Put the two players on the Sfx bus at the game's volume for their sound (SmsActorSound.LevelDb by the stream's file name); off = as set on the nodes.</summary>
     [Export] public bool SoundsAtGameLevel = true;
     /// <summary>A build marker for the drives (read in the built DLL before a run).</summary>
-    public const string BuildMarker = "SMS251B_SELECT_SOUNDS_B";
+    public const string BuildMarker = "SMS251C_SELECT_SOUNDS";
 
     private Container _portraits;
     private Control _selectHand;
@@ -261,7 +263,7 @@ public partial class LevelSelect : Control
 
         if (GameData.Instance != null)
             GameData.Instance.LevelSelectScene = SceneFilePath;   // the level's way back: a Shine's exit / the Exit Area with no destination of their own
-        if (ConfirmSound != null && ConfirmSound.Stream != null) ConfirmSound.Play();   // 251b: A -- the talk window's band rolls open
+        if (ConfirmSound != null && ConfirmSound.Stream != null) ConfirmSound.Play();   // 251b / 251c: A -- a talk box comes up (TALK_MODE_IN)
         GD.Print($"LevelSelect: {entry.DisplayName} -> {dest}");
 
         // Let the stamp finish painting before the level swallows the screen.

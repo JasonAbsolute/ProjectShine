@@ -24,7 +24,7 @@
 [ext_resource type="Script" path="res://assets/Sms/Sound/SmsMenuMusic.cs" id="24_menumusic"]
 [ext_resource type="AudioStream" path="res://assets/Sms/Sound/Music/LevelCharSelectMusic.mp3" id="25_song"]
 [ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_E3_MENU_CURSOR.wav" id="26_cursor"]
-[ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_TALK_OBI.wav" id="27_obi"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_TALK_MODE_IN.wav" id="27_talkin"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
 shader = ExtResource("8_grad")
@@ -338,4 +338,4 @@ script = ExtResource("24_menumusic")
 stream = ExtResource("26_cursor")
 
 [node name="Confirm" type="AudioStreamPlayer" parent="Sfx"]
-stream = ExtResource("27_obi")
+stream = ExtResource("27_talkin")

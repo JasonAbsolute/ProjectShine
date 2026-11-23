@@ -21,6 +21,8 @@
 [ext_resource type="Resource" path="res://assets/characters/YoshiEntry.tres" id="63_yoshi"]
 [ext_resource type="Script" path="res://assets/Sms/Sound/SmsMenuMusic.cs" id="70_menumusic"]
 [ext_resource type="AudioStream" path="res://assets/Sms/Sound/Music/LevelCharSelectMusic.mp3" id="71_song"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_E3_MENU_CURSOR.wav" id="72_cursor"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/System/MSD_SE_SY_TALK_MODE_IN.wav" id="73_talkin"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
 shader = ExtResource("60_grad")
@@ -42,6 +44,8 @@ PosterScene = ExtResource("51_poster")
 SelectHandPath = NodePath("SelectHand")
 SelectHandGap = 16.0
 LevelToLoad = "res://assets/LevelSelect.tscn"
+MoveSoundPath = NodePath("Sfx/Move")
+ConfirmSoundPath = NodePath("Sfx/Confirm")
 
 [node name="Background" type="TextureRect" parent="." unique_id=150886938]
 layout_mode = 1
@@ -230,3 +234,11 @@ color = Color(0, 0, 0, 0)
 [node name="Music" type="AudioStreamPlayer" parent="."]
 stream = ExtResource("71_song")
 script = ExtResource("70_menumusic")
+
+[node name="Sfx" type="Node" parent="."]
+
+[node name="Move" type="AudioStreamPlayer" parent="Sfx"]
+stream = ExtResource("72_cursor")
+
+[node name="Confirm" type="AudioStreamPlayer" parent="Sfx"]
+stream = ExtResource("73_talkin")
