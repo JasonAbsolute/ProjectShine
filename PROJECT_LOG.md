@@ -15886,3 +15886,35 @@ carry the fixed scenes: no one-sided inside-out shape left but the banana leaves
 **Not in this pass:** the Shell's climbable PoleNormal (no pole mechanic in the project), the 100-coin Shines, the Casino's seagulls and shimmer,
 the invisible NPC boards -- all as the 243 reports listed them. Jaysonn moved the Level Select's GreenBlob, Sunflower and the two 249 figures in
 the editor while this pass ran; that edit is his, uncommitted in his tree.
+
+### 251 / 251b -- the Level Select shows two courses for now (Ricco Tower, Hillside Cave); the Player Select and the Level Select play Jaysonn's menu song, one play carried across the two screens; the Level Select's hand clicks with the yes / no cursor sound and A plays the talk window's band (feature/kingboo-casino, code `3bef906` + `f0e1912`)
+
+**Jaysonn:** "ok there are still a bunch of broken things in all the levels we will fix them later. for now can we just have the level selct have rico, and
+bianco hill screct? and also for char select and level i have a song in the ref folder to use Level&CharSelectMusic.mp3" -- then: "next i want the sound of
+when you pick yes or no for dialog option box as the sound it makes picking the levels. and when you press A it plays the sound of a text box opening."
+
+**The list** (`assets/LevelSelect.tscn`): `Levels = [RiccoTowerEntry, HillsideCaveEntry]`; the ten other entries are off the scene's list but their
+`.tres` files stay under `assets/levels/` (an entry back on the list brings a course back). The scene is his working-tree file, so this commit also
+carries the decor moves he made in the editor tonight (GreenBlob, Sunflower, FigureBig, FigureSmall) and the editor's normalisation of it.
+
+**The song** (`assets/Sms/Sound/Music/LevelCharSelectMusic.mp3`, his `Ref/Level&CharSelectMusic.mp3` renamed without the `&`; 73.2 s): new
+`assets/Sms/Sound/SmsMenuMusic.cs` on a Music node in both select scenes. One piece for both screens, so it does not restart on the way from the Player
+Select to the Level Select: the first menu to ready hands the song to a KEEPER of the same class under `/root/SmsMenuMusic` (CarryAcrossMenus; the next
+menu with the same song leaves it playing); the keeper watches the current scene each frame and, when none of its children is an SmsMenuMusic -- a level,
+the title -- fades out over FadeOutSeconds (0.35) and frees itself; StopAllMusic cuts it like any music player; a return to the Level Select starts it
+over. Loop (+ LoopOffset) on the mp3 stream as the rematch does; StreamDb -5.2 on top of SmsActorSound.MusicDb on the Music bus (the song is mastered
+loud: RMS -12.4 dBFS, peaks at 0, against the boss theme's render at -17.6; -5.2 puts it level with the themes); SmsActorSound.Music off = silent.
+
+**The sounds** (251b, `assets/Sms/Sound/System/`, baked from the disc's sequence data with `sms_audio.py bake`): `MSD_SE_SY_E3_MENU_CURSOR.wav` (0x481E,
+0.19 s: the talk balloon's yes / no highlight moving, also the card save's hand) on the hand's move to ANOTHER level, and `MSD_SE_SY_TALK_OBI.wav` (0x4827,
+0.76 s: a talk window's band rolling open) on A as the pick begins. `LevelSelect.cs`: MoveSoundPath / ConfirmSoundPath (Sfx/Move, Sfx/Confirm), both on
+the Sfx bus at the sound table's level (SoundsAtGameLevel: 127 -> 0 dB, 60 -> -6.5 dB); nothing on the first highlight at load. Two alternatives shipped
+for the knobs with table rows: `MSD_SE_SY_SELECT_COMMON.wav` (the yes / no PICK) and `MSD_SE_SY_TALK_MODE_IN.wav` (talk mode begins). The Player Select
+has no sounds yet (not asked). A first wiring as [Export] AudioStreamPlayer fields set by NodePath came up null at run time; the project's NodePath +
+GetNodeOrNull convention is used.
+
+**Verified:** build 0 errors (the marker constants read in the DLL as UTF-16 through PowerShell -- an ASCII findstr misses a C# string constant);
+`menushot251.gd` (windowed): the keeper plays on the Music bus at -9.2 dB, looping; the pick loads the Level Select with the SAME keeper still playing
+(2.20 s -> 4.96 s: no restart); two posters, the hand on Ricco Tower, a right step to Hillside Cave; the pick loads `assets/secrect_level.tscn`, the keeper
+is gone 1.5 s in and the course's own MSD_BGM_EXTRA plays. `soundshot251b.gd` run b: the two players on the Sfx bus at 0 / -6.51 dB, nothing on the first
+highlight, a right step plays Move, a left step again, a step at the row's start moves nothing and plays nothing, A plays Confirm, the pick loads Ricco.
