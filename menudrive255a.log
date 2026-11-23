@@ -1,0 +1,16 @@
+Godot Engine v4.7.1.stable.mono.official.a13da4feb - https://godotengine.org
+
+[M255] load CharacterSelect -> 0
+[M255] PASS: the Player Select loaded (CharacterSelect)
+[M255] PASS: the SmsGcAdapter autoload is there
+[M255] ui_right events: [InputEventKey: keycode=4194321 (Right), mods=none, physical=false, location=unspecified, pressed=false, echo=false, InputEventJoypadButton: button_index=14, pressed=false, pressure=0.00, InputEventJoypadMotion: axis=0, axis_value=1.00]
+[M255] ui_accept events: [InputEventKey: keycode=4194309 (Enter), mods=none, physical=false, location=unspecified, pressed=false, echo=false, InputEventKey: keycode=4194310 (Kp Enter), mods=none, physical=false, location=unspecified, pressed=false, echo=false, InputEventKey: keycode=32 (Space), mods=none, physical=false, location=unspecified, pressed=false, echo=false]
+[M255] focus at start: Portrait0
+[M255] after pad stick right: focus Portrait1
+[M255] PASS: a plain pad's stick right moves the hand (Portrait0 -> Portrait1)
+[M255] PASS: and stick left brings it back (Portrait1 -> Portrait0)
+[M255] after the adapter's stick right: focus Portrait0; adapter device 20 axis 0 = 0.0
+[M255] FAIL: the adapter's stick right moves the hand (Portrait0 -> Portrait0)
+[M255] PASS: and its stick left brings it back (Portrait0)
+[M255] FAIL: a plain pad's A confirms the character and the Level Select comes up (scene now CharacterSelect)
+[M255] DONE fails=2

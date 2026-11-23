@@ -23,6 +23,29 @@
 [ext_resource type="Script" uid="uid://f2hy74ux2obi" path="res://assets/Sms/SmsReturnSpot.cs" id="20_arohq"]
 [ext_resource type="PackedScene" uid="uid://vodc17m8tfot" path="res://yellow_coin.tscn" id="20_s1m0r"]
 [ext_resource type="Texture2D" uid="uid://cvyk3kjuhnex7" path="res://Font/LifeMeter/194-p.png" id="23_s1m0r"]
+[ext_resource type="PackedScene" uid="uid://clw07sfgk75uv" path="res://blue_coin.tscn" id="23_yb4ke"]
+[ext_resource type="PackedScene" uid="uid://chamukuri0125" path="res://assets/Sms/Enemy/Hamukuri.tscn" id="25_akyh3"]
+[ext_resource type="PackedScene" uid="uid://cdorokuri125f" path="res://assets/Sms/Enemy/Dorokuri.tscn" id="26_ummxf"]
+[ext_resource type="PackedScene" uid="uid://chanekuri125f" path="res://assets/Sms/Enemy/Hanekuri.tscn" id="27_rgary"]
+[ext_resource type="PackedScene" uid="uid://cfirehamu125g" path="res://assets/Sms/Enemy/FireHamukuri.tscn" id="28_yn6uu"]
+[ext_resource type="PackedScene" uid="uid://bpbr2gp3pfcio" path="res://assets/Sms/Enemy/Dango.tscn" id="29_r33fa"]
+[ext_resource type="PackedScene" uid="uid://cdorohane125g" path="res://assets/Sms/Enemy/DoroHane.tscn" id="30_l64f2"]
+[ext_resource type="PackedScene" uid="uid://claunch126" path="res://assets/Sms/Enemy/Spawn/Launcher.tscn" id="31_gvmbb"]
+[ext_resource type="PackedScene" uid="uid://cspawner126" path="res://assets/Sms/Enemy/Spawn/Spawner.tscn" id="32_oteg1"]
+[ext_resource type="PackedScene" uid="uid://coneshot126" path="res://assets/Sms/Enemy/Spawn/OneShotSpawner.tscn" id="33_k405l"]
+[ext_resource type="PackedScene" uid="uid://qs0dnce4fbuh" path="res://assets/Sms/Enemy/Spawn/GateKeeper.tscn" id="34_oteg1"]
+[ext_resource type="Texture2D" uid="uid://bdhj8lesayde6" path="res://assets/Sms/Fx/Goop/OilGoop.png" id="35_k405l"]
+[ext_resource type="PackedScene" uid="uid://cmgate127a" path="res://assets/Sms/Gate/MGate.tscn" id="36_1n17g"]
+[ext_resource type="Resource" uid="uid://bsbbfjarv8sfe" path="res://assets/Sms/Gate/Stages/RiccoHarbor.tres" id="37_obmlf"]
+[ext_resource type="PackedScene" uid="uid://cpoihana128" path="res://assets/Sms/Enemy/Poihana.tscn" id="38_o6ljn"]
+[ext_resource type="PackedScene" uid="uid://chanasambo13a" path="res://assets/Sms/Enemy/Sambo/HanaSambo.tscn" id="39_bohq5"]
+[ext_resource type="PackedScene" uid="uid://cbombhei130" path="res://assets/Sms/Enemy/Bomb/BombHei.tscn" id="40_tcd2q"]
+[ext_resource type="PackedScene" uid="uid://d136gorodoro" path="res://assets/Sms/Enemy/Gorogoro/GoroDoro.tscn" id="41_milaf"]
+[ext_resource type="PackedScene" uid="uid://d136gorofumi" path="res://assets/Sms/Enemy/Gorogoro/GoroFumi.tscn" id="42_27p00"]
+[ext_resource type="PackedScene" uid="uid://d136gorogoro" path="res://assets/Sms/Enemy/Gorogoro.tscn" id="43_tm7kf"]
+[ext_resource type="PackedScene" uid="uid://d14akumokun" path="res://assets/Sms/Enemy/Kumokun.tscn" id="44_27p00"]
+[ext_resource type="PackedScene" uid="uid://dbwanwan1" path="res://assets/Sms/Enemy/BossWanwan.tscn" id="45_tm7kf"]
+[ext_resource type="PackedScene" uid="uid://d153arena" path="res://assets/Sms/Enemy/BossTelesa/KingBooArena.tscn" id="46_jmips"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_82gkg"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -209,7 +232,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84.5004, -14.4019, 41)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -86.2609, -14.4019, 41)
 
 [node name="Mario" parent="." unique_id=1241972682 instance=ExtResource("6_swhci")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.4623823, 20.642525)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7973862, 49.337856, 182.16347)
 
 [node name="Sea" type="Area3D" parent="." unique_id=927641836 groups=["sms_water"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.4823, -20.054996, 0)
@@ -405,9 +428,87 @@ FromScene = "uid://cwve1f1kpa2pf"
 transform = Transform3D(0.06797475, -0.090072304, -0.9936126, -0.06874141, 0.99312663, -0.0947309, 0.9953161, 0.07474168, 0.06131585, -8.04111, 5.372006, 40.22412)
 script = ExtResource("19_lltui")
 Kind = 4
-HiddenScene = ExtResource("20_s1m0r")
+HiddenScene = ExtResource("23_yb4ke")
 AppearSpeed = 120.0
 AppearYSpeed = -100.0
 PictureColor = Color(1, 1, 1, 1)
 PictureTexture = ExtResource("23_s1m0r")
 PictureSize = Vector2(10, 10.035)
+
+[node name="Hamukuri" parent="." unique_id=2092283852 instance=ExtResource("25_akyh3")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.4665904, 17.46779)
+
+[node name="Dorokuri" parent="." unique_id=721707628 instance=ExtResource("26_ummxf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.452956, 1.6829534, 16.630024)
+
+[node name="Hanekuri" parent="." unique_id=1957604868 instance=ExtResource("27_rgary")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 8.753688, 4.9352627, 16.974762)
+
+[node name="FireHamukuri" parent="." unique_id=863021561 instance=ExtResource("28_yn6uu")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 9.506777, 1.3297358, 17.973701)
+
+[node name="Dango" parent="." unique_id=766604297 instance=ExtResource("29_r33fa")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 13.087622, 0, 12.082092)
+
+[node name="DoroHane" parent="." unique_id=497582611 instance=ExtResource("30_l64f2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -14.858886, 1.933177, 11.551877)
+
+[node name="Launcher" parent="." unique_id=1569965966 instance=ExtResource("31_gvmbb")]
+transform = Transform3D(1, 0, 0, 0, -4.371139e-08, 1, 0, -1, -4.371139e-08, -29.71543, 2.629477, 30.20052)
+
+[node name="Spawner" parent="." unique_id=1608625011 instance=ExtResource("32_oteg1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -34.142487, 1.8966551, 31.244076)
+
+[node name="OneShotSpawner" parent="." unique_id=2052361428 instance=ExtResource("33_k405l")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -36.80035, 4.2357264, 30.701586)
+
+[node name="GateKeeper" parent="." unique_id=1728280884 instance=ExtResource("34_oteg1")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -31.547335, 0, 39.858334)
+Kind = 0
+GoopTexture = ExtResource("35_k405l")
+
+[node name="MGate" parent="." unique_id=1322131429 instance=ExtResource("36_1n17g")]
+transform = Transform3D(0.0025348635, 0, 0.9999968, 0, 1, 0, -0.9999968, 0, 0.0025348635, -24.57877, -14.01844, 62.175186)
+Stage = ExtResource("37_obmlf")
+SprayFirst = true
+WindAlpha = 0.6
+WindSize = 0.75
+RayAlpha = 0.4
+
+[node name="Poihana" parent="." unique_id=631320980 instance=ExtResource("38_o6ljn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -44.9469, -14.299411, 67.65154)
+UseBodyColor = true
+BodyColor = Color(0, 0.5070334, 0.095717795, 1)
+
+[node name="Poihana2" parent="." unique_id=822870624 instance=ExtResource("38_o6ljn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -51.6343, -14.299411, 67.65154)
+Kind = 2
+
+[node name="Poihana3" parent="." unique_id=142693438 instance=ExtResource("38_o6ljn")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -48.04684, -14.299411, 67.65154)
+Kind = 1
+
+[node name="HanaSambo" parent="." unique_id=2010651523 instance=ExtResource("39_bohq5")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -62.04311, -13.404418, 67.83624)
+
+[node name="BombHei" parent="." unique_id=1050324769 instance=ExtResource("40_tcd2q")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -68.30199, -12.391301, 51.502686)
+
+[node name="GoroDoro" parent="." unique_id=1655233994 instance=ExtResource("41_milaf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -75.72965, -13.72288, 56.185226)
+EmitFrames = 1.0
+
+[node name="GoroFumi" parent="." unique_id=963537974 instance=ExtResource("42_27p00")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -72.21141, -14.344913, 69.2247)
+
+[node name="Gorogoro" parent="." unique_id=770845714 instance=ExtResource("43_tm7kf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -75.224106, -6.2134504, 74.1209)
+
+[node name="Kumokun" parent="." unique_id=387001647 instance=ExtResource("44_27p00")]
+transform = Transform3D(1, 0, 0, 0, 0.13541271, -0.9907893, 0, 0.9907893, 0.13541271, -17.48244, -8.498229, 65.86089)
+
+[node name="BossWanwan" parent="." unique_id=1970505528 instance=ExtResource("45_tm7kf")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -113.17684, -14.886137, 64.75685)
+
+[node name="KingBooArena" parent="." unique_id=2006943446 instance=ExtResource("46_jmips")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 37.13945, 180.73405)

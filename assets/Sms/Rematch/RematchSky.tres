@@ -1,11 +1,11 @@
-[gd_resource type="ShaderMaterial" load_steps=7 format=3 uid="uid://d208rematchsk"]
+[gd_resource type="ShaderMaterial" format=3 uid="uid://d208rematchsk"]
 
-[ext_resource type="Shader" path="res://assets/Sms/Rematch/RematchSky.gdshader" id="1_sky"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_bg04.png" id="2_bg04"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_sin_wave.png" id="3_sin"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_gs001m.png" id="4_gs"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_gaku_fire01.png" id="5_fire"]
-[ext_resource type="Texture2D" path="res://assets/Sms/Rematch/Sky/lm_ramp02.png" id="6_ramp"]
+[ext_resource type="Shader" uid="uid://bhmabdw4rjny4" path="res://assets/Sms/Rematch/RematchSky.gdshader" id="1_sky"]
+[ext_resource type="Texture2D" uid="uid://d208skybg04a" path="res://assets/Sms/Rematch/Sky/lm_bg04.png" id="2_bg04"]
+[ext_resource type="Texture2D" uid="uid://d208skysinwav" path="res://assets/Sms/Rematch/Sky/lm_sin_wave.png" id="3_sin"]
+[ext_resource type="Texture2D" uid="uid://d208skygs001m" path="res://assets/Sms/Rematch/Sky/lm_gs001m.png" id="4_gs"]
+[ext_resource type="Texture2D" uid="uid://d208skyfire01" path="res://assets/Sms/Rematch/Sky/lm_gaku_fire01.png" id="5_fire"]
+[ext_resource type="Texture2D" uid="uid://d208skyramp02" path="res://assets/Sms/Rematch/Sky/lm_ramp02.png" id="6_ramp"]
 
 [resource]
 resource_name = "SMS 208: Luigi's Mansion's boss-arena sky (the disc's vrball_B dome: its three textures, its scrolls, its colour flashes); 208b: the final-boss sky (vrKoopa: the fire, the red glow) behind final_blend -- the knobs are the shader parameters"
@@ -15,3 +15,33 @@ shader_parameter/sin_wave = ExtResource("3_sin")
 shader_parameter/gs001m = ExtResource("4_gs")
 shader_parameter/gaku_fire01 = ExtResource("5_fire")
 shader_parameter/ramp02 = ExtResource("6_ramp")
+shader_parameter/final_blend = 0.0
+shader_parameter/final_brightness = 1.0
+shader_parameter/final_fire_gain = 1.0
+shader_parameter/final_streak_gain = 1.0
+shader_parameter/final_turn = 0.0
+shader_parameter/final_stretch = 2.5
+shader_parameter/final_drop = 0.0
+shader_parameter/final_flame_tiles = 1.6
+shader_parameter/peace_blend = 0.0
+shader_parameter/peace_zenith = Color(0.012, 0.022, 0.075, 1)
+shader_parameter/peace_mid = Color(0.03, 0.075, 0.17, 1)
+shader_parameter/peace_horizon = Color(0.08, 0.2, 0.27, 1)
+shader_parameter/peace_below = Color(0.025, 0.045, 0.075, 1)
+shader_parameter/aurora_green = Color(0.3, 1, 0.58, 1)
+shader_parameter/aurora_teal = Color(0.12, 0.82, 0.8, 1)
+shader_parameter/aurora_violet = Color(0.9, 0.38, 0.95, 1)
+shader_parameter/aurora_gain = 0.9
+shader_parameter/aurora_lift = -5.0
+shader_parameter/aurora_speed = 1.0
+shader_parameter/star_gain = 1.0
+shader_parameter/brightness = 1.0
+shader_parameter/streak_gain = 1.0
+shader_parameter/flash_amount = 1.0
+shader_parameter/base_lift = Color(0, 0, 0, 1)
+shader_parameter/clear_color = Color(0, 0, 0, 1)
+shader_parameter/streak_dim = Color(0.996, 0.235, 0.729, 1)
+shader_parameter/streak_bright = Color(0.047, 0.996, 0.949, 1)
+shader_parameter/speed = 1.0
+shader_parameter/turn = 0.0
+shader_parameter/sky_time = -1.0

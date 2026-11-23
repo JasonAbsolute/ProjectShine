@@ -1,4 +1,4 @@
-[gd_scene load_steps=5 format=3 uid="uid://d232osenbubble"]
+[gd_scene format=3 uid="uid://cklycjby7mfk5"]
 
 [ext_resource type="Script" path="res://assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb" id="2_model"]

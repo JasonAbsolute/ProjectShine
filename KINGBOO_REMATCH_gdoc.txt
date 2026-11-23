@@ -1,0 +1,154 @@
+KING BOO REMATCH
+
+The fight that follows the Casino Delfino roulette fight. King Boo drops the puzzle act and fights for real.
+
+
+WHAT MAKES IT DIFFERENT FROM EVERY OTHER FIGHT IN THE PORT
+
+- No FLUDD. Mario arrives without it. The hose is not the answer to anything here.
+- Reaction, not thinking. Every other King Boo fight in Mario is a puzzle. This one is a dodge test built on Sunshine's tight movement.
+- Three hits, and Mario's only weapon is a Boo he throws back at him.
+- Fast and upbeat.
+
+
+INTRO
+
+1. The roulette fight ends. The casino floor takes a cracked glass effect, then shatters.
+2. Mario falls through the floor into a load trigger, which loads the new scene.
+3. The screen fades to black and two lines appear:
+- "You call that a fight fit for a king?"
+- "I'll show you a real fight..."
+4. Fade in on Mario falling into the arena. He has no FLUDD.
+5. King Boo spawns in and gives a long chuckle.
+6. The fight starts.
+
+
+ARENA
+
+Bouldergeist's arena from Super Mario Galaxy. Creepy on its own, and it is the same fight the Bomb Boos come from, so the arena and Mario's weapon read as one idea. Files under MODEL FILES below.
+
+
+MODEL FILES
+
+All four sit on Jaysonn's machine under C:\Users\Jaysonn\Downloads, outside version control, so each needs a home under models/ before anything references it. Every folder name has a space in it, so quote the paths. Everything except Boolossus is .dae rather than .glb, so it needs a Blender pass to match the rest of the project's models.
+
+THE ARENA
+C:\Users\Jaysonn\Downloads\Bouldergeist Planet
+14 files, 1.4 MB.
+
+- PoltaBattlePlanet.dae is the arena. Polta is Bouldergeist's Japanese name.
+- PoltaBattlePlanetPartsA.dae is the breakable parts set.
+- PoltaBattlePlanet_bake.dae and PoltaBattlePlanetPartsA_bake.dae are the baked versions of each.
+- vertexColors_planet.png and vertexColors_parts.png carry the vertex colours as textures. This matters, because the usual BMD route loses vertex colours and here they arrived already baked out.
+- materials_planet.txt and materials_parts.txt list seven materials between them, all named lambert*_v, each with its textures, ambient colours, constant colours, material colours and colour registers.
+- Planet textures: Z_isiblock01, rock05S, TeresaBrokenWall, saku.
+- Parts textures: rock05S, kz_WallRock_uri002_mm, kz_WallRock_uri003_mm.
+
+BOOLOSSUS, for attack 2
+C:\Users\Jaysonn\Downloads\Boolossus
+8 files, 77 KB. The odd one out in this set.
+
+- Boolossus.obj with Boolossus.mtl, exported out of Boolossus.blend. OBJ, not .dae, so it comes in without a Blender round trip but also without any of the console material data.
+- Textures/telesa2_0.png through telesa2_5.png, one per material, six in all.
+- No TEV data and no transparency. The .mtl is plain Blender defaults, Kd 0.8 and d 1.0 on every material, so the see-through ghost look has to be authored by hand. Compare the Boo below, which arrived with its recipe intact.
+
+BOO, for the 15 that split off Boolossus
+C:\Users\Jaysonn\Downloads\Boo
+29 files, 1.1 MB. Three variants, and the one the split uses is the plain Teresa.
+
+- Teresa.dae is the plain Boo, with Teresa_bake.dae as its baked twin. This is the one the 15 Boos use.
+- TeresaChief.dae and TeresaWater.dae are the chief and water variants, each with a _bake twin. Not needed for this fight, but they are in the folder.
+- Face textures teresa.0 through teresa.3, each with a c variant, which are the alternate face frames.
+- materials.txt carries the ghost shader written out as TEV steps, which is the useful part of this folder:
+
+    body_m_v, textures teresa.0 + IndDummy + TeresaInd4 (scale 0.45)
+    Step 1: RGB = tex1 RGB * vertex RGB
+            A   = lerp from tex1 A to 32 using vertex A, then add -89
+    Step 2: RGB = vertex RGB * prev A, then add prev RGB, multiply by 2
+            A   = 64 * vertex A, then add -89, multiply by 2
+    Step 3: RGB = tex2 RGB
+            A   = lerp from prev A to 0 using tex2 A
+
+  That is the transparency recipe the normal export drops, and it uses indirect texturing through IndDummy and TeresaInd4. Worth reading against the GhostOpacity shaders already written for King Boo in pass 153c, since this is the same effect with its real numbers attached.
+- materials_chief.txt and materials_water.txt do the same for the other two variants. vertexColors.png, vertexColors_chief.png and vertexColors_water.png carry the vertex colours.
+
+BOMB BOO, Mario's weapon
+C:\Users\Jaysonn\Downloads\Bomb Boo
+12 files, 402 KB. The body and the tongue are separate models, which matters for the grab.
+
+- BombTeresa.dae is the body and BombTeresaTongue.dae is the tongue, each with a _bake twin.
+- The tongue being its own model lines up with how Galaxy does the grab: Mario takes the Bomb Boo by the tongue and swings it. Worth deciding whether the grounded spin attaches to the tongue model or just parents the whole thing above his head.
+- materials.txt gives the body one material, BodyMat_v on the BombTeresa texture, ambient 64, 64, 64, 150, so it is partly see-through by default. materials_tongue.txt covers the tongue.
+- vertexColors.png and vertexColors_tongue.png carry the vertex colours.
+- Textures BombTeresa.png and TeresaBombTongue.png, with a Switch/ subfolder holding the Switch versions of both. Pick one set and stay with it.
+
+
+KING BOO
+
+Look. A slight glow on him throughout.
+
+Movement. He is a ghost, so he is quick and light. He teleports between spots around the arena, or crosses to one fast, the way Thunderblight Ganon moves in Breath of the Wild. He does not walk anywhere.
+
+Faces. Three of them, one per hit point, each angrier than the last.
+
+
+PACE AND ATTACK SELECTION
+
+Hectic by design. He picks his next attack close to at random rather than running a fixed rotation, and the gap between attacks is short. Each hit he takes shortens that gap further, so the last third of the fight is the fastest. The player should rarely be standing still.
+
+
+KING BOO'S ATTACKS
+
+1. LICK
+No crown colour. He teleports directly in front of Mario and licks, with half a second of wind-up before it lands. The wind-up is the whole tell and a jump clears it.
+
+2. BOOLOSSUS SMASH
+Crown glows white. A Boolossus falls from above Mario and tries to slam down on him. On landing it splits into 15 Boos that spread out as a shockwave, then vanish after one second.
+
+3. GHOST LIGHTNING
+Crown glows red. Two walls of lightning close in on Mario from either side and try to squash him. Three times in a row, fast.
+
+4. GHOST BREATH
+Crown glows frosty blue. He blows cold breath in a sweep across the arena, left to right or right to left. A hit freezes Mario for one second.
+
+5. FIREBALLS
+Crown glows red. Fireballs shoot off in random directions and bounce off the arena walls. They shrink as they travel and fade out.
+
+6. GHOST WIND
+Crown glows pink, for now. Tornados come at Mario and fling him around the arena.
+
+
+WHEN AN ATTACK CONNECTS
+
+No new damage model. Each attack hands Mario the reaction Sunshine already has for that element, through the existing Mario.SmsDamageProfile and SmsDamageExec.
+
+- Lick and Boolossus Smash: the plain hit, knocked down and back. The knockback comes off the profile's downType and minSpeed fields.
+- Fireballs: the burn. Set fireDown on the profile, which routes into SmsFireDownEnter and the ms_firedmg_a cloud.
+- Ghost Lightning: the shock. SmsElectricDamageEnter, which already locks Mario for 120 ticks and runs the ma_shock clip with its sparks and closing puff.
+- Ghost Wind: knocked back and flung. Nothing to reuse here. The Chucksters are not in the port, so there is no thrown-by-a-Pianta state to borrow, and the fling is new work either way.
+- Ghost Breath: the one reaction Sunshine does not have. There is no ice or freeze anywhere in the game, so the one second freeze is a new state.
+
+
+HOW MARIO DEALS DAMAGE: BOO BOMBS
+
+The black Boos from Mario Galaxy. This is the only way to hurt King Boo.
+
+- Black foggy spots appear at random through the fight and a Boo bomb comes out of each one. Mario has to notice them and get to them.
+- Grounded spin next to one and Mario grabs it. It then spins above his head, the way the Galaxy bomb does.
+- While carrying: Mario can run and single jump, nothing else. A spin jump makes the Boo spin faster.
+- Diving drops it. The Boo is released and goes back to drifting toward Mario.
+- Land the spinning Boo on King Boo and he takes a hit. He flips around in a hurt animation.
+- Every Boo bomb on the field clears when he takes a hit.
+
+Supply. The spawn rate, the cap on how many are out at once and whether one expires on its own are all knobs, tuned in playtest. The target to tune against: often enough that the fight is not pure dodging with no way to answer, rare enough that it is not easy.
+
+
+NEW WORK THIS NEEDS
+
+- An animation blend that holds one of Mario's arms in the air, for the carry.
+- A grounded spin that grabs a Boo bomb and spins it above his head, which Sunshine's Mario does not have.
+- The cracked glass and shatter effect on the casino floor.
+- The two-line text card over black between the two scenes.
+- A freeze state on Mario for Ghost Breath. Nothing in Sunshine freezes, so this is built from nothing.
+- A fling state for Ghost Wind. The Chuckster throw is not in the port, so there is nothing to reuse.
+- Three King Boo faces and the hurt flip animation.
