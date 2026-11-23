@@ -15943,3 +15943,33 @@ rematch's had both a skip and the straight-in-after-a-miss rule he describes. Th
 **Verified:** build 0 errors; `introshot252.gd` (windowed): four posters in that order, the hand reaches the Rematch in three steps; the arena loaded plain --
 A 1 s into the card leaves it up, the card ends by itself 5.2 s later, the cutscene begins, A during it changes nothing, it runs to its end in 8.5 s
 unskipped; the arena reloaded with CameFromMiss -- no card, falling at 1 s, the fight on at 7 s with no cutscene state passed.
+
+### 253 -- the GameCube controller adapter read directly over USB (the Mayflash in Wii U / Switch mode, Nintendo's own): a Godot joypad per port with the triggers' analog pulls AND their clicks (feature/kingboo-casino, code `d134da2`)
+
+**Jaysonn:** "ok we need to touch up on the controller. i wanna be able to use mayflash so my gamecube controller work on my godot game. rivals of aether 2
+does this. i want it on mine so we have proper trigger work".
+
+**Why directly.** In Wii U / Switch mode the adapter (USB 057E:0337) is no Windows gamepad at all -- Dolphin and Rivals of Aether 2 read it over USB
+through the WinUSB driver (the Zadig step), which is where the real analog triggers and the 125-Hz reports come from; the Mayflash's PC mode is a plain
+HID pad with flattened triggers, and his Delfinovin route (the adapter turned into an Xbox pad) loses the click.
+
+**`assets/Sms/Input/SmsGcAdapter.cs`** (autoload `SmsGcAdapter`, `project.godot` [autoload] after GameData; Windows P/Invoke -- setupapi, winusb,
+advapi32; idle elsewhere): finds the present 057E:0337 by its driver's own interface GUIDs (the `DeviceInterfaceGUIDs` a WinUSB install writes; libusb's
+way) and the hub's generic USB interface, opens it (CreateFile, WinUsb_Initialize), sends the 0x13 start command and reads the 37-byte reports on a
+thread (0x21, then a port: status 0x10 wired / 0x20 WaveBird, A B X Y and the D-pad, Start Z and the R / L CLICKS, both sticks, the two analog triggers
+0..255). The physics tick turns changes into joypad events on device 20 + port through `Input.ParseInputEvent` (+ FlushBufferedEvents, so the same
+tick's actions read them): A B X Y -> 0-3, Start -> 6, Z -> 10 (`button_z`), the L click -> 9 (`button_l`), the R click -> 17 (paddle 2; a
+`button_rclick` action added when the map has none -- `Mario.SmsRClick`, the stand-and-aim spray), the D-pad -> 11-14, the main stick -> axes 0 / 1,
+the C stick -> 2 / 3, the analog pulls -> axes 4 / 5 (`button_l` / `button_r` strengths: Mario's `_fluddR` is the game's mAnalogR). Sticks calibrated
+at the controller's first report (the console's power-on origin; `Recalibrate()`), StickRange 100 raw = full, StickDeadzone 6; triggers from their rest,
+TriggerFull 170 raw = 1.0. A port that goes releases what it held; the adapter lost is rescanned every 2 s; `Rumble(port, on)`. When the adapter is
+there but will not open, the log says why once: no WinUSB driver (Zadig), or another program holding it.
+
+**His PC tonight:** the Mayflash is plugged in in Wii U mode (WUP-028, serial 15/07/2014) with the WinUSB driver already on it (libwdi's "GameCube
+Controller Adapter"), but Delfinovin and Dolphin were running and WinUSB gives the adapter to one program at a time, so the game's open got ACCESS_DENIED
+and said so. The live read awaits Delfinovin closed; the report -> input chain is verified with injected reports.
+
+**Verified:** build 0 errors; `gcdrive253.gd` run b (headless, reports injected as the USB thread stores them): the autoload, `button_rclick` as joypad
+17; a rest report sets the origin; A X Z and the R click press the actions, the R pull (180 raw over rest) = `button_r` 1.0, a half pull 0.375 (the
+action's 0.2 deadzone) with no click, the main stick +80 raw = Lstick (0.8, 0), the C stick +60 up = Rstick (0, -0.6), the L click + pull = `button_l`
+1.0, the D-pad on device 20; a rest report releases all; a 'no controller' report drops the port; a short report is refused.
