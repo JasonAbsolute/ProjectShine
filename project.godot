@@ -24,6 +24,7 @@ config/icon="uid://d3enyfqepubhr"
 [autoload]
 
 GameData="*res://assets/GameData.cs"
+SmsGcAdapter="*res://assets/Sms/Input/SmsGcAdapter.cs"
 
 [display]
 
