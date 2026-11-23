@@ -15811,3 +15811,29 @@ Shell's item height was 200 u over the REST position, 2.15 m too high); the Shel
 **Verified:** build 0 errors; `nailtest248.gd` (run b, the Shell's Secret, windowed) through the real path -- a jump, then L in the air over the head:
 Nail00 (coin), Nail01 (empty), Nail19 (1-Up) each drop 0.672 m at once per landing, sink 2.015 m after three, ignore a fourth; the impact sound plays at
 the nail; the coin / 1-Up appears 0.67 m over the rest position and rises, the empty nail throws nothing; the 120-tick lockout on Nail02's receive path.
+
+### 249 -- Jaysonn's two drawn characters join the Level Select's bottom row as painted-icon decor: flipping on his SnapRotate like the other doodles, their antenna bulbs blinking (feature/kingboo-casino, code `218a573`)
+
+**Jaysonn:** "ok lets add them to the level select page. near the bottom like the other icons" -- after the 248/248b figure work: his pasted drawing of the two
+characters, first rendered glossy (rejected: "they need to be in the style of the icons of the level select, so like the fish, sunflower and shell"), then
+painted in the menu doodles' wet-brush style by an agent and iterated here (tuning 7: the icons' smooth swelling line, flat paint, the drawing's proportions;
+tuning 8: arms and legs as tubes, eyes re-measured off the drawing; tuning 9: the first set's eyes back, the bow rebuilt as the drawing's two standing loops
+with a knot and gather lines). `tools/projectshine/rematch157/figure248b/paint248.py` renders the set; each image has a lights-off twin.
+
+**The textures** (`Font/LevelSelect/decor_big_on/off.png` 532x492, `decor_small_on/off.png` 384x355): the tuning-9 renders cropped to the union of each
+figure's lit and lights-off painted bounds plus 3 % -- one crop per figure, so the blink never shifts it -- at native pixels (the painted big one is 462 px tall
+for an ~86-px rect; his Pianta icon is 512 px for a 71-px one), transparent pixels zeroed.
+
+**The scene** (`assets/LevelSelect.tscn`, under `Decor` after the Pianta): `FigureBig` (94x87 at 536,554, rotation 0.08 rad; SnapRotate -15 deg / 0.5 s: it
+rests leaning toward the small one and flips away) and `FigureSmall` (71x66 at 642,581, rotation -0.1 rad; SnapRotate +15 / 0.5 s), the painted figures
+~86 and ~62 px tall (the drawing's 0.72 ratio; the big one the Sunflower's size), feet on one line at the screen's bottom edge, in the GreenBlob-Sunflower
+gap -- the only bottom-row spot that holds the pair at the icons' size (the painted doodles span x 531..706). `FigureBlink`, an AnimationPlayer with
+autoplay `blink`: a 1.5-s looping Animation whose two discrete value tracks (`FigureBig:texture`, `FigureSmall:texture`) key the lit twin at 0 and the
+lights-off twin at 1.0 s, plus a RESET to the lit twins -- so the bulbs are lit 1.0 s, dark 0.5 s, the pair in step. Knobs: the AnimationPlayer's
+`speed_scale` (the cadence) and the keys themselves in the editor's animation panel; the two SnapRotates as on every doodle. The P1 hand sits over the
+centred poster, i.e. over the big figure for posters 2-9; it ends 6 px above the figure's box (the glove ~20 px above the bulbs' rays).
+
+**Verified:** headless import (the four `.import` written, no errors); `selectshot249.gd` (run b, windowed 1280x720): both figures present with the right
+textures and his SnapRotate; FigureBlink playing `blink` (1.5 s, loops); both inside the screen under the poster row, between the GreenBlob and the
+Sunflower, feet within 2 px; 3.3 s sampled -- both twins shown, the two in step on every frame, lit 1.04 s / dark 0.50 s, 15-deg flips every 0.5 s; the hand
+at poster 2 ends above both figures; twelve posters; cancel loads the Player Select. Shots lit / dark / with the hand. No C# changed (no Build needed).
