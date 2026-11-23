@@ -15926,3 +15926,20 @@ The Player Select gets the Level Select's wiring (`CharacterSelect.cs`: MoveSoun
 -- the yes / no cursor click on the hand's move between characters, the talk box on A. `MSD_SE_SY_2D_IN.wav` (the save card's window coming in) joins
 System/ and the table as the other "a box appears" sound for the knob. Verified on both screens by `soundshot251c.gd`: the players on the Sfx bus at
 0 / -2.08 dB (127 / 100 of 127), nothing on the first highlight, each step clicks, A plays the box as the pick begins, both picks load.
+
+### 252 -- King Boo and King Boo's Rematch back on the Level Select; the rematch's intro can no longer be skipped, a miss still goes straight into the fight (feature/kingboo-casino, code `2e6d088`)
+
+**Jaysonn:** "next put the king boo and rematch back on the level select then make it so you cant skip the intro cutscene on the king boo fight. but keep it
+where if you die you just go right into the fight".
+
+`assets/LevelSelect.tscn`: Levels = [Ricco Tower, Hillside Cave, King Boo, King Boo's Rematch] (the entries' `.tres` files had stayed; two lines back).
+
+`assets/Sms/Rematch/SmsRematchIntro.cs`: `SkipAllowed` defaults to OFF -- A no longer skips the two-line card nor cuts the 174 look-about cutscene short;
+the intro plays through. The miss path is as it was: after a death `GameData.CameFromMiss` sends `Start()` straight to the fall (no card) and gates the
+cutscene off -- Mario falls in and King Boo comes. The knob is per scene; RematchArena.tscn does not set it (neither the committed file nor his uncommitted
+copy), so the default applies without touching his scene. Which intro he meant: the casino fight's own intro (the disc ride) never had a skip, and only the
+rematch's had both a skip and the straight-in-after-a-miss rule he describes. The mid-fight split cutscenes keep their A skip (SplitSkipAllowed; not asked).
+
+**Verified:** build 0 errors; `introshot252.gd` (windowed): four posters in that order, the hand reaches the Rematch in three steps; the arena loaded plain --
+A 1 s into the card leaves it up, the card ends by itself 5.2 s later, the cutscene begins, A during it changes nothing, it runs to its end in 8.5 s
+unskipped; the arena reloaded with CameFromMiss -- no card, falling at 1 s, the fight on at 7 s with no cutscene state passed.
