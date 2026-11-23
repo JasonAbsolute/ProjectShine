@@ -1,23 +1,13 @@
-[gd_scene load_steps=36 format=3]
+[gd_scene format=3 uid="uid://cnr8x2m187h21"]
 
-[ext_resource type="Script" path="res://assets/LevelSelect.cs" id="1_script"]
+[ext_resource type="Script" uid="uid://dtymssts710db" path="res://assets/LevelSelect.cs" id="1_script"]
 [ext_resource type="Resource" path="res://assets/levels/HillsideCaveEntry.tres" id="2_HillsideCaveEntry"]
-[ext_resource type="Resource" path="res://assets/levels/DirtyLakeEntry.tres" id="3_DirtyLakeEntry"]
 [ext_resource type="Resource" path="res://assets/levels/RiccoTowerEntry.tres" id="4_RiccoTowerEntry"]
-[ext_resource type="Resource" path="res://assets/levels/SandCastleEntry.tres" id="5_SandCastleEntry"]
-[ext_resource type="Resource" path="res://assets/levels/BeachCannonEntry.tres" id="6_BeachCannonEntry"]
-[ext_resource type="Resource" path="res://assets/levels/YoshiGoRoundEntry.tres" id="7_YoshiGoRoundEntry"]
-[ext_resource type="Resource" path="res://assets/levels/HotelLobbyEntry.tres" id="8_HotelLobbyEntry"]
-[ext_resource type="Resource" path="res://assets/levels/CasinoSecretEntry.tres" id="9_CasinoSecretEntry"]
-[ext_resource type="Resource" path="res://assets/levels/ShellSecretEntry.tres" id="10_ShellSecretEntry"]
-[ext_resource type="Resource" path="res://assets/levels/VillageUndersideEntry.tres" id="11_VillageUndersideEntry"]
-[ext_resource type="Resource" path="res://assets/levels/KingBooEntry.tres" id="12_KingBooEntry"]
-[ext_resource type="Resource" path="res://assets/levels/RematchEntry.tres" id="13_RematchEntry"]
 [ext_resource type="PackedScene" uid="uid://bg72dlcmvwypi" path="res://assets/CharacterPoster.tscn" id="6_poster"]
 [ext_resource type="Texture2D" uid="uid://kfyytoolf68u" path="res://Font/CharacterSelect/background.png" id="7_bg"]
 [ext_resource type="Shader" uid="uid://dy4lyx2nlb5pf" path="res://assets/ArtGradient.gdshader" id="8_grad"]
 [ext_resource type="Texture2D" uid="uid://sjwc2cvryw5j" path="res://Font/CharacterSelect/SelectHand.png" id="9_hand"]
-[ext_resource type="Texture2D" path="res://Font/LevelSelect/LevelSelectText.png" id="10_title"]
+[ext_resource type="Texture2D" uid="uid://0y7mvsstnr0g" path="res://Font/LevelSelect/LevelSelectText.png" id="10_title"]
 [ext_resource type="Texture2D" uid="uid://clk3k5lf0nfbn" path="res://Font/CharacterSelect/MenuGraphic6.png" id="11_sunl"]
 [ext_resource type="Texture2D" uid="uid://cajjskvybjfi5" path="res://Font/CharacterSelect/MenuGraphic11.png" id="12_sunr"]
 [ext_resource type="Texture2D" uid="uid://jexf4yi6sllv" path="res://Font/CharacterSelect/MenuGraphic4.png" id="13_palm"]
@@ -27,10 +17,12 @@
 [ext_resource type="Texture2D" uid="uid://ffhg2psc0fxh" path="res://Font/CharacterSelect/MenuGraphic2.png" id="17_fishb"]
 [ext_resource type="Texture2D" uid="uid://drj2axgfyejce" path="res://Font/CharacterSelect/MenuGraphic1.png" id="18_pinkblob"]
 [ext_resource type="Texture2D" uid="uid://iwld5brm4v6n" path="res://Font/CharacterSelect/MenuGraphic10.png" id="19_pianta"]
-[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_big_on.png" id="20_bigon"]
-[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_big_off.png" id="21_bigoff"]
-[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_small_on.png" id="22_smallon"]
-[ext_resource type="Texture2D" path="res://Font/LevelSelect/decor_small_off.png" id="23_smalloff"]
+[ext_resource type="Texture2D" uid="uid://co6td8creaofe" path="res://Font/LevelSelect/decor_big_on.png" id="20_bigon"]
+[ext_resource type="Texture2D" uid="uid://jowft6qmrtna" path="res://Font/LevelSelect/decor_big_off.png" id="21_bigoff"]
+[ext_resource type="Texture2D" uid="uid://bgfxab0c54hur" path="res://Font/LevelSelect/decor_small_on.png" id="22_smallon"]
+[ext_resource type="Texture2D" uid="uid://5pdmp7aygr4q" path="res://Font/LevelSelect/decor_small_off.png" id="23_smalloff"]
+[ext_resource type="Script" path="res://assets/Sms/Sound/SmsMenuMusic.cs" id="24_menumusic"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/Music/LevelCharSelectMusic.mp3" id="25_song"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
 shader = ExtResource("8_grad")
@@ -102,7 +94,7 @@ _data = {
 &"blink": SubResource("Animation_blink")
 }
 
-[node name="LevelSelect" type="Control"]
+[node name="LevelSelect" type="Control" unique_id=422380670]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -110,12 +102,12 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
-Levels = [ExtResource("2_HillsideCaveEntry"), ExtResource("3_DirtyLakeEntry"), ExtResource("4_RiccoTowerEntry"), ExtResource("5_SandCastleEntry"), ExtResource("6_BeachCannonEntry"), ExtResource("7_YoshiGoRoundEntry"), ExtResource("8_HotelLobbyEntry"), ExtResource("9_CasinoSecretEntry"), ExtResource("10_ShellSecretEntry"), ExtResource("11_VillageUndersideEntry"), ExtResource("12_KingBooEntry"), ExtResource("13_RematchEntry")]
+Levels = [ExtResource("4_RiccoTowerEntry"), ExtResource("2_HillsideCaveEntry")]
 PosterScene = ExtResource("6_poster")
 SelectHandPath = NodePath("SelectHand")
 SelectHandGap = 16.0
 
-[node name="Background" type="TextureRect" parent="."]
+[node name="Background" type="TextureRect" parent="." unique_id=1741321007]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -127,7 +119,7 @@ texture = ExtResource("7_bg")
 expand_mode = 1
 stretch_mode = 6
 
-[node name="Decor" type="Control" parent="."]
+[node name="Decor" type="Control" parent="." unique_id=1923171431]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -136,7 +128,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 
-[node name="SunLeft" type="TextureRect" parent="Decor"]
+[node name="SunLeft" type="TextureRect" parent="Decor" unique_id=828420400]
 material = SubResource("ShaderMaterial_sun")
 layout_mode = 0
 offset_left = 1004.0
@@ -148,7 +140,7 @@ texture = ExtResource("11_sunl")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="SunRight" type="TextureRect" parent="Decor"]
+[node name="SunRight" type="TextureRect" parent="Decor" unique_id=347511499]
 layout_mode = 0
 offset_left = 13.999998
 offset_top = 39.0
@@ -161,7 +153,7 @@ texture = ExtResource("12_sunr")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Palm" type="TextureRect" parent="Decor"]
+[node name="Palm" type="TextureRect" parent="Decor" unique_id=812364092]
 layout_mode = 0
 offset_left = 40.999996
 offset_top = 541.0
@@ -176,12 +168,12 @@ stretch_mode = 5
 script = ExtResource("14_snap")
 HoldSeconds = 0.5
 
-[node name="GreenBlob" type="TextureRect" parent="Decor"]
+[node name="GreenBlob" type="TextureRect" parent="Decor" unique_id=1329900237]
 layout_mode = 0
-offset_left = 461.0
-offset_top = 585.99994
-offset_right = 518.9176
-offset_bottom = 643.91754
+offset_left = 523.0
+offset_top = 574.00006
+offset_right = 580.9176
+offset_bottom = 631.91766
 rotation = -0.49029806
 mouse_filter = 2
 texture = ExtResource("15_greenblob")
@@ -190,12 +182,12 @@ stretch_mode = 5
 script = ExtResource("14_snap")
 HoldSeconds = 0.5
 
-[node name="Sunflower" type="TextureRect" parent="Decor"]
+[node name="Sunflower" type="TextureRect" parent="Decor" unique_id=1890510761]
 layout_mode = 0
-offset_left = 723.0
-offset_top = 497.99997
-offset_right = 810.0
-offset_bottom = 585.0
+offset_left = 684.0
+offset_top = 529.0
+offset_right = 771.0
+offset_bottom = 616.0
 rotation = 0.37367368
 mouse_filter = 2
 texture = ExtResource("16_sunflower")
@@ -205,7 +197,7 @@ script = ExtResource("14_snap")
 AngleDegrees = -15.0
 HoldSeconds = 0.5
 
-[node name="FishB" type="TextureRect" parent="Decor"]
+[node name="FishB" type="TextureRect" parent="Decor" unique_id=1642564963]
 layout_mode = 0
 offset_left = 882.0
 offset_top = 594.0
@@ -219,7 +211,7 @@ stretch_mode = 5
 script = ExtResource("14_snap")
 HoldSeconds = 0.5
 
-[node name="PinkBlob" type="TextureRect" parent="Decor"]
+[node name="PinkBlob" type="TextureRect" parent="Decor" unique_id=205331976]
 layout_mode = 0
 offset_left = 1059.0
 offset_top = 566.99994
@@ -234,7 +226,7 @@ script = ExtResource("14_snap")
 AngleDegrees = -15.0
 HoldSeconds = 0.5
 
-[node name="Pianta" type="TextureRect" parent="Decor"]
+[node name="Pianta" type="TextureRect" parent="Decor" unique_id=731035567]
 layout_mode = 0
 offset_left = 255.00003
 offset_top = 518.0
@@ -249,12 +241,12 @@ script = ExtResource("14_snap")
 AngleDegrees = -15.0
 HoldSeconds = 0.5
 
-[node name="FigureBig" type="TextureRect" parent="Decor"]
+[node name="FigureBig" type="TextureRect" parent="Decor" unique_id=290812168]
 layout_mode = 0
-offset_left = 536.0
-offset_top = 554.0
-offset_right = 630.0
-offset_bottom = 641.0
+offset_left = 383.00003
+offset_top = 538.0
+offset_right = 477.00003
+offset_bottom = 625.0
 rotation = 0.08
 mouse_filter = 2
 texture = ExtResource("20_bigon")
@@ -264,12 +256,12 @@ script = ExtResource("14_snap")
 AngleDegrees = -15.0
 HoldSeconds = 0.5
 
-[node name="FigureSmall" type="TextureRect" parent="Decor"]
+[node name="FigureSmall" type="TextureRect" parent="Decor" unique_id=1157331135]
 layout_mode = 0
-offset_left = 642.0
-offset_top = 581.0
-offset_right = 713.0
-offset_bottom = 647.0
+offset_left = 782.0
+offset_top = 565.99994
+offset_right = 853.0
+offset_bottom = 631.99994
 rotation = -0.1
 mouse_filter = 2
 texture = ExtResource("22_smallon")
@@ -278,11 +270,11 @@ stretch_mode = 5
 script = ExtResource("14_snap")
 HoldSeconds = 0.5
 
-[node name="FigureBlink" type="AnimationPlayer" parent="Decor"]
+[node name="FigureBlink" type="AnimationPlayer" parent="Decor" unique_id=1475930189]
 libraries/ = SubResource("AnimationLibrary_blink")
-autoplay = "blink"
+autoplay = &"blink"
 
-[node name="Title" type="TextureRect" parent="."]
+[node name="Title" type="TextureRect" parent="." unique_id=1418506746]
 layout_mode = 1
 anchors_preset = 10
 anchor_right = 1.0
@@ -294,7 +286,7 @@ texture = ExtResource("10_title")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="Portraits" type="HBoxContainer" parent="."]
+[node name="Portraits" type="HBoxContainer" parent="." unique_id=1575089300]
 layout_mode = 1
 anchors_preset = 8
 anchor_left = 0.5
@@ -310,7 +302,7 @@ grow_vertical = 2
 theme_override_constants/separation = 24
 alignment = 1
 
-[node name="SelectHand" type="TextureRect" parent="."]
+[node name="SelectHand" type="TextureRect" parent="." unique_id=624591812]
 visible = false
 custom_minimum_size = Vector2(64, 92)
 layout_mode = 0
@@ -321,7 +313,7 @@ texture = ExtResource("9_hand")
 expand_mode = 1
 stretch_mode = 5
 
-[node name="FadeOut" type="ColorRect" parent="."]
+[node name="FadeOut" type="ColorRect" parent="." unique_id=138263774]
 visible = false
 layout_mode = 1
 anchors_preset = 15
@@ -331,3 +323,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("25_song")
+script = ExtResource("24_menumusic")

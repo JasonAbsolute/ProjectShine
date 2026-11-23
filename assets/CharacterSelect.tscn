@@ -19,6 +19,8 @@
 [ext_resource type="Texture2D" uid="uid://cuqnfpj2nqqrx" path="res://Font/CharacterSelect/PlayerSelectText.png" id="52_title"]
 [ext_resource type="Shader" uid="uid://dy4lyx2nlb5pf" path="res://assets/ArtGradient.gdshader" id="60_grad"]
 [ext_resource type="Resource" path="res://assets/characters/YoshiEntry.tres" id="63_yoshi"]
+[ext_resource type="Script" path="res://assets/Sms/Sound/SmsMenuMusic.cs" id="70_menumusic"]
+[ext_resource type="AudioStream" path="res://assets/Sms/Sound/Music/LevelCharSelectMusic.mp3" id="71_song"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_sun"]
 shader = ExtResource("60_grad")
@@ -224,3 +226,7 @@ grow_horizontal = 2
 grow_vertical = 2
 mouse_filter = 2
 color = Color(0, 0, 0, 0)
+
+[node name="Music" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("71_song")
+script = ExtResource("70_menumusic")
