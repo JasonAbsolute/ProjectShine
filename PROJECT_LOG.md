@@ -15973,3 +15973,40 @@ and said so. The live read awaits Delfinovin closed; the report -> input chain i
 17; a rest report sets the origin; A X Z and the R click press the actions, the R pull (180 raw over rest) = `button_r` 1.0, a half pull 0.375 (the
 action's 0.2 deadzone) with no click, the main stick +80 raw = Lstick (0.8, 0), the C stick +60 up = Rstick (0, -0.6), the L click + pull = `button_l`
 1.0, the D-pad on device 20; a rest report releases all; a 'no controller' report drops the port; a short report is refused.
+
+### 254 -- FLUDD's water drawn the game's way: textured view-aligned quads with the frame refracted through them, the water tint and the glints, and the flat wet disc where a drop lands (feature/kingboo-casino, code `dfe1bea`)
+
+**Jaysonn:** "can you go and add the textures for fludd now for the water. so it doesnt look like blue spheres?"
+
+**The game's draw (ModelWaterManager.cpp).** calcDrawVtx (770) builds every flying drop as a quad in VIEW space: a diamond whose front and back corners
+lie along the on-screen velocity -- vtx0 = pos + n + vel x mExtension x 4.0 (unk5D18), vtx2 = pos - n - vel x ..., n = the unit on-screen velocity
+x 1.414 x size / 2 -- and whose side corners sit across it, UVs (0,0) (1,0) (1,1) (0,1) (DLUtil.cpp's TDLTexQuad), so the texture's disc is drawn out
+into a streak along the flight. drawRefracAndSpec (1806) then draws that quad three times: the screen (TScreenTexture, the frame at 320 x 224)
+through an indirect warp -- waterref.bti's texel - 128 times 0.07 (unk5D1C) texels, S from its alpha, T from its intensity -- at alpha 255 (unk5D65)
+x waterMask.bti; the water colour gModelWaterManagerWaterColor[0] = (0x3C, 0x46, 0x78) at 0x14 x the mask; and the glint, (0x8e, 0x8e, 0x9e) +
+waterSpec.bti x (0xbc, 0xcc, 0xdc) at alpha waterSpec, ADDED. A landed drop is drawWaterVolume (1029): water_shadow_yuka.bmd (a ball of radius 11.76)
+scaled by size x mMagnify x the life left into destination alpha where it meets the ground (128, then the screen's alpha x 80 / 255), the water
+colour through it -- a flat disc at 0.157; and move() 677-690 MERGES landed drops: one within 2.5 x (size + size) of an earlier one hands it its size
+and life and dies, so there is one disc a spot.
+
+**`assets/Sms/Fx/tex/waterref.png`, `watermask.png`, `waterspec.png`** (+ pinned `.import`): the three `/mario/timg` textures out of chr0.szs
+(IA8 / I8 / I8, 32 x 32). **`assets/Sms/Fx/water_drop.gdshader`** (new): the vertex shader is calcDrawVtx on the MultiMesh instance (translation = the
+drop, INSTANCE_CUSTOM = velocity x mExtension and size, or -1 for a puddle, which then takes the instance basis as its plane and extent); the fragment
+composes the three passes as the game's premultiplied source and coverage in display space (the screen taken to sRGB as this project's GX shaders do)
+and hands Godot the linear source with the coverage as alpha; a puddle is the tint at puddle_alpha through the mask's hardened edge. Z test on, no
+write, no cull, no fog. **`assets/Sms/SmsWaterDrops.cs`**: the sphere mesh and its StandardMaterial3D are gone -- a 4-vertex quad with custom data,
+the shader with the three textures and the game's numbers as public knobs (WaterColor, SpecBase, SpecGain, RefractScale, RefractAlpha, Tail,
+PuddleAlpha, PuddleRadius 11.76, PuddleWallHalfWidth 8.5 / Up 7.29 / Down 14.1 from water_shadow_kabe.bmd, PuddleLift 2, MergeReach 2.5,
+ExtraCullMargin 8); _Process draws the puddles first (one a cluster, the merge applied to the drawing only -- the drops still sit and clean as
+before -- on the kept landing normal, 2 units off the surface) and then every flying drop as the quad. The old Magnify x 2 draw scale is gone: a
+drop's drawn disc is its size, as the game's.
+
+**Verified:** build 0 errors; `waterdrive254.gd` run f (windowed; a bare stage with a checkered floor, a wall and a 2.15 m post; the spray nozzle's
+emit at the floor then the wall) 17/17 -- the shader, the three 32 x 32 textures and the custom data on the MultiMesh, the game's water_color / tail /
+ind_scale, one puddle for one landing spot (7 visible instances = 1 puddle + 6 flying of 38 drops), the stream changing the pixels along its arc from the
+side and from behind, the landing spot bluer and the floor 4.7 m away unchanged, the wall hit one patch, all gone 2.5 s after the spray; runs c / d in
+the Hillside Cave course from its PlayerSpawner. Before / after shots in tools/projectshine/rematch157/water254/.
+
+**Left for later:** the landed drops still live the port's 40 ticks (the game: up to 256, slower on slippery planes) and do not slide; the puddle
+merge is drawn, not simulated (the cleaning balance stays as it was); the game's silhouette pass (waterJumping.bti, Mario seen through the water) is
+not drawn.
