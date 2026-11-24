@@ -16171,3 +16171,32 @@ missing destination or a changed importer version), so the forced re-import dele
 fails -- the local `[filesystem] import/blender/enabled=false` line must be IN project.godot (`select255/local_blend_off.py`, never committed:
 `anim260/project_godot260.py` rebuilds the commit-ready file from HEAD). The headless 4.7.2 editor also drops `[editor_plugins]` (godot_ai does not load
 headless) when it saves project.godot -- another reason to rebuild it rather than commit what the editor leaves.
+
+### 261 -- a death plane under every secret course, at the game's height (feature/kingboo-casino, code `efe661b`)
+
+**Jaysonn:** "ok add death planes the the secrect levels".
+
+**The game's.** A `BG_TYPE_DEATH_PLANE` (0x800) polygon in each stage's map.col; `TMario::thinkSituation` (MarioMove.cpp 1886) finds it under him with its
+height over his feet the tick he drops through -- MARIO_FLAG_GAME_OVER, HP 0, MARIO_STATUS_FALL_DEAD (`fallDead()` = `jumpProcess(0)`: he falls on, no
+control), the cry MSD_SE_MV10B_CRY_JUMP_01 unless the long fall's ANIM_THROWN already cried, CAMERA_FLAG_HELL_DEAD_DEMO, DEMO_FLAG_HELL_DEAD (the miss's
+2-s iris); `decideNextStageOfMiss` (MarDirectorDirect.cpp 205): an EX map restarts itself from its start. All ported in 212 / 213 (`SmsDeathPlane.cs`,
+`Mario.SmsFallDead`, `SmsMissTick`, Level's no-intro miss re-entry); the courses simply had no plane.
+
+**Where.** y 0 in all ten. The two courses whose vanilla collision is to hand prove it: coro_ex1 (Hillside Cave Secret) and coro_ex2 (Secret of Ricco
+Tower) `map.col` hold nothing but the death plane at y 0 (x -15000..35000 / -15000..45000, z +-15000 u) and a catch floor at -16000; their pieces are
+map objects 1700-3400 u over it (`tools/projectshine/rematch157/death261/col_death261.py`: header {vertexNum, vertexOff, groupNum, groupOff}, 0x18-byte
+groups {bgType, triNum, flags, pad, 4 offsets}, s16 x3 indices). Jaysonn's other eight courses sit on the same unit grid, lowest pieces 16-88 m over
+y 0, nothing under it: the same plane (their map.col were not to hand -- the disc is on the PC, offline tonight -- the node is his to move).
+
+**The scenes** (`add_death_planes261.py`): a `DeathPlane` node (SmsDeathPlane, MarioPath ../PlayerSpawner/Mario, a note) at the end of each file with a
+red see-through Preview sheet (the game's rectangle for the two known courses, the course's bounds + 60 m for the others), hidden in play by the node.
+`SmsDeathPlane.cs`: a course's Mario is the PlayerSpawner's, made in the spawner's own _Ready, so a plane that readies first looks once more once the
+scene is up (deferred) before giving up.
+
+**Verified** (headless, `deathdrive261.gd`, 87/87): Hillside with no intro (GameData.CameFromMiss, the miss's own re-entry) -- Mario runs on W; carried
+40 m off the start island he falls 2.07 s, the plane fires the frame his feet cross y 0 (feet -0.26), FALL_DEAD + GAME_OVER, the cry the long fall's
+(ma_thrown on: no second cry, as the game), 18.6 m more of fall in 0.6 s with W doing nothing, the miss takes a life (4 -> 3), the course reloads from
+its start (0.8 m from the first spawn, lives 3, fresh flags, the re-entry flag consumed); a second 12-m fall there: the fresh plane fires, this death
+cries itself (FallCry playing, no ma_thrown), another reload (lives 2). The other nine courses load with the plane at y 0, Mario found, the sheet hidden.
+Fall note: the port's Mario gravity is the shipped mGravity 1.0 u/tick^2 = 48.4 m/s^2 (the self-tests' model since the jump passes), so 52 m to the
+plane is 2.07 s, 12 m is 0.73 s.
