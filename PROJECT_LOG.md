@@ -16088,3 +16088,26 @@ the two launch constants are gone.
 **Verified** (Mac, headless, the Hillside course, Mario himself -- the game's own climb-down puts him in the hang): 12/12 -- ma_hgjmp plays for 0.50 s,
 he never rises over the hang height and his velocity never goes up, he ends idle on the top 0.48 m in from the hang at the ledge's height; B during the
 hop lets go into LAND_SAFE_DOWN.
+
+### 258 -- Mario's alternate colours on the Player Select: X / Y cycle Red, Yellow, Blue, Green, Black on his poster; he spawns wearing the pick (feature/kingboo-casino, code `1f0ce9d`)
+
+**Jaysonn:** "a cool feature i wanna include is the color options mario can wear. i have the texture files done to make him look like alt colors from
+super smash bros melee but in the char select screen i wanna be able to pick them by pressing X or y to cycle thru them".
+
+**The textures.** His four recoloured body atlases were in `Font/` as "untitled_ma_mdl1_0 - Copy*.png" (the "(4)" copy is byte-for-byte the default and
+stays): Melee's yellow (Wario's colours), blue (blue cap and shirt, red overalls), green (with brown overalls) and black (slate overalls). Moved and
+named `models/Mario/Colors/mario_yellow.png`, `mario_blue.png`, `mario_green.png`, `mario_black.png` (uids kept, the `.import` rewritten with the
+default atlas's own settings). Only the body atlas ma_mdl1_0 changes; the eyes and the gloves are other atlases.
+
+**The code.** `assets/CharacterColor.cs` (new): a colour -- DisplayName, BodyTexture (null = the default look), BodyTextureMatch, Swatch.
+`CharacterEntry.Colors`: the list (empty = no choice; Luigi, Piantissimo, Yoshi have none). `assets/characters/MarioEntry.tres`: the five.
+`CharacterPoster`: a colour strip built in code under the head when the entry has colours -- swatch dots (the current one bigger, rimmed) and the
+name, "Y ◂ Red ▸ X" on the highlighted poster; knobs for its box and sizes. `CharacterSelect`: X / Y (keyboard E / Q) cycle the highlighted poster's
+colour with the hand's click; A writes it to `GameData.SelectedColor`; back on the screen, the played character's poster starts on it.
+`GameData.SelectedColor` / `SelectedColorEntry` (session-only, like the character). `Mario.ApplyBodyTexture` (ApplyProfile's swap, factored) runs in
+_Ready after the profile and before the eyes and the body overlay cache the materials, so blinks and the damage fog see the coloured body.
+
+**Verified** (Mac, headless + windowed): 21/21 on the select (five colours, the strip, X / Y and their wraps, Luigi ignoring X, the click, A carrying
+Yellow to GameData, B back keeping it) and in a level Mario's Mesh_0 on the picked atlas on all 8 body surfaces, none on the default, the 2 eye
+surfaces untouched; frames of the strip and of Mario in each colour in the Ricco course. A lesson from the Mac loop: a `git checkout -- models/`
+(the fix for the import's clobbered animation files) also reverts unstaged edits under `models/` -- stage first.
