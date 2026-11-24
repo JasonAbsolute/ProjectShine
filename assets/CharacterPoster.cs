@@ -27,8 +27,11 @@ public partial class CharacterPoster : Button
     [Export] public int ColorNameSize = 12;
     [Export] public float ColorDot = 7f;
     [Export] public float ColorDotGap = 6f;
-    /// <summary>The hint shown either side of the name while the poster is highlighted ("Y" and "X": the buttons that cycle).</summary>
+    /// <summary>The hint shown either side of the name while the poster is highlighted ("Y" and "X": the buttons that cycle). Only with ColorShowName.</summary>
     [Export] public bool ColorShowButtons = true;
+    /// <summary>258c (Jaysonn: "we dont need the text at the bottom sayin what color they are"): the colour's name under the dots. Off = the dots alone,
+    /// centred in the strip's box.</summary>
+    [Export] public bool ColorShowName = false;
 
     private TextureRect _nameArt;
     private TextureRect _headArt;
@@ -101,6 +104,9 @@ public partial class CharacterPoster : Button
         _colorStrip.Visible = true;
         var cur = CurrentColor;
         string name = cur?.DisplayName ?? "";
+        _colorName.Visible = ColorShowName;
+        // the dots: over the name when it shows, else alone down the middle of the strip
+        _colorDots.Position = ColorShowName ? Vector2.Zero : new Vector2(0f, ColorStripRect.Size.Y * 0.29f);
         // 258b: the head shot in the colour, when the colour brings one
         if (_headArt != null)
         {
