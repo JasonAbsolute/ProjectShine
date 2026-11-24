@@ -21,4 +21,8 @@ public partial class CharacterColor : Resource
 
     /// <summary>The dot shown on the poster for this colour.</summary>
     [Export] public Color Swatch = new(0.93f, 0.11f, 0.14f, 1f);
+
+    /// <summary>258b: the poster's head shot in this colour (Mario's MarioHead_<colour>.png: the cap and the emblem re-hued by
+    /// tools/projectshine/rematch157/colors258/recolor_head258.py from the atlas's own cap colour); null = the entry's HeadArt.</summary>
+    [Export] public Texture2D HeadArt;
 }

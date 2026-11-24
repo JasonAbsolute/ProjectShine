@@ -101,6 +101,14 @@ public partial class CharacterPoster : Button
         _colorStrip.Visible = true;
         var cur = CurrentColor;
         string name = cur?.DisplayName ?? "";
+        // 258b: the head shot in the colour, when the colour brings one
+        if (_headArt != null)
+        {
+            var art = cur?.HeadArt ?? Entry.HeadArt;
+            if (_headArt.Texture != art)
+                _headArt.Texture = art;
+            _headArt.Visible = art != null;
+        }
         _colorName.Text = ColorShowButtons && _highlighted && ColorCount > 1 ? $"Y \u25C2  {name}  \u25B8 X" : name;
         // one dot a colour, the current one full size and rimmed, the rest small
         while (_colorDots.GetChildCount() < ColorCount)

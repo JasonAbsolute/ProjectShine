@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CharacterEntry" load_steps=15 format=3 uid="uid://b20oyjaihlb72"]
+[gd_resource type="Resource" script_class="CharacterEntry" load_steps=19 format=3 uid="uid://b20oyjaihlb72"]
 
 [ext_resource type="Script" uid="uid://dgwvqcjfth5pi" path="res://assets/CharacterEntry.cs" id="1_script"]
 [ext_resource type="PackedScene" path="res://assets/Mario.tscn" id="2_scene"]
@@ -10,6 +10,10 @@
 [ext_resource type="Texture2D" uid="uid://iopcntr8ebbr" path="res://models/Mario/Colors/mario_blue.png" id="8_blue"]
 [ext_resource type="Texture2D" uid="uid://dhk7qdfnfbo6e" path="res://models/Mario/Colors/mario_green.png" id="9_green"]
 [ext_resource type="Texture2D" uid="uid://d0mmx2f0ktsf6" path="res://models/Mario/Colors/mario_black.png" id="10_black"]
+[ext_resource type="Texture2D" uid="uid://cdxtffvwojfke" path="res://Font/CharacterSelect/MarioHead_yellow.png" id="11_head_yellow"]
+[ext_resource type="Texture2D" uid="uid://clghl1d4drj5a" path="res://Font/CharacterSelect/MarioHead_blue.png" id="12_head_blue"]
+[ext_resource type="Texture2D" uid="uid://cr86ge3ilpx8f" path="res://Font/CharacterSelect/MarioHead_green.png" id="13_head_green"]
+[ext_resource type="Texture2D" uid="uid://cnwsk4673r27l" path="res://Font/CharacterSelect/MarioHead_black.png" id="14_head_black"]
 
 [sub_resource type="Resource" id="Resource_red"]
 script = ExtResource("6_color")
@@ -24,6 +28,7 @@ DisplayName = "Yellow"
 BodyTexture = ExtResource("7_yellow")
 BodyTextureMatch = "ma_mdl1_0"
 Swatch = Color(0.98, 0.8, 0.08, 1)
+HeadArt = ExtResource("11_head_yellow")
 metadata/_custom_type_script = ExtResource("6_color")
 
 [sub_resource type="Resource" id="Resource_blue"]
@@ -32,6 +37,7 @@ DisplayName = "Blue"
 BodyTexture = ExtResource("8_blue")
 BodyTextureMatch = "ma_mdl1_0"
 Swatch = Color(0.16, 0.3, 0.85, 1)
+HeadArt = ExtResource("12_head_blue")
 metadata/_custom_type_script = ExtResource("6_color")
 
 [sub_resource type="Resource" id="Resource_green"]
@@ -40,6 +46,7 @@ DisplayName = "Green"
 BodyTexture = ExtResource("9_green")
 BodyTextureMatch = "ma_mdl1_0"
 Swatch = Color(0.2, 0.62, 0.2, 1)
+HeadArt = ExtResource("13_head_green")
 metadata/_custom_type_script = ExtResource("6_color")
 
 [sub_resource type="Resource" id="Resource_black"]
@@ -48,6 +55,7 @@ DisplayName = "Black"
 BodyTexture = ExtResource("10_black")
 BodyTextureMatch = "ma_mdl1_0"
 Swatch = Color(0.16, 0.16, 0.18, 1)
+HeadArt = ExtResource("14_head_black")
 metadata/_custom_type_script = ExtResource("6_color")
 
 [resource]
