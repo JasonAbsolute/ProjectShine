@@ -16235,3 +16235,27 @@ the NORMAL dead demo is on (not the hell one), the eye held to the unit for the 
 look-at), the timer 296 -> 174, the live Camera3D wearing it, the pace the game's chase (expected 32.68); the miss takes the last life (0 -> -1); 7.3 s
 on the card save opens with the mask up, "Continue | Return to Title Screen", the tree paused, the course still up under it; Down + A -> the Player
 Select, the tree running, Lives -1. Run 2: A on Continue -> the Level Select, the progress the save's, no miss flag left. The 261 drive still 87/87.
+
+### 262b -- Mario's battle stance re-posed on the sprite sheets: a right-foot lunge, the far fist up, the near arm down (feature/kingboo-casino, code `e38bbf8`)
+
+**Jaysonn:** "can we polish up the pose a bit i think it still looks a bit off".
+
+**The reference, read properly this time.** His three sprite sheets from 176 (now kept under `tools/projectshine/rematch157/anim176/ref/`), blown up
+cell by cell (`sheet_zoom.gd`, `sheet_measure.gd`): the stance is a LUNGE -- the right foot far forward with the knee bent hard and the shin upright,
+the left leg stretched back nearly straight, the hips low (84 % of his standing height; 2.8 x his standing width front to back in the 3/4 view), the
+torso leaning well forward and turned so the right shoulder leads, the RIGHT fist up beside the face at nose height, the LEFT arm hanging low and back
+by the hip, the head up on the enemy. 176 had drawn a bladed boxing guard: the LEFT foot forward, both fists at the chin, the chest turned the other
+way -- so from the stand-off camera (Mario seen from his left) the near fist was up where the sprite has the near arm down and the far fist up.
+
+**The pose** (`anim176/stance262.py` generates both `.pose.json`; the baker makes the `.tres`): named numbers -- body yaw 18 and chest yaw 18 (the right
+shoulder forward), lean 31, the head back 32 and up 40 onto the enemy, the lead thigh 65 deg forward with the shin upright (knee 21), the rear thigh 67
+back nearly straight, the centre down 9.8. The centre drop, the rear thigh and the lead knee are SOLVED so both ankles sit at the idle's 9.0 (the rig:
+the idle thigh hangs 26 forward and the knee is bent 44, so a knee of -36 leaves 8 deg; the legs are 20 + 19.5 units); the arms are fitted by grid to
+targets about the head (the fist 20 to his right of its centre, 10 under, 20 ahead -- beside the face, clear of it from the front; the first fits sat
+it on his cheek) and the left hip (the hand by it, behind). The loop's bounce: up 2 and back along the rear leg's line, both feet re-planted (0.3 u),
+the lead fist pumping, the rear arm swinging. The drop-in: the idle, the fists up as the RIGHT foot steps (off the floor; the rear knee solved so that
+foot stays down), the stance. Names, lengths, the intro's knobs and the 176b hold unchanged; the hand table still closes the fists.
+
+**Verified**: `stanceshot262.gd` (windowed, 176's clips beside these from the stand-off side, the right-front three-quarter and the front, plus the
+bounce frame: `anim176/shots262/`) and `introstance262.gd` (headless 8/8: the rematch intro plays the look-about at 8.1 s, the drop-in at 10.1 s, the
+loop from 10.6 s; the fight starts with him holding it, a stick push ends the hold, the tree comes back). No C#: no Build needed.
