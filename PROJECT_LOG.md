@@ -16037,3 +16037,35 @@ without it) and the editor's 4.7.2 re-stamps of the `.import` files and Mario's 
 **Verified** (Mac, Godot 4.7.2 mono headless): build 0 errors (markers in the DLL); `menudrive255.gd` (joypad events on device 0) 17/17 -- the stick
 moves the hand on both screens with and without a focused poster, a HELD stick moves once and a second push after the centre moves again, A on the
 Player Select brings up the Level Select, B there goes back and A again comes forward, the D-pad with no focus puts the hand on a poster.
+
+### 256 -- the Hillside Cave Secret's two star platforms before the goal turn as they circle: the game's SPLINE rail lift (feature/kingboo-casino, code `4cd0868`)
+
+**Jaysonn:** "the star platforms at the end of hillside secrect need to rotate and they are not".
+
+**What the game does.** normalvariant0 0 / 1 are TNormalLift objects on the rails `S_block00` / `S_block01`: closed four-node diamonds 100 u across, every
+node yaw 40 (the speed, 0.4 u a tick). `TGraphWeb` gives every rail whose name starts with `S_` a `TSplineRail` (graph.cpp 145) -- `TSplinePath`'s natural
+cubic spline on a chord-length parametrization, closed (last node, every node, the first, the second; t wrapped between the first node's t and its
+repeat). On a spline the lift does not walk node to node: the tracer advances t by speed x (t ahead - t behind) / chord (`calcSplineSpeed`, `traceSpline`),
+the position is the spline at t and `mRotation = MsGetRotFromZaxis(spline(t + 0.01) - spline(t))` (MapObjRailBlock.cpp 75) -- it faces along the curve, so
+a star on a closed loop turns once a lap while it circles (a lap = 4 x 141.42 u at 0.4 u a tick = 11.8 s, about 30 deg/s). 237-238 had put the two on
+MovingPlatform's straight waypoint loop with no rotation: the 15-m star slid round a 1.3-m square and never turned, which read as nothing at all.
+
+**`assets/Sms/SmsSplineLift.cs`** (new): the port -- TSplinePath (makeTable / calcSpline as written), TSplineRail (wrapT; getPosAndRot with the 0.01
+look-ahead; MsGetRotFromZaxis: yaw = atan2(x, z), pitch = -asin(y)), the tracer on the spline (the wrap cases of calcSplineSpeed / traceSpline;
+getShortestNextIndex: the one not come from, else the nearer, the lower index on a tie), TNormalLift::control's speed re-read at each node (1.0 u a tick
+before the first node, the game's unk144), Rz Ry Rx for the facing, the authored scale kept out of it, 120 ticks a second, an AnimatableBody3D with
+SyncToPhysics so Mario rides it. One difference, deliberate: the game's tracer starts at t = 0, which wraps onto the LAST node's stretch (its lift jumps
+there on its first tick); here t starts at the node the lift stands on. Knobs: RailNodes, RailSpeeds, ClosedLoop, StartNode, FirstSpeed, UnitsPerMetre,
+FaceAlongRail (off = the placed rotation kept), LookAheadT, TicksPerSecond, SpeedScale, Active. **`assets/secrect_level.tscn`**: StarLift0 / StarLift1 on
+the new script with the disc's four nodes each (the script set on the instance, as the RollCubes carry SmsRailBlock). The mid-course RollStars (48 deg/s in
+place) are untouched.
+
+**The Mac clone, two things learned:** a headless `--import` under 4.7.2 REWRITES Mario's animation `.res` files under `models/` (they are the glb
+import's saved-to-file animations), and the rewritten clips' tracks no longer resolve (`Node/Skeleton3D:...`): Mario's AnimationMixer then logs some 75
+warnings a frame and a 15-s drive writes a 2.8-GB log. `git checkout -- models/` after any import puts the committed ones back; they must never be
+committed from here. And a `--script` drive must wait for `current_scene` by name before touching it (the course takes more than a few physics frames to
+load on this machine); a GDScript error before `quit()` leaves the tree running until the bound.
+
+**Verified** (Mac, Godot 4.7.2 mono): build 0 errors; `starcheck256.gd` (headless, 15 s sampled) 13/13 -- each lift sweeps 494 deg in 15 s (32.9 deg/s),
+circles its rail's centre at 1.27..1.35 m, stays level, runs at 0.4 u a tick after its first node, the two turn opposite ways as their mirrored rails
+run; before the fix the same probe read 0.0 deg of yaw over 2 s. Windowed frames 3 s apart show the stars turning.
