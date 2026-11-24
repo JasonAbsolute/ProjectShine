@@ -16127,3 +16127,16 @@ and back, Luigi's unchanged) with the poster frames.
 
 **Jaysonn:** "we dont need the text at the bottom sayin what color they are". `CharacterPoster.ColorShowName` (off): the swatch dots alone, centred in
 the strip's box under the head; the "Y / X" hint went with the name. Verified with the head-shot drive (7/7) and the poster frames.
+
+### 259 -- the menu song is gone before a level's music starts (feature/kingboo-casino, code `116c161`)
+
+**Jaysonn:** "when transitioning to the level the music from the select screen sometimes overlaps. i think this is a loading issue?"
+
+**Why.** 251's keeper noticed the menus were gone only in its own _Process, on the first frame of the new scene, then faded over 0.35 s -- but the level's
+SmsStageMusic had started in its _Ready, so both played for the fade; and the keeper ran at full volume through the load stall before that (the audio
+thread mixes on while the main thread loads). The overlap was the fade, longer on a slow load.
+
+**The fix.** `SmsMenuMusic.LeaveMenus(from, seconds)`: the Level Select's Confirm fades the song out over its own 0.7-s fade to black, so it is silent before
+the level loads; `CutUnderLevels` (on): a level that comes up with the song still audible cuts it rather than fading over it. The Player Select's M-gate path
+fades the same way; the way to the Level Select still carries the song. Verified frame by frame: fade from 1.32 s after A, under -40 dB at 1.75 s, the
+keeper gone at the scene change (2.64 s) when the stage music starts; no frame with both audible.
