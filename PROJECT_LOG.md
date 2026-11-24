@@ -14173,7 +14173,7 @@ down two not one; the drive's clear now takes the rising ones too -- run ez 68 /
 logs, the shots and the tasks deleted.
 
 **Deviations:** not ported -- `mAnmSound->stop()` and the Yoshi kill (no Yoshi); the NORMAL death's dead demo (the eye held, the fov closing on him over
-343 ticks): a death on the floor keeps its camera as before; no miss jingle (Mario's `MissJingle` slot is empty, for every miss in the port) and the boss
+343 ticks) -- PORTED IN 216 (CtrlNormalDeadDemo; this line stood uncorrected till 262); no miss jingle (Mario's `MissJingle` slot is empty, for every miss in the port) and the boss
 music runs on to the reload. The plane is a flat plane with no edges (the game's is a floor polygon of the death type under him): under this arena
 nothing else is there, so it is the same. The regression and shot drives turn it off (a rim flake, the fake hit's knock off the rim, would reload the
 arena mid-run); the fall drive tests it. The scene's two notes were corrected after the runs (text only: "25 m under the floor's top" -> "about 26 m
@@ -16200,3 +16200,38 @@ its start (0.8 m from the first spawn, lives 3, fresh flags, the re-entry flag c
 cries itself (FallCry playing, no ma_thrown), another reload (lives 2). The other nine courses load with the plane at y 0, Mario found, the sheet hidden.
 Fall note: the port's Mario gravity is the shipped mGravity 1.0 u/tick^2 = 48.4 m/s^2 (the self-tests' model since the jump passes), so 52 m to the
 plane is 2.07 s, 12 m is 0.73 s.
+
+### 262 -- the game over goes where the game's goes: the "Continue / Return to Title Screen" window; the floor death's camera demo was 216's, verified (feature/kingboo-casino, code `6d2b283`)
+
+**Jaysonn:** "Game over goes nowhere. GameOverScene is empty on Mario, so losing the last life reloads the same course with the lives reset. For a demo
+that should probably drop back to the Player Select. Small pass. and fix the normal (floor) death's camera demo: the game holds the eye and closes the
+FOV on Mario over 343 ticks; a floor death keeps the play camera."
+
+**The game** (MarDirectorDirect.cpp 417-441, 383-407; CardSave.cpp 361, 1245). The Miss state with no life left plays the game-over jingle under the
+game-over wipe; the screen out and the jingle done, `startWipe(WIPE_FADE_IN, 0.3)` and STATE_CARD_SAVE with PURPOSE_GAME_OVER: the card save's `'mask'`
+(juice_mask.bti, black, alpha 255: the screen stays black) and the `'w_6'` window (411 x 112 at (95, 188)) with savemessage.bmg 31 "Continue" and 32
+"Return to Title Screen" (`'sm7b'` / `'sm8b'`, the hands `'sc6a'` / `'sc7a'`); up / down move the hand, A picks (0x481C). Continue -> PROGRESS_UNK1 ->
+getNextState 0: `TFlagManager::restore()` (the progress back to the last save), MSF_UNK30001, the Plaza (the intro stage with no shine); Return to Title
+Screen -> PROGRESS_UNK19 -> 1: APP_STATE_DONE, the title.
+
+**The port.** `assets/Sms/Console/SmsCardSave.cs`: `Purpose.GameOver` (7); the fourth window `'w_6'` at the blo's own places (the hands at x 21, the
+323-wide texts at 72, rows 27 / 63 -- `OptionList` takes them), bmg 31 / 32; `Progress.GameOverSel` = waitForSelectOver (0 Done, 1 Quit); the mask, a
+black ColorRect over the whole viewport under the windows (GMSP01_NX widens the game's 600 x 480 pane for 16:9), shown for this purpose alone and kept up
+through Finish till the stage moves; `CenterContents` centres a 323 box as the 250 ones; readouts `GameOverOptionsShown`, `MaskShown`. `assets/Mario.cs`:
+`SmsMissTick`'s no-life branch: `FadeIn(0.3)` and the card save instead of a reload; `SmsGameOverFinish(next)`: 1 -> the card save's `TitleScene`
+(`assets/CharacterSelect.tscn`, the Player Select); 0 -> `GameData.RestoreFromSave()` then `GameOverContinueScene` (new; empty = the Level Select this
+course was picked on, `GameData.LevelSelectScene`, else the title); the miss's quiet holds through the window as the game's does till the next stage's
+initSound (the card save's sounds are the system's, never muted). `GameOverScene` stays as an OVERRIDE (set = straight there, no window). `GameData.
+RestoreFromSave`: the shine / blue coin sets reloaded from the file (none = empty). Not ported: startDisappearStar / Coin (the HUD's counters leaving:
+under the solid mask).
+
+**The camera: already done.** The normal dead demo was ported in 216 (`SunshineCamera.CtrlNormalDeadDemo`: 16 ticks after MARIO_FLAG_GAME_OVER the eye is
+held and the fov closes at a steady pace toward clamp(10500 / eye-to-lookat, 5, 80) deg over 343 ticks, the look-at on his body + 35 u). 212's entry
+had called it not ported and the line was never corrected (fixed in place now). No code change; the drive below proves it.
+
+**Verified** (`death261/gameoverdrive262.gd`, headless 33/33 and windowed with the shot `gameover262.png`): the Hillside Cave Secret with 0 lives, Mario
+killed ON THE FLOOR through the enemies' entry (`TakeDamage` x 8, 2.5 s apart, knocked inward) -- a floor death, not the plane's; 0.25 s after the flag
+the NORMAL dead demo is on (not the hell one), the eye held to the unit for the next second, the fov 45.19 -> 32.64 deg toward 14.8 (708 u to the
+look-at), the timer 296 -> 174, the live Camera3D wearing it, the pace the game's chase (expected 32.68); the miss takes the last life (0 -> -1); 7.3 s
+on the card save opens with the mask up, "Continue | Return to Title Screen", the tree paused, the course still up under it; Down + A -> the Player
+Select, the tree running, Lives -1. Run 2: A on Continue -> the Level Select, the progress the save's, no miss flag left. The 261 drive still 87/87.
