@@ -16007,9 +16007,8 @@ ind_scale, one puddle for one landing spot (7 visible instances = 1 puddle + 6 f
 side and from behind, the landing spot bluer and the floor 4.7 m away unchanged, the wall hit one patch, all gone 2.5 s after the spray; runs c / d in
 the Hillside Cave course from its PlayerSpawner. Before / after shots in tools/projectshine/rematch157/water254/.
 
-**Left for later:** the landed drops still live the port's 40 ticks (the game: up to 256, slower on slippery planes) and do not slide; the puddle
-merge is drawn, not simulated (the cleaning balance stays as it was); the game's silhouette pass (waterJumping.bti, Mario seen through the water) is
-not drawn.
+**Left for later (DONE in 263):** the landed drops' 256-tick life, the slide, the simulated merge, and the silhouette pass -- which is the WATER drawn in
+Mario's through-the-map silhouette (TSilhouette), not Mario seen through the water as this note had it.
 
 ### 255 -- a controller on the Player Select and the Level Select: A picks, B goes back, the stick and the D-pad move the hand (feature/kingboo-casino, code `732f8d6`)
 
@@ -16297,3 +16296,35 @@ place unchanged from 262b.
 **Verified**: `stancering262.gd` (windowed, FLUDD hidden, 12 views: `anim176/shots262d/`) -- both fists up from the front, the lead one's back of the hand
 to the camera with the thumb on top, the rear fist at his left side at chest height; the rear elbow back and the fist by the ribs from the stand-off
 side; `introstance262.gd` headless 8/8. No C#.
+
+### 263 -- FLUDD's landed drops live the game's way, and Mario's silhouette through the map with his water in it (feature/kingboo-casino, code `5a36261`)
+
+**Jaysonn:** "fix these: Small leftovers, low priority: FLUDD's landed drops live a fixed 40 ticks and don't slide (the game: up to 256, sliding on slippery
+floors), and the see-Mario-through-the-water silhouette isn't drawn."
+
+**The landed drops** (`assets/Sms/SmsWaterDrops.cs`; `TModelWaterManager::move`, ModelWaterManager.cpp 420-724; `gWaterManagerPlaneInfo` 355 = { 0.93, -3, 2 |
+0.7, -1, 1 }). A drop that meets a floor splashes and survives as a puddle with unk5D88[0] = 0.5 (0.35 under the L camera; a wall 0.5) -- else it is spent;
+its life is capped at 256 (unk5D68) and runs down by the plane's vanish speed (1 plain, 2 wet), the disc shrinking with it; case 2, the slide: the horizontal
+speed x the plane's friction (0.7 / 0.93) + the plane normal's horizontal part (downhill), capped at a drop size a tick, the floor under the new place taking it
+back (a ray spanning half a drop size about the last contact) -- no floor = it slid off the edge and flies again; case 3, a wall drop runs down the wall (-1 /
+-3 units a tick) and dies at the floor; the merge (unk5D60 & 0x40) simulated in index order (the earlier takes the later's size and life, the later dies) instead
+of drawn. A wet plane is a collider in the group `sms_wet_ground` (`SlipGroup`). Knobs for every number; readouts `TakeStats`, `Landed(k)`, `PuddleCount`.
+Not ported: the DRY_UP sound, the splashes. A first slide check had the floor ray too short for a tilted plane (the lifted particle's own offset ate it:
+the puddle "slid off" at the top of a 25-degree ramp) -- the ray now spans half a drop size about the last contact.
+
+**The silhouette.** 254's note was backwards: the game draws the WATER in Mario's silhouette pass, not Mario through the water. `TSilhouette`
+(MarioUtil/DrawUtil.cpp): when the camera's view of Mario is blocked (MARIO_FLAG_OCCLUDED) his model is drawn again in the stage's silhouette colour ((0, 0x27,
+0x77) by default) where the map is in front of him (Z GEQUAL), the alpha chasing 128 at 0.01 of the gap a game frame while hidden and 0 once seen; the water
+joins (`drawSilhouette`, 952: waterJumping.bti blobs for the flying drops, the puddle volumes) at 80 x the alpha. The port had no silhouette at all. Now:
+`assets/Sms/Fx/silhouette.gdshader` (flat colour, depth_test_inverted: only behind what is nearer) rides every mesh under his skeleton as a material_overlay
+while the alpha is above zero (`Mario.SmsSilhouetteTick`, in _Process at the game's rate scaled to the frame rate; `SunshineCamera.MarioOccluded` -- its
+ray from the eye to his waist -- stands in for the framebuffer peek); `assets/Sms/Fx/water_silhouette.gdshader` + `tex/waterjumping.png` draw the drops'
+MultiMesh again in that colour at 80 / 255 x the alpha's fraction (`SmsWaterDrops.SetSilhouette`). Knobs: `SmsSilhouette`, `SmsSilhouetteColor`,
+`SmsSilhouetteOccludedAlpha`, `SmsSilhouetteApproachRate`. The game's per-triangle layering (no Z write) is kept: his far side over his near side reads a shade
+darker, as it does on the GameCube.
+
+**Verified** (`water263/waterdrive263.gd`, windowed 28/28): a bare stage -- 80 drops on a flat floor: 51 % die in the splash, puddles at 150 ticks, gone by 300,
+0.044 -> 0.001 m/tick in 10 ticks; the wet patch: gone by 160, 0.048 -> 0.023; the 25-degree ramp: a steady 0.019 m/tick downhill (the game's 1.4 units =
+0.42 / 0.3) from x 14.3 to the foot at 15.96, then off it; the wall: 2.38 m down to the floor and dead there; a stream on one spot: 235 landings, 119 merges,
+one puddle at most. Hillside with a wall between the camera and Mario: occluded, the alpha 37.5 of 128 after a second and 110 after five, the overlay on
+12 of 12 meshes, the spray's silhouette pass on; the wall gone: 110 -> 59 in two seconds, off, the overlays gone. Shots in `water263/shots/`.
