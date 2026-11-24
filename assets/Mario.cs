@@ -973,6 +973,7 @@ public partial class Mario : CharacterBody3D
     // timers for climb/hopup
     private float ledgeClimbT = 0f;
     private float ledgeClimbDur = 0.55f; // will auto-fill from animation if found
+    private float ledgeHopDur = 0.35f;   // 257: the hop's length, ma_hgjmp's (auto-filled); the climb's is ma_hgup's
 
     // TUNING (these are "world units" — adjust once and you're done)
     // --- LEDGE GRAB (scaled) ---
@@ -983,8 +984,7 @@ public partial class Mario : CharacterBody3D
     private const float LEDGE_STAND_UP = 0.004443f; // 0.01 * SCALE_FIX
     private const float LEDGE_STAND_FORWARD = 0.444264f; // 1.0 * SCALE_FIX
 
-    private const float LEDGE_HOP_UP_VEL = 17.770573f; // 40 * SCALE_FIX
-    private const float LEDGE_HOP_FWD_SPEED = 7.996758f; // 18 * SCALE_FIX
+    // (257: the hop's launch constants LEDGE_HOP_UP_VEL 17.77 / LEDGE_HOP_FWD_SPEED 8.0 are gone -- HANG_JUMPING is ma_hgjmp played in place, like ASCEND's ma_hgup)
 
     private const int LEDGE_REGRAB_COOLDOWN_FRAMES = 10;
     private int ledgeRegrabCooldown = 0;
@@ -1810,6 +1810,9 @@ public partial class Mario : CharacterBody3D
         var hgup = animPlayer.GetAnimation(SmsNames.Of("ma_hgup"));
         if (hgup != null)
             ledgeClimbDur = (float)hgup.Length;
+        var hgjmp = animPlayer.GetAnimation(SmsNames.Of("ma_hgjmp"));
+        if (hgjmp != null)
+            ledgeHopDur = (float)hgjmp.Length;   // 257: HANG_JUMPING runs for ma_hgjmp's length, as ASCEND runs for ma_hgup's
 
         if (hangAnchor == null)
             GD.PushError(
@@ -3046,11 +3049,11 @@ public partial class Mario : CharacterBody3D
             wasOnFloor = false;
             return;
         }
-        if (UseSmsPhysics && IsOnFloor() && (stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb))
+        if (UseSmsPhysics && IsOnFloor() && (stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb || stateOfMario == MarioState.ledgeHopUp))
         {
             // Entered from the top (DESCEND): pinned states never call MoveAndSlide, so IsOnFloor() is still the stale true
             // of the last step on the platform and the grounded branch would stand him up. Same handling as the airborne
-            // branch gives a hang that started in the air.
+            // branch gives a hang that started in the air. 257: the hop (HANG_JUMPING) is pinned like the climb.
             if (stateOfMario == MarioState.ledgeHang)
             {
                 TickLedgeHang(delta, LstickVec);
@@ -3058,7 +3061,7 @@ public partial class Mario : CharacterBody3D
                 wasOnFloor = false;
                 return;
             }
-            bool climbDone = TickLedgeClimb(delta);
+            bool climbDone = stateOfMario == MarioState.ledgeHopUp ? TickLedgeHop(delta) : TickLedgeClimb(delta);
             Velocity = Vector3.Zero;
             wasOnFloor = climbDone;
             return;
@@ -4156,8 +4159,12 @@ public partial class Mario : CharacterBody3D
 
             if (stateOfMario == MarioState.ledgeHopUp)
             {
-                // hop-up behaves like airborne after the initial impulse
-                // (gravity already applies because we don't skip it for ledgeHopUp)
+                // 257: HANG_JUMPING is pinned at the ledge while ma_hgjmp plays (hangJumping(): waitProcess, the clip, WAIT at its end), the
+                // same as the climb -- no gravity, no MoveAndSlide (the vault's launch is gone)
+                bool hopDone = TickLedgeHop(delta);
+                Velocity = Vector3.Zero;
+                wasOnFloor = hopDone;
+                return;
             }
 
             // try to START a ledge grab if we're not already doing ledge stuff
@@ -7662,29 +7669,65 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>HANG_JUMPING: the vault onto the ledge (the port's hop, kept).</summary>
+    /// <summary>HANG_JUMPING (MarioSpecial.cpp 457 / 582 / 629): A on the ledge (or a floor within 100 u below the hang) -- the quick hop up. In the
+    /// game it is ANIM_HGJMP played where he hangs with waitProcess() under it (no launch, no velocity: the clip itself carries the body up
+    /// over the edge) and WAIT on its last frame, the same shape as ASCEND's ma_hgup. Until 257 the port fired a LAUNCH here instead
+    /// (vy 17.8 m/s, 8 m/s forward: a single-jump's height out of a hang, "flung onto the platform"); now the hop is the pinned,
+    /// animation-driven move the climb is (TickLedgeHop: XZ eased from the hang to the stand spot over ma_hgjmp's length, Y pinned). The
+    /// exert voice (MSD_SE_MV15_EXERT_INST_01) plays on the way in.</summary>
     private void SmsLedgeVault(string why)
     {
         if (SmsDebugPrint)
-            GD.Print($"[SMS ledge] vault ({why})");
+            GD.Print($"[SMS ledge] hop up: HANG_JUMPING, ma_hgjmp ({why})");
         _smsHangMovingAnim = false;
         animPlayer.SpeedScale = 1f;
+        SmsPlaySlot(ExertVoice);   // startVoice(MSD_SE_MV15_EXERT_INST_01), the take's grunt
         stateOfMario = MarioState.ledgeHopUp;
         SetMarioState(stateOfMario);
-        Vector3 fwdOntoLedge = -ledgeWallNormal;
-        // start from the wall face, not the hang anchor 0.34 m inside the wall, or the depenetration shoves him; and refresh
-        // the floor state (stale while pinned) so the next frame runs the airborne branch
-        Vector3 outXZ = ledgeHangPos + ledgeWallNormal * (capRadiusWorld + 0.02f);
-        GlobalPosition = new Vector3(outXZ.X, ledgeHangPos.Y, outXZ.Z);
-        Velocity = Vector3.Zero;
-        MoveAndSlide();
+        ledgeClimbT = 0f;
         velocity = Vector3.Zero;
-        velocity.Y = LEDGE_HOP_UP_VEL;
-        velocity.X = fwdOntoLedge.X * LEDGE_HOP_FWD_SPEED;
-        velocity.Z = fwdOntoLedge.Z * LEDGE_HOP_FWD_SPEED;
+        Velocity = Vector3.Zero;
+    }
+
+    /// <summary>hangJumping(): one frame of the hop. Pinned at the hang like the climb (TickLedgeClimb), ma_hgjmp playing, the body eased from
+    /// the hang spot to the stand spot over the clip's length (the game's clip carries the root; the port's visual-root lock keeps the clip in
+    /// place, so the body is moved here as the climb's is); B lets go into the passive drop (mInput &amp; 0x4 -> LAND_SAFE_DOWN); the last frame =
+    /// WAIT. True when done.</summary>
+    private bool TickLedgeHop(double delta)
+    {
+        if (!UpdateLedgePlatformPositions())
+        {
+            ExitLedgeHangToFall();
+            return false;
+        }
+        velocity = Vector3.Zero;
+        if (UseSmsPhysics && Input.IsActionJustPressed(SmsNames.Of("button_b")))
+        {
+            SmsHangLetGo(false, "B during the hop");
+            return false;
+        }
+        LockArmatureVisualRoot();
+        ledgeClimbT += (float)delta;
+        float dur = ledgeHopDur > 0.01f ? ledgeHopDur : 0.35f;
+        float t = Mathf.Clamp(ledgeClimbT / dur, 0f, 1f);
+        float s = t * t * (3f - 2f * t);
+        Vector3 lerpedPos = ledgeHangPos.Lerp(ledgeStandPos, s);
+        GlobalPosition = new Vector3(lerpedPos.X, ledgeHangPos.Y, lerpedPos.Z);
+        armature.Rotation = new Vector3(0f, BaseYawFromDir(-ledgeWallNormal), 0f);
+        if (t < 1f)
+            return false;
         ledgePinned = false;
         _ledgePlatformBody = null;
         ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
+        stateOfMario = MarioState.idle;
+        animPlayer.Play(SmsNames.Of("ma_wait"));
+        SetMarioState(stateOfMario);
+        LockArmatureVisualRoot();
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        landingEnteredThisContact = true;
+        suppressLandingFrames = 2;
+        return true;
     }
 
     /// <summary>hanging(): one frame of the hang. Runs after the pin; returns having set the animation.</summary>
@@ -9615,23 +9658,10 @@ public partial class Mario : CharacterBody3D
             return;
         }
 
-        // A = quick get up / hop
+        // A = quick get up / hop (257: the animated hop, the same on both physics paths)
         if (Input.IsActionJustPressed(SmsNames.Of("button_a")))
         {
-            // play hop anim and give impulse
-            stateOfMario = MarioState.ledgeHopUp;
-            SetMarioState(stateOfMario);
-
-            // hop upward + forward onto ledge (uses current rotated wall normal)
-            Vector3 fwdOntoLedge = -ledgeWallNormal; // onto platform
-            velocity = Vector3.Zero;
-            velocity.Y = LEDGE_HOP_UP_VEL;
-            velocity.X = fwdOntoLedge.X * LEDGE_HOP_FWD_SPEED;
-            velocity.Z = fwdOntoLedge.Z * LEDGE_HOP_FWD_SPEED;
-
-            ledgePinned = false;
-            _ledgePlatformBody = null;
-            ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
+            SmsLedgeVault("A");
             return;
         }
     }
