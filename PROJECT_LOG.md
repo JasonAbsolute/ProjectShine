@@ -16111,3 +16111,14 @@ _Ready after the profile and before the eyes and the body overlay cache the mate
 Yellow to GameData, B back keeping it) and in a level Mario's Mesh_0 on the picked atlas on all 8 body surfaces, none on the default, the 2 eye
 surfaces untouched; frames of the strip and of Mario in each colour in the Ricco course. A lesson from the Mac loop: a `git checkout -- models/`
 (the fix for the import's clobbered animation files) also reverts unstaged edits under `models/` -- stage first.
+
+### 258b -- the mugshot follows the colour: Mario's cap and emblem re-hued in four new head shots the poster swaps in (feature/kingboo-casino, code `c8e245c`)
+
+**Jaysonn:** "could you modify marios mugshot to be the different colors? it would just need to change the hat color".
+
+`Font/CharacterSelect/MarioHead_yellow.png`, `_blue`, `_green`, `_black` from `MarioHead.png` by
+`tools/projectshine/rematch157/colors258/recolor_head258.py`: the cap's pixels (hue within 9 degrees of red, saturation 0.72 up, above the mouth, the
+outlines left; feathered edges) re-hued to each alternate's cap colour read from his atlases themselves (the median where the default atlas is cap red),
+the shading kept; skin, hair, eyes, mustache untouched; the M goes with the cap as on the atlases. `CharacterColor.HeadArt` (null = the entry's);
+`CharacterPoster` puts the colour's head on as the strip refreshes; `MarioEntry.tres` names the four. Verified 7/7 (the head art round the five colours
+and back, Luigi's unchanged) with the poster frames.
