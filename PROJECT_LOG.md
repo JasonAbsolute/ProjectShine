@@ -16259,3 +16259,22 @@ foot stays down), the stance. Names, lengths, the intro's knobs and the 176b hol
 **Verified**: `stanceshot262.gd` (windowed, 176's clips beside these from the stand-off side, the right-front three-quarter and the front, plus the
 bounce frame: `anim176/shots262/`) and `introstance262.gd` (headless 8/8: the rematch intro plays the look-about at 8.1 s, the drop-in at 10.1 s, the
 loop from 10.6 s; the fight starts with him holding it, a stick push ends the hold, the tree comes back). No C#: no Build needed.
+
+### 262c -- the battle stance's hands: the lead fist's knuckles to the enemy, the rear arm wound straight back (feature/kingboo-casino, code `1a99031`)
+
+**Jaysonn:** "yeah his fist should be turned and his back hand should be more fighting pose. i gave you ref images from before do you have them still?"
+(yes: `anim176/ref/`, the three sheets of 176).
+
+**The sheets at 8x** (the side row's frames 6-8): the lead fist in front of the face with its KNUCKLES toward the enemy, thumb up; the rear arm straight
+BACK from the shoulder, near horizontal, the fist behind the body at the shoulder line -- a wound-up punch. 262b had read the 3/4 row's low glove as a
+hand hanging by the hip, and the lead glove came out knuckles-up with the fingers curled over the top.
+
+**The pose** (`anim176/stance262.py`): `FIST_TWIST_R` -90 -- the lead hand turned 90 deg about its own forearm (the elbow-to-hand line of the posed body,
+decomposed into the script's body-axis turns: `euler_pairs` / `twist_pairs`); three turns shot side by side (`twistshot262.gd`, -90 / +90 / 0) and -90 is
+the sprite's. `REAR_TARGET` (6, -2, -24) about the left shoulder joint: the rear fist straight back at shoulder height, a little out; the fit (swing 30,
+out 20, yaw 30, the elbow eased 10) lands 26 u behind the shoulder, the elbow held behind it (`ELBOW_BACK` 12). Two earlier readings -- a fist cocked
+by the ribs, a fist at the hip -- were fitted, shot and dropped. The legs, the lean, the head and the lead arm's place are 262b's.
+
+**Verified**: `stancering262.gd` (windowed, FLUDD hidden, 12 views: `anim176/shots262c/`) -- the knuckles toward the camera from the front, the rear arm out
+behind him in the side, back and high views; `introstance262.gd` (headless 8/8): the intro's look-about at 8.1 s, the drop-in at 10.1 s, the loop from
+10.6 s, the hold, the stick ending it. No C#.
