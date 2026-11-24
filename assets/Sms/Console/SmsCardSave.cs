@@ -27,7 +27,7 @@ using System.Collections.Generic;
 /// The frame: standard_window.bti at the four corners (mirrored), the window colour 00bbb988 (tools/projectshine/npc82/save124/
 /// gen_save_assets.py -> save/standard_window.png, a NinePatch with 20 px margins). The texts: <see cref="SmsTextBox"/> with the system font
 /// (TalkFont.tres), 20 x 24, line space 20, each with its black shadow box.
-/// DEVIATIONS (logged): the window's own mask never shows (the game shows it for GAME_OVER / ALL_SHINES / EXPLANATION only, none here);
+/// DEVIATIONS (logged): the window's own mask shows for GAME_OVER only (262; the game shows it for ALL_SHINES / EXPLANATION too, neither here);
 /// no memory-card states (no card, format, corrupt -- the file is user://save_data.json); the YES / NO sparks (emitter 0x1FA) are not ported;
 /// <see cref="HeadingMessage"/>: the game's shine-get heading is savemessage.bmg entry 0x21 (CardSave.cpp 1460) -- on the US disc that
 /// entry reads "File created." (the Japanese order's "SHINE! Save data?" moved to 41 and the index was never updated); 33 = as shipped,
@@ -38,8 +38,12 @@ using System.Collections.Generic;
 [GlobalClass]
 public partial class SmsCardSave : CanvasLayer
 {
-    public enum Purpose { Save = 0, BlueCoinGet = 1, ShineGet = 6 }
-    /// <summary>getNextState: 0 = the game goes on, 1 = the title (Save and Quit / "Continue playing?" No).</summary>
+    /// <summary>262: PURPOSE_GAME_OVER (7) -- the director's STATE_UNK7 with no life left (MarDirectorDirect.cpp 430): over the card save's black
+    /// 'mask' (juice_mask.bti, shown at alpha 255 for this purpose alone: CardSave.cpp 364) the 'w_6' window (411 x 112), two options 'sm7b' / 'sm8b'
+    /// (bmg 31 "Continue", 32 "Return to Title Screen") with the hands 'sc6a' / 'sc7a' -- waitForSelectOver (1245): up / down move the hand, A picks
+    /// (0x481C); Continue = PROGRESS_UNK1 -> getNextState 0 (TFlagManager::restore, the Plaza), Title = PROGRESS_UNK19 -> 1 (APP_STATE_DONE).</summary>
+    public enum Purpose { Save = 0, BlueCoinGet = 1, ShineGet = 6, GameOver = 7 }
+    /// <summary>getNextState: 0 = the game goes on, 1 = the title (Save and Quit / "Continue playing?" No / the game over's "Return to Title Screen").</summary>
     [Signal] public delegate void FinishedEventHandler(int next);
 
     public static SmsCardSave Current { get; private set; }
@@ -100,6 +104,8 @@ public partial class SmsCardSave : CanvasLayer
         [28] = "Save and Continue",
         [29] = "Continue",
         [30] = "Save and Quit",
+        [31] = "Continue",
+        [32] = "Return to Title Screen",
         [33] = "File created.",
         [35] = "Save complete.\nContinue playing?",
         [36] = "You got a Blue Coin!\n\nCollect ten of them\nthen visit the boathouse\nin Delfino Plaza.",
@@ -108,7 +114,7 @@ public partial class SmsCardSave : CanvasLayer
     public static string Message(int id) => Messages.TryGetValue(id, out string s) ? s : "";
 
     // ----------------------------------------------------------------------------------------------------------------- the machine
-    private enum Progress { None, Begin, Confirm, Event, ShineGetSel, Saving, SaveDone, Done, Quit }   // UNK0/2, UNK15, UNK2A, UNK2B, SAVING, SAVE_DONE, UNK1, UNK19
+    private enum Progress { None, Begin, Confirm, Event, ShineGetSel, Saving, SaveDone, Done, Quit, GameOverSel }   // UNK0/2, UNK15, UNK2A, UNK2B, SAVING, SAVE_DONE, UNK1, UNK19, UNK2E
     private enum Step { Open, Opening, Shown, Close, Closing, Done }                                   // WindowStep
 
     private Purpose _purpose;
@@ -129,8 +135,10 @@ public partial class SmsCardSave : CanvasLayer
 
     // ---------------------------------------------------------------------------------------------------------------------- the panes
     private Control _root;
+    private ColorRect _mask;                // 262: 'mask' -- the screen black under the game over's window (the whole viewport, as GMSP01_NX widens the 600 x 480 pane)
     private ShaderMaterial _glyphMat;
-    private Win _confirm, _event, _shine;   // 'w_1', 'w_4', 'w_5'
+    private Win _confirm, _event, _shine, _gameOver;   // 'w_1', 'w_4', 'w_5', 'w_6'
+    private Win[] Windows => new[] { _confirm, _event, _shine, _gameOver };
 
     /// <summary>A WIN1 pane with TExPane's size animation (setCenteredSize + update: linear over N frames, about the initial bounds' centre).</summary>
     private sealed class Win
@@ -212,17 +220,23 @@ public partial class SmsCardSave : CanvasLayer
     /// <summary>For the drives: which frame is up and its size, the heading, the hands and the count shown.</summary>
     public string DebugPanes()
     {
-        string W(Win w, string n) => w.Frame.Visible ? $"{n} {w.Frame.Size.X:F0}x{w.Frame.Size.Y:F0} msg '{(w.Msg.Visible ? w.Msg.Text.Replace("\n", "/") : "")}'" : $"{n} hidden";
-        int hands = 0; foreach (Win w in new[] { _event, _shine }) foreach (TextureRect h in w.Hands) if (h.Visible) hands++;
+        string W(Win w, string n) => w.Frame.Visible ? $"{n} {w.Frame.Size.X:F0}x{w.Frame.Size.Y:F0} msg '{(w.Msg != null && w.Msg.Visible ? w.Msg.Text.Replace("\n", "/") : "")}'" : $"{n} hidden";
+        int hands = 0; foreach (Win w in new[] { _event, _shine, _gameOver }) foreach (TextureRect h in w.Hands) if (h.Visible) hands++;
         string count = _confirm.CountUnder.Visible ? "confirm:under" : _confirm.CountOver.Visible ? "confirm:over" : _confirm.NewText.Visible ? "confirm:NEW" : _shine.CountUnder.Visible ? "shine:under" : _shine.CountOver.Visible ? "shine:over" : _shine.NewText.Visible ? "shine:NEW" : "none";
-        return $"{W(_confirm, "w_1")}; {W(_event, "w_4")}; {W(_shine, "w_5")}; hands {hands}; count {count}; yes {(_confirm.Yes.Visible ? _confirm.Yes.Modulate.ToHtml(false) + " " + _confirm.Yes.Size.X.ToString("F0") : "-")}";
+        return $"{W(_confirm, "w_1")}; {W(_event, "w_4")}; {W(_shine, "w_5")}; {W(_gameOver, "w_6")}; mask {(_mask.Visible ? "on" : "off")}; hands {hands}; count {count}; yes {(_confirm.Yes.Visible ? _confirm.Yes.Modulate.ToHtml(false) + " " + _confirm.Yes.Size.X.ToString("F0") : "-")}";
     }
+    /// <summary>262, for the drives: the game over's two option texts as shown, and whether the black mask is up.</summary>
+    public string GameOverOptionsShown => _gameOver.Frame.Visible && _gameOver.Options[0].Visible ? $"{_gameOver.Options[0].Text} | {_gameOver.Options[1].Text}" : "";
+    public bool MaskShown => _mask.Visible;
 
     public override void _Ready()
     {
         Current = this;
         ProcessMode = ProcessModeEnum.Always;
         if (GlyphShader != null) _glyphMat = new ShaderMaterial { Shader = GlyphShader };
+        _mask = new ColorRect { Name = "Mask", Color = Colors.Black, MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
+        _mask.SetAnchorsPreset(Control.LayoutPreset.FullRect);
+        AddChild(_mask);   // under the windows: the first child
         _root = new Control { Name = "Root", MouseFilter = Control.MouseFilterEnum.Ignore, Visible = false };
         _root.Size = new Vector2(600f, 480f);
         AddChild(_root);
@@ -283,7 +297,7 @@ public partial class SmsCardSave : CanvasLayer
     /// <summary>Live: the colour knob on the three frames (the editor's inspector or a script at run time).</summary>
     public void ApplyWindowColor()
     {
-        foreach (Win w in new[] { _confirm, _event, _shine }) if (w?.Frame != null) w.Frame.SelfModulate = WindowColor;
+        foreach (Win w in Windows) if (w?.Frame != null) w.Frame.SelfModulate = WindowColor;
     }
 
     /// <summary>The file bookmark: the Mario-text, the three letters (one shown), the "New" box and the two count groups (icon, x, digits).</summary>
@@ -331,24 +345,26 @@ public partial class SmsCardSave : CanvasLayer
         {
             SmsTextBox o = w.Options[i];
             o.HBind = 0;
-            o.Position = new Vector2(c - 125f - 3f, o.Position.Y);
+            float bw = o.Size.X;                                          // 250 (the save windows) or 323 (the game over's)
+            o.Position = new Vector2(c - bw * 0.5f - 3f, o.Position.Y);
             int lineW = (int)(o.LineWidth(o.Text) + 0.5f);
-            float textLeft = o.Position.X + (250 - lineW) / 2;             // J2DPrint's integer centring inside the 250 box
+            float textLeft = o.Position.X + (int)((bw - lineW) / 2);      // J2DPrint's integer centring inside the box
             float handCentre = textLeft - 33.5f;
             w.Hands[i].Position = new Vector2(handCentre - 14.5f, w.Hands[i].Position.Y);
             w.HandShadows[i].Position = new Vector2(handCentre - 13.5f, w.HandShadows[i].Position.Y);
         }
     }
 
-    /// <summary>The option list: the texts (left-bound 250 x 24) and the hands ('scNa' 29 x 41 turned 270 at (49, y - 5); the shadow 'scNb' at (50, y - 1), black, alpha 125).</summary>
-    private void OptionList(Win w, float[] ys)
+    /// <summary>The option list: the texts (left-bound 250 x 24) and the hands ('scNa' 29 x 41 turned 270 at (49, y - 5); the shadow 'scNb' at (50, y - 1), black, alpha 125).
+    /// 262: the game over's 'w_6' places them at the blo's own x (the hands at 21, the 323-wide texts at 72).</summary>
+    private void OptionList(Win w, float[] ys, float handX = 49f, float textX = 100f, float textW = 250f)
     {
         w.Options = new SmsTextBox[ys.Length]; w.Hands = new TextureRect[ys.Length]; w.HandShadows = new TextureRect[ys.Length];
         for (int i = 0; i < ys.Length; i++)
         {
-            w.HandShadows[i] = Pic(w.Frame, $"HandShadow{i}", CursorTexture, new Vector2(50f, ys[i] - 1f), new Vector2(29f, 41f), 270f, new Color(0f, 0f, 0f, 125f / 255f));
-            w.Hands[i] = Pic(w.Frame, $"Hand{i}", CursorTexture, new Vector2(49f, ys[i] - 5f), new Vector2(29f, 41f), 270f);
-            w.Options[i] = TextBox(w.Frame, $"Option{i}", new Vector2(100f, ys[i]), new Vector2(250f, 24f), 2, 0);
+            w.HandShadows[i] = Pic(w.Frame, $"HandShadow{i}", CursorTexture, new Vector2(handX + 1f, ys[i] - 1f), new Vector2(29f, 41f), 270f, new Color(0f, 0f, 0f, 125f / 255f));
+            w.Hands[i] = Pic(w.Frame, $"Hand{i}", CursorTexture, new Vector2(handX, ys[i] - 5f), new Vector2(29f, 41f), 270f);
+            w.Options[i] = TextBox(w.Frame, $"Option{i}", new Vector2(textX, ys[i]), new Vector2(textW, 24f), 2, 0);
             w.Contents.Add(w.HandShadows[i]); w.Contents.Add(w.Hands[i]); w.Contents.Add(w.Options[i]);
         }
     }
@@ -372,7 +388,11 @@ public partial class SmsCardSave : CanvasLayer
         Bookmark(_shine, new Vector2(114f, 96f), new Vector2(114f, 129f), new Vector2(127f, 122f), new Vector2(118f, 122f));
         OptionList(_shine, new[] { 174f, 210f, 246f });
         _shine.Options[0].SetText(Message(28)); _shine.Options[1].SetText(Message(30)); _shine.Options[2].SetText(Message(29));
-        foreach (Win w in new[] { _confirm, _event, _shine }) { if (CenterContents) CenterWindow(w); w.HideContents(); }
+        // 262 -- 'w_6': the game over's window (no heading): 'sm7b' / 'sm8b' at (72, 27) / (72, 63), 323 wide; the hands 'sc6a' / 'sc7a' at (21, 22) / (21, 58)
+        _gameOver = Frame("GameOver", new Vector2(95f, 188f), new Vector2(411f, 112f));
+        OptionList(_gameOver, new[] { 27f, 63f }, handX: 21f, textX: 72f, textW: 323f);
+        _gameOver.Options[0].SetText(Message(31)); _gameOver.Options[1].SetText(Message(32));
+        foreach (Win w in Windows) { if (CenterContents) CenterWindow(w); w.HideContents(); }
     }
 
     // ------------------------------------------------------------------------------------------------------------------ open / finish
@@ -385,6 +405,7 @@ public partial class SmsCardSave : CanvasLayer
         _pausedTree = pauseTree;
         if (pauseTree) GetTree().Paused = true;
         _root.Visible = true;
+        _mask.Visible = purpose == Purpose.GameOver;   // 262: init(purpose): the mask shown (alpha 255 -- the screen black) for GAME_OVER (and ALL_SHINES / EXPLANATION, not here)
         foreach (string act in new[] { "button_a", "button_b" }) Pressed(act);
         StickEdge(true, ref _stickV); StickEdge(false, ref _stickH);   // the stick's state as it is: a stick held through the opening is no move
         SetProgress(Progress.Begin);
@@ -395,7 +416,8 @@ public partial class SmsCardSave : CanvasLayer
     {
         _progress = Progress.None;
         _root.Visible = false;
-        foreach (Win w in new[] { _confirm, _event, _shine }) { w.HideContents(); w.Frame.Visible = false; }
+        if (_purpose != Purpose.GameOver) _mask.Visible = false;   // 262: the game over's mask stays black till the stage moves (the scene change is a frame away; the layer goes with the scene)
+        foreach (Win w in Windows) { w.HideContents(); w.Frame.Visible = false; }
         if (_pausedTree) { GetTree().Paused = false; _pausedTree = false; }
         if (DebugPrint) GD.Print($"[SMS cardsave] done: {_purpose} -> next {next} ({(next == 1 ? "the title" : "the game goes on")})");
         EmitSignal(SignalName.Finished, next);
@@ -451,8 +473,14 @@ public partial class SmsCardSave : CanvasLayer
                 // UNK0 + UNK2: the bookmark read (gpCardManager->getBookmarkInfos): the file as on disk
                 _savedExists = GameData.Instance?.HasSaveFile ?? false;
                 _savedCount = GameData.Instance?.SavedShineCount ?? 0;
-                SetProgress(_purpose == Purpose.Save ? Progress.Confirm : _purpose == Purpose.ShineGet ? Progress.ShineGetSel : Progress.Event);
+                SetProgress(_purpose == Purpose.Save ? Progress.Confirm : _purpose == Purpose.ShineGet ? Progress.ShineGetSel : _purpose == Purpose.GameOver ? Progress.GameOverSel : Progress.Event);
                 break;
+            case Progress.GameOverSel:
+            {   // 262 -- UNK2E: waitForSelectOver (1245): 0 Continue -> UNK1 (getNextState 0), 1 Return to Title Screen -> UNK19 (1)
+                int r = WaitForSelect(_gameOver, a, dv, null, bookmark: false);
+                if (r == 0) SetProgress(Progress.Done); else if (r == 1) SetProgress(Progress.Quit);
+                break;
+            }
             case Progress.Confirm:
             {   // UNK15: waitForChoiceBM(SAVING, UNK1, 0)
                 int r = WaitForChoiceBM(a, dh, Message(9), live: false);
@@ -549,7 +577,7 @@ public partial class SmsCardSave : CanvasLayer
             case Step.Open:
                 w.Frame.Visible = true;
                 w.SetCenteredSize(20, w.Initial.Size.X, w.Initial.Size.Y, 0f, 0f);
-                w.Msg.SetText(heading);
+                w.Msg?.SetText(heading ?? "");
                 w.HideContents();
                 _step = Step.Opening;
                 break;
@@ -557,7 +585,7 @@ public partial class SmsCardSave : CanvasLayer
                 if (w.Update())
                 {
                     _step = Step.Shown; _sel = 0;
-                    w.Msg.Visible = true;
+                    if (w.Msg != null) w.Msg.Visible = true;
                     for (int i = 0; i < w.Options.Length; i++) { w.Options[i].Visible = true; w.Hands[i].Visible = w.HandShadows[i].Visible = i == 0; }
                     if (bookmark) ShowBookmark(w, withCount: true, newFileText: !_savedExists);
                 }

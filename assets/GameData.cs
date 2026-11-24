@@ -132,6 +132,17 @@ public partial class GameData : Node
         GetTree().ReloadCurrentScene();
     }
 
+    /// <summary>262: TFlagManager::restore() -- the game over's "Continue" (MarDirectorDirect.cpp 386) puts the flags back to the last save: the
+    /// shines and blue coins taken since are gone again (the file on disk unchanged; no file = nothing). The lives are the Miss state's (-1: a new
+    /// game's next time).</summary>
+    public void RestoreFromSave()
+    {
+        _collectedBlueCoins.Clear();
+        _collectedShines.Clear();
+        HasSaveFile = false; SavedShineCount = 0;
+        Load();
+    }
+
     private void Save()
     {
         var coinArray = new Godot.Collections.Array();

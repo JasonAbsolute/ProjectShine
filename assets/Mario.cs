@@ -144,8 +144,13 @@ public partial class Mario : CharacterBody3D
     [Export]
     public int StartingLives = 4;
     private int _lives;
-    /// <summary>Where a miss with no life left goes (the game: the save / title flow). Empty: the stage reloads with the lives reset.</summary>
-    [Export] public string GameOverScene = "";
+    /// <summary>262: an OVERRIDE -- where a miss with no life left goes instead of the game's game-over dialog. Empty (the default): the game's flow --
+    /// the card save's "Continue / Return to Title Screen" window over the black screen (SmsCardSave PURPOSE_GAME_OVER); Continue restores the
+    /// save and goes to <see cref="GameOverContinueScene"/>, Return to Title Screen to the card save's TitleScene (the Player Select).</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string GameOverScene = "";
+    /// <summary>262: where the game over's "Continue" goes -- the game's Delfino Plaza with the saved progress (MarDirectorDirect.cpp 386: the flags
+    /// restored, stage 1). Empty: the Level Select this course was picked on (GameData.LevelSelectScene), else the title.</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string GameOverContinueScene = "";
     /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves). 213: filled by his sound
     /// node with MSD_BGM_MISS (k_miss.com, 4.5 s) on the Music bus when empty.</summary>
     [Export] public AudioStreamPlayer MissJingle;
@@ -15408,8 +15413,8 @@ public partial class Mario : CharacterBody3D
     /// miss BGM, and the fader's request -- the death wipe (10, Hx_Test2) 2.2 s on, the iris (2) 2.0 s on for a hell death, or with no
     /// life left the game-over wipe (0xD) 2.0 s on. Once the fader is fully out and the BGM has ended (or 1200 of its frames have passed)
     /// the stage moves: lives left -> the miss flag (0x30002) and decideNextStageOfMiss + moveStage, the same stage from its start with no
-    /// intro and a plain 0.4 s fade in (Level.cs); none left -> the save / title flow (GameOverScene; empty: this stage again, lives
-    /// reset). Mario keeps flying his FIRE_DOWN or lying in his pose meanwhile, as in the game.
+    /// intro and a plain 0.4 s fade in (Level.cs); none left -> the game over's card save (262: the "Continue / Return to Title Screen" window
+    /// on the black screen, SmsGameOverFinish; GameOverScene overrides it). Mario keeps flying his FIRE_DOWN or lying in his pose meanwhile, as in the game.
     /// </summary>
     private void SmsMissTick()
     {
@@ -15453,9 +15458,9 @@ public partial class Mario : CharacterBody3D
         if (!(faded && bgmDone))
             return;
         _smsMissTicks = int.MinValue;
-        SmsActorSound.DemoModeOut("the stage moves"); // 216: the next stage's MSound::initSound restores every category (here before the load: the statics outlive the scene)
         if (_lives >= 0)
         {
+            SmsActorSound.DemoModeOut("the stage moves"); // 216: the next stage's MSound::initSound restores every category (here before the load: the statics outlive the scene)
             if (GameData.Instance != null)
                 GameData.Instance.CameFromMiss = true; // TFlagManager 0x30002: the next load is a miss's
             if (SmsDebugPrint)
@@ -15465,12 +15470,62 @@ public partial class Mario : CharacterBody3D
         }
         if (GameData.Instance != null)
             GameData.Instance.Lives = -1; // a new game's lives next time
-        if (SmsDebugPrint)
-            GD.Print($"[SMS miss] game over -> {(GameOverScene != "" ? GameOverScene : "this stage, lives reset")}");
         if (GameOverScene != "")
-            GetTree().ChangeSceneToFile(GameOverScene);
+        {
+            // his override: straight there
+            SmsActorSound.DemoModeOut("the game over: the override scene");
+            if (SmsDebugPrint)
+                GD.Print($"[SMS miss] game over -> {GameOverScene} (GameOverScene)");
+            GetTree().ChangeSceneToFile(SmsReturnSpot.ScenePath(GameOverScene)); // the editor saves the File export as uid://; resolved
+            return;
+        }
+        // 262: the game's (MarDirectorDirect.cpp 430-438): startWipe(WIPE_FADE_IN, 0.3) -- the fader lets go over 0.3 s under the card save's black
+        // mask -- and STATE_CARD_SAVE with PURPOSE_GAME_OVER: the "Continue / Return to Title Screen" window on the black screen, the game stopped
+        // (startDisappearStar / startDisappearCoin take the HUD's counters off meanwhile: under the mask here, not ported). The quiet (demoModeIn)
+        // holds till the stage moves, as in the game: the card save's sounds are the system's (category 4), which it never muted.
+        SmsCardSave card = SmsCardSave.Current;
+        if (card != null && !card.IsOpen)
+        {
+            _smsFader?.FadeIn(0.3f);
+            if (SmsDebugPrint)
+                GD.Print("[SMS miss] game over: the card save (PURPOSE_GAME_OVER) -- Continue / Return to Title Screen");
+            void OnDone(int next) { card.Finished -= OnDone; SmsGameOverFinish(next); }
+            card.Finished += OnDone;
+            card.Open(SmsCardSave.Purpose.GameOver, pauseTree: true, screenFaded: true);
+            return;
+        }
+        SmsGameOverFinish(1); // no card save in this scene: the title at once
+    }
+
+    /// <summary>262: after the game over's window (TMarDirector::STATE_CARD_SAVE, MarDirectorDirect.cpp 383-407). getNextState 0 = "Continue":
+    /// TFlagManager::restore() (the progress back to the last save: GameData.RestoreFromSave), MSF_UNK30001, and the Plaza (stage 1; the intro stage
+    /// with no shine) -- here <see cref="GameOverContinueScene"/>, else the Level Select this course came from, else the title; 1 = "Return to Title
+    /// Screen": APP_STATE_DONE -- the card save's TitleScene (the Player Select). The lives stay -1 (a new game's next time); the miss's quiet ends as
+    /// the stage moves (the next initSound).</summary>
+    private void SmsGameOverFinish(int next)
+    {
+        SmsActorSound.DemoModeOut(next == 1 ? "the game over: to the title" : "the game over: continue");
+        string title = SmsCardSave.Current?.TitleScene ?? "";
+        string dest;
+        if (next == 1)
+            dest = title;
         else
-            GetTree().ReloadCurrentScene();
+        {
+            GameData.Instance?.RestoreFromSave(); // TFlagManager::restore()
+            dest = SmsReturnSpot.ScenePath(GameOverContinueScene);
+            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelSelectScene);
+            if (dest == "") dest = title;
+        }
+        if (GameData.Instance != null)
+        {
+            GameData.Instance.Lives = -1;
+            GameData.Instance.CameFromMiss = false;
+            GameData.Instance.ReturnFromScene = null; GameData.Instance.ReturnWithShine = false;
+        }
+        if (dest == "") dest = ProjectSettings.GetSetting("application/run/main_scene").AsString();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS miss] game over: {(next == 1 ? "Return to Title Screen" : "Continue (the save restored)")} -> {dest}");
+        GetTree().ChangeSceneToFile(dest);
     }
 
     /// <summary>
