@@ -283,6 +283,8 @@ public partial class LevelSelect : Control
         if (!IsInstanceValid(this))
             return;
 
+        // 259: the menu song fades out WITH the screen, so it is silent before the level and its own music load (it used to fade over them)
+        SmsMenuMusic.LeaveMenus(this, FadeSeconds);
         if (!await FadeOut())
             return;
 

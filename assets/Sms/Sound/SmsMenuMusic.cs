@@ -30,8 +30,14 @@ public partial class SmsMenuMusic : AudioStreamPlayer
     /// to the Level Select and stops when the scene is no longer a menu. Off = this node plays itself and the song restarts with each screen.</summary>
     [Export] public bool CarryAcrossMenus = true;
 
-    /// <summary>How long the keeper fades out when the menus are left (seconds; 0 = cut).</summary>
+    /// <summary>How long the keeper fades out when the menus are left (seconds; 0 = cut). 259: the select screens start this fade themselves
+    /// as their screen fades to black before a level (LeaveMenus), so the song is silent by the time the level's music starts.</summary>
     [Export(PropertyHint.Range, "0,3,0.05")] public float FadeOutSeconds = 0.35f;
+
+    /// <summary>259 (Jaysonn: "when transitioning to the level the music from the select screen sometimes overlaps"): a level that comes up while the
+    /// song is still audible (a select that did not call LeaveMenus, a stage reached some other way) CUTS the song at once instead of fading it
+    /// over the level's own music -- the fade was the overlap. Off = the old 0.35-s fade over the level.</summary>
+    [Export] public bool CutUnderLevels = true;
 
     public const string KeeperName = "SmsMenuMusic";
     /// <summary>A build marker for the drives (read in the built DLL before a run).</summary>
@@ -92,10 +98,31 @@ public partial class SmsMenuMusic : AudioStreamPlayer
         if (scene == null) return;                   // between scenes: wait for the next one
         foreach (Node c in scene.GetChildren())
             if (c is SmsMenuMusic m && !m._isKeeper) return;   // still a menu
+        if (CutUnderLevels)
+        {
+            // 259: a level is up and the song is still going (nobody faded it on the way out): cut, no fade over the level's music
+            if (SmsActorSound.DebugPrint) GD.Print($"[SMS menu music] {scene.Name} is no menu and the song is still playing: cut");
+            Stop(); QueueFree();
+            return;
+        }
         _fade = 0f;
         if (SmsActorSound.DebugPrint) GD.Print($"[SMS menu music] {scene.Name} is no menu: the song fades out over {FadeOutSeconds:F2} s");
     }
 
+    /// <summary>259: a select screen is leaving the menus for a level: fade the keeper out over <paramref name="seconds"/> (its screen's fade to black),
+    /// so the song is gone before the level and its music load. Nothing happens when no keeper plays. Call from the select's Confirm, not from a
+    /// move to another menu (the Player Select -> the Level Select keeps the song).</summary>
+    public static void LeaveMenus(Node from, float seconds)
+    {
+        var k = Keeper(from);
+        if (k == null || !k.Playing || k._fade >= 0f) return;
+        k.FadeOutSeconds = Mathf.Max(0f, seconds);
+        k._fade = 0f;
+        if (SmsActorSound.DebugPrint) GD.Print($"[SMS menu music] leaving the menus: the song fades out over {k.FadeOutSeconds:F2} s");
+    }
+
     /// <summary>For drives: the keeper, if one is playing.</summary>
     public static SmsMenuMusic Keeper(Node from) => from != null && from.IsInsideTree() ? from.GetTree().Root.GetNodeOrNull(KeeperName) as SmsMenuMusic : null;
+    /// <summary>For drives: the keeper's fade has begun (or it is gone).</summary>
+    public bool FadingOut => _fade >= 0f;
 }

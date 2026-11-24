@@ -230,6 +230,10 @@ public partial class CharacterSelect : Control
 
         // Fade the whole screen once the tag is painted, so the level doesn't
         // snap in over a poster that's still on screen.
+        // 259: a destination that is not another select screen (a stage through an M gate: GameData.PendingStage) takes the menu song down with the
+        // screen; the Level Select keeps it going
+        if (GameData.Instance.PendingStage != null && GameData.Instance.PendingStage.ScenePath != "")
+            SmsMenuMusic.LeaveMenus(this, FadeSeconds);
         if (_fadeRect != null && FadeSeconds > 0f)
         {
             _fadeRect.Color = new Color(_fadeRect.Color, 0f);
