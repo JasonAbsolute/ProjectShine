@@ -16010,3 +16010,30 @@ the Hillside Cave course from its PlayerSpawner. Before / after shots in tools/p
 **Left for later:** the landed drops still live the port's 40 ticks (the game: up to 256, slower on slippery planes) and do not slide; the puddle
 merge is drawn, not simulated (the cleaning balance stays as it was); the game's silhouette pass (waterJumping.bti, Mario seen through the water) is
 not drawn.
+
+### 255 -- a controller on the Player Select and the Level Select: A picks, B goes back, the stick and the D-pad move the hand (feature/kingboo-casino, code `732f8d6`)
+
+**Jaysonn:** "the controller doesnt work for the char and select menu can you fix it? A should select whatever the cursor is on and the control stick
+should move it left and right".
+
+**Why it did not.** Both screens confirmed on Godot's `ui_accept` and went back on `ui_cancel`, and the project's map has `ui_accept` = Enter / Kp Enter /
+Space and `ui_cancel` = Escape -- no pad button at all (the game's own `button_a` / `button_b` are joypad 0 / 1). The stick reached the hand only through
+Godot's focus navigation (`ui_left` / `ui_right` carry axis 0 and the D-pad), which needs a focused poster and steps on every motion event over its
+deadzone. The first headless drive showed it: the stick moved the hand, A did nothing.
+
+**`assets/CharacterSelect.cs`, `assets/LevelSelect.cs`** (PadControls, on): `_Input` takes the left stick's axis 0 from any device (Godot's joypads, the
+GameCube adapter's 20+) before the GUI sees it -- past StickThreshold (0.5) the hand moves one poster (`MoveHighlight`: the poster takes the focus,
+`Highlight` follows with the sound, the hand and the Level Select's row slide) and not again until the stick is back inside StickRelease (0.3); the event is
+marked handled so the focus navigation never steps as well (a held stick moved twice in the first cut). `_UnhandledInput`: `button_a` confirms beside
+`ui_accept`; on the Level Select `button_b` goes back beside `ui_cancel`; `ui_left` / `ui_right` (the D-pad) move the hand when no poster had the focus.
+
+**Where the work happens now.** Jaysonn pushed the branch (his `d169f04` "Commit outstanding work" on top of 254's log commit) and put Godot 4.7.2 mono on
+the Mac; the repo is cloned at `~/Repos/ProjectShine` there, with the .NET 8 SDK in `~/.dotnet` and a full headless import done. This pass was built,
+driven and committed on the Mac and PUSHED from it -- the PC is no longer in the loop. Two local-only things in that clone, never committed: a
+`[filesystem] import/blender/enabled=false` line in project.godot (no Blender on the Mac; the headless import stops at the repo's two .blend files
+without it) and the editor's 4.7.2 re-stamps of the `.import` files and Mario's `.res` clips. His `d169f04` also swept the PC's 255 drive leftovers
+(`menudrive255*.gd / .log / .out / .err`) into the repo; this log commit removes them.
+
+**Verified** (Mac, Godot 4.7.2 mono headless): build 0 errors (markers in the DLL); `menudrive255.gd` (joypad events on device 0) 17/17 -- the stick
+moves the hand on both screens with and without a focused poster, a HELD stick moves once and a second push after the centre moves again, A on the
+Player Select brings up the Level Select, B there goes back and A again comes forward, the D-pad with no focus puts the hand on a poster.
