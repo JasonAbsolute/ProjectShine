@@ -290,6 +290,25 @@ public partial class Mario : CharacterBody3D
     // S2: the tank and the spray (see SmsFluddGunExecTick)
     private SmsWaterDrops _fluddDrops;                             // TModelWaterManager
     private readonly Skeleton3D[] _fluddNozzleSkel = new Skeleton3D[4];
+
+    // 263: TSilhouette (MarioUtil/DrawUtil.cpp) -- Mario drawn through the map as a flat silhouette while the camera's view of him is blocked
+    [ExportGroup("SMS (263): the silhouette through the map")]
+    /// <summary>Off = no silhouette: hidden behind the map he is simply hidden.</summary>
+    [Export] public bool SmsSilhouette = true;
+    /// <summary>The stage's silhouette colour (gpSunMgr->getSilhouetteColor(); TSilhouette::load's default (0, 0x27, 0x77), a deep blue). The alpha is the
+    /// silhouette's own, below.</summary>
+    [Export] public Color SmsSilhouetteColor = new Color(0f, 0x27 / 255f, 0x77 / 255f);
+    /// <summary>mOccludedAlpha: the alpha (of 255) the silhouette chases while he is hidden (128); 0 once he is seen again.</summary>
+    [Export(PropertyHint.Range, "0,255")] public float SmsSilhouetteOccludedAlpha = 128f;
+    /// <summary>mAlphaApproachRate: the share of the gap closed each game frame (30 a second): 0.01 -- a slow fade in and out (a third of the way in a second).</summary>
+    [Export(PropertyHint.Range, "0.001,1")] public float SmsSilhouetteApproachRate = 0.01f;
+    [ExportGroup("")]
+    private float _smsSilAlpha;                                      // mSilhouetteAlpha, 0..255
+    private ShaderMaterial _smsSilMat;
+    private bool _smsSilOn;
+    /// <summary>263, for the drives: the silhouette's alpha (0..255) and whether its material is on his meshes.</summary>
+    public float SmsSilhouetteAlpha => _smsSilAlpha;
+    public bool SmsSilhouetteOn => _smsSilOn;
     private readonly int[][] _fluddMuzzleBone = new int[4][];     // null_G_muzzle (and the hover's null_G_muzzle2)
     private int _fluddWater = SmsParams.Fludd.Spray.AmountMax;    // mCurrentWater
     private int _fluddPressure = 0;                               // mCurrentPressure: R x 150
@@ -5214,6 +5233,7 @@ public partial class Mario : CharacterBody3D
 
     public override void _Process(double delta)
     {
+        SmsSilhouetteTick(delta); // 263: TSilhouette -- his silhouette through the map while the camera's view of him is blocked
         UpdateStepVisual((float)delta);
         UpdateRunBob((float)delta);
         UpdateHeadLock((float)delta);
@@ -13000,7 +13020,60 @@ public partial class Mario : CharacterBody3D
         if (!_fluddReady || _fluddDrops == null) return;
         int n = SmsUnits.TicksFor(delta, ref _fluddTickAccum);
         _fluddDrops.MarioPos = GlobalPosition;
+        _fluddDrops.LCamera = _camera != null && _camera.IsLCamera;   // 263: unk5D88[1] -- a landing under the L camera keeps fewer puddles
         for (int i = 0; i < n; i++) _fluddDrops.Tick();
+    }
+
+    /// <summary>263: TSilhouette::perform (DrawUtil.cpp 100): each game frame the alpha chases mOccludedAlpha (128) while MARIO_FLAG_OCCLUDED is on (the camera's
+    /// view of him blocked: SunshineCamera.MarioOccluded, its ray from the eye to his waist standing in for the game's framebuffer peek) and 0 otherwise, by
+    /// mAlphaApproachRate (0.01) of the gap -- here per rendered frame scaled to the game's 30 a second. While it is above zero his silhouette material
+    /// (Fx/silhouette.gdshader: the flat colour, drawn only behind what is nearer) rides every mesh under his skeleton as a material_overlay (the body, the
+    /// hands the hand table swaps, FLUDD), and his water joins (SmsWaterDrops.SetSilhouette: drawSilhouette). The director runs the silhouette list only
+    /// while the alpha is above zero or he is occluded (MarDirectorDirect.cpp 170): the same gate.</summary>
+    private void SmsSilhouetteTick(double delta)
+    {
+        if (!SmsSilhouette)
+        {
+            if (_smsSilOn) SmsSilhouetteApply(false);
+            _smsSilAlpha = 0f;
+            _fluddDrops?.SetSilhouette(0f, SmsSilhouetteColor);
+            return;
+        }
+        bool occluded = _camera != null && _camera.MarioOccluded && Visible && stateOfMario != MarioState.dead;
+        float target = occluded ? SmsSilhouetteOccludedAlpha : 0f;
+        float k = 1f - MathF.Pow(1f - Mathf.Clamp(SmsSilhouetteApproachRate, 0.001f, 1f), (float)(delta * 30.0));   // 0.01 of the gap a 30-Hz frame, whatever the frame rate
+        _smsSilAlpha += k * (target - _smsSilAlpha);
+        if (!occluded && _smsSilAlpha < 0.5f) _smsSilAlpha = 0f;   // the fade's tail: gone
+        bool on = _smsSilAlpha > 0f;
+        if (on != _smsSilOn || on) SmsSilhouetteApply(on);
+        _fluddDrops?.SetSilhouette(_smsSilAlpha / 128f, SmsSilhouetteColor);
+    }
+
+    /// <summary>The overlay on (every MeshInstance3D under the skeleton that lacks it: the hands come and go) or off (every one that has it), the colour's alpha set.</summary>
+    private void SmsSilhouetteApply(bool on)
+    {
+        var skel = skeleton ?? GetNodeOrNull<Skeleton3D>("Armature/Skeleton3D");
+        if (skel == null) return;
+        if (on)
+        {
+            if (_smsSilMat == null)
+            {
+                var sh = GD.Load<Shader>("res://assets/Sms/Fx/silhouette.gdshader");
+                if (sh == null) { SmsSilhouette = false; GD.PushWarning("[SMS silhouette] no shader at res://assets/Sms/Fx/silhouette.gdshader: off"); return; }
+                _smsSilMat = new ShaderMaterial { ResourceName = "sms silhouette", Shader = sh };
+            }
+            _smsSilMat.SetShaderParameter("color", new Color(SmsSilhouetteColor.R, SmsSilhouetteColor.G, SmsSilhouetteColor.B, Mathf.Clamp(_smsSilAlpha / 255f, 0f, 1f)));
+            foreach (Node n in skel.FindChildren("*", "MeshInstance3D", true, false))
+                if (n is MeshInstance3D mi && mi.MaterialOverlay != _smsSilMat && mi.Visible) mi.MaterialOverlay = _smsSilMat;
+            if (!_smsSilOn && SmsDebugPrint) GD.Print($"[SMS silhouette] on: hidden from the camera, the silhouette fades in toward {SmsSilhouetteOccludedAlpha:F0}");
+        }
+        else
+        {
+            foreach (Node n in skel.FindChildren("*", "MeshInstance3D", true, false))
+                if (n is MeshInstance3D mi && mi.MaterialOverlay == _smsSilMat) mi.MaterialOverlay = null;
+            if (_smsSilOn && SmsDebugPrint) GD.Print("[SMS silhouette] off");
+        }
+        _smsSilOn = on;
     }
 
     private void SmsFluddTick(double delta)
@@ -13040,7 +13113,10 @@ public partial class Mario : CharacterBody3D
         _fluddKeyN = keyN;
         _fluddAFrame = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
         if (_fluddDrops != null)
+        {
             _fluddDrops.MarioPos = GlobalPosition;
+            _fluddDrops.LCamera = _camera != null && _camera.IsLCamera;   // 263: unk5D88[1]
+        }
         for (int i = 0; i < n; i++)
         {
             SmsFluddUpperTick();

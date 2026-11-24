@@ -1094,6 +1094,8 @@ public partial class SunshineCamera : Node3D
     // ============================================================ what Mario's half of the L camera reads (MarioYCam.cs)
     /// <summary>isLButtonCamera(): the mode proper, from the tick it turns on (through its inbetween) to the tick it leaves.</summary>
     public bool IsLCamera => _mode == SmsCamKind.LNormal;
+    /// <summary>263: MARIO_FLAG_OCCLUDED as the camera reads it (the ray from the eye to his waist blocked by the map) -- the silhouette's trigger.</summary>
+    public bool MarioOccluded => _occluded;
     /// <summary>mMode: the kind in force (the inbetween into it may still be running: InbetweenTicks).</summary>
     public SmsCamKind CurrentKind => _mode;
     public int InbetweenTicks => _ibFrames;
