@@ -1769,6 +1769,14 @@ public partial class Mario : CharacterBody3D
         // underneath them - which is why Luigi's eyes never closed.
         if (Profile != null)
             ApplyProfile(Profile);
+        // 258: the colour picked on the Player Select, over the profile's body (before the eyes and the body overlay cache the materials)
+        var pickedColor = GameData.Instance?.SelectedColorEntry;
+        if (pickedColor?.BodyTexture != null)
+        {
+            int n = ApplyBodyTexture(pickedColor.BodyTexture, pickedColor.BodyTextureMatch);
+            if (SmsDebugPrint)
+                GD.Print($"[SMS color] '{pickedColor.DisplayName}' ({pickedColor.BodyTexture.ResourcePath.GetFile()}) on {n} body surfaces");
+        }
 
         //Setting up anything related to sleeping
         SetupSleeping();
@@ -11318,6 +11326,44 @@ public partial class Mario : CharacterBody3D
             mat.AlbedoTexture = replacement;
             mesh.SetSurfaceOverrideMaterial(i, mat);
         }
+    }
+
+    /// <summary>258: the alternate colour picked on the Player Select (GameData.SelectedColorEntry, a CharacterColor) -- its body atlas on every
+    /// surface of Mesh_0 whose albedo path contains the colour's BodyTextureMatch ("ma_mdl1_0": the cap, shirt, overalls, shoes, buttons and
+    /// emblem; the eyes and the gloves are other atlases). Over a profile's own body texture when there is one (the override's albedo is read,
+    /// not the mesh's). Runs after ApplyProfile and before anything that caches the body's materials (SetupSleeping, the body overlay's Bind), so
+    /// the eyes' swaps and the damage fog see the coloured body. Public for the Player Select's preview and the drives.</summary>
+    public int ApplyBodyTexture(Texture2D body, string match)
+    {
+        if (body == null || string.IsNullOrEmpty(match))
+            return 0;
+        var mesh = GetNodeOrNull<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
+        if (mesh?.Mesh == null)
+            return 0;
+        int swapped = 0;
+        for (int i = 0; i < mesh.Mesh.GetSurfaceCount(); i++)
+        {
+            var active = (mesh.GetSurfaceOverrideMaterial(i) ?? mesh.Mesh.SurfaceGetMaterial(i)) as StandardMaterial3D;
+            if (active?.AlbedoTexture == null || !active.AlbedoTexture.ResourcePath.Contains(match))
+                continue;
+            var mat = (StandardMaterial3D)active.Duplicate();
+            mat.AlbedoTexture = body;
+            mat.ResourceName = $"{active.ResourceName} ({body.ResourcePath.GetFile()})";
+            mesh.SetSurfaceOverrideMaterial(i, mat);
+            swapped++;
+        }
+        return swapped;
+    }
+
+    /// <summary>The surfaces of Mesh_0 wearing <paramref name="match"/> in their albedo's path right now (for the drives).</summary>
+    public int SmsBodyTextureCount(string match)
+    {
+        var mesh = GetNodeOrNull<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
+        if (mesh?.Mesh == null) return 0;
+        int n = 0;
+        for (int i = 0; i < mesh.Mesh.GetSurfaceCount(); i++)
+            if (mesh.GetActiveMaterial(i) is StandardMaterial3D std && std.AlbedoTexture != null && std.AlbedoTexture.ResourcePath.Contains(match)) n++;
+        return n;
     }
 
     private void UpdateCarryRunBlend(float dt)

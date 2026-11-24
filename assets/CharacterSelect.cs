@@ -133,6 +133,9 @@ public partial class CharacterSelect : Control
 
             poster.Name = $"Portrait{i}";
             poster.SetEntry(entry);
+            // 258: back on this screen, the character you played keeps the colour you picked; everyone else starts on their default
+            if (GameData.Instance != null && GameData.Instance.SelectedCharacter == entry)
+                poster.SetColor(GameData.Instance.SelectedColor);
 
             int index = i; // capture per iteration, not the loop variable
             poster.Pressed += () => Confirm(index);
@@ -211,6 +214,7 @@ public partial class CharacterSelect : Control
         }
 
         GameData.Instance.SelectedCharacter = entry;
+        GameData.Instance.SelectedColor = _buttons[index].ColorIndex;   // 258: the colour on the poster goes with him
         // SMS pass 127: through an M gate the destination is the gate's stage (GameData.PendingStage), not this screen's own level
         string dest = GameData.Instance.PendingStage != null && GameData.Instance.PendingStage.ScenePath != "" ? GameData.Instance.PendingStage.ScenePath : LevelToLoad;
         if (ConfirmSound != null && ConfirmSound.Stream != null) ConfirmSound.Play();   // 251c: A -- a talk box comes up (TALK_MODE_IN)
@@ -289,7 +293,36 @@ public partial class CharacterSelect : Control
             MoveHighlight(-1);
             GetViewport().SetInputAsHandled();
         }
+        // 258: X = the next colour, Y = the previous one, on the highlighted poster (the keyboard: E / Q); the hand's click for the change
+        else if (ColorCycling && _highlighted >= 0 && !_confirming && (@event.IsActionPressed("button_x") || (@event is InputEventKey kx && kx.Keycode == Key.E)))
+        {
+            CycleColor(1);
+            GetViewport().SetInputAsHandled();
+        }
+        else if (ColorCycling && _highlighted >= 0 && !_confirming && (@event.IsActionPressed("button_y") || (@event is InputEventKey ky && ky.Keycode == Key.Q)))
+        {
+            CycleColor(-1);
+            GetViewport().SetInputAsHandled();
+        }
     }
+
+    /// <summary>258: X / Y on the Player Select cycles the highlighted character's alternate colours (CharacterEntry.Colors).</summary>
+    [Export] public bool ColorCycling = true;
+
+    /// <summary>The highlighted poster's colour one step along; the move click plays when it changed.</summary>
+    public bool CycleColor(int dir)
+    {
+        if (_highlighted < 0 || _highlighted >= _buttons.Count)
+            return false;
+        if (!_buttons[_highlighted].CycleColor(dir))
+            return false;
+        if (MoveSound != null && MoveSound.Stream != null)
+            MoveSound.Play();
+        return true;
+    }
+
+    /// <summary>The highlighted poster's colour index (for the drives).</summary>
+    public int HighlightedColorIndex => _highlighted >= 0 && _highlighted < _buttons.Count ? _buttons[_highlighted].ColorIndex : -1;
 
     /// <summary>The hand one poster along (focus moves with it: FocusEntered -> Highlight); at the ends it stays.</summary>
     private void MoveHighlight(int dir)

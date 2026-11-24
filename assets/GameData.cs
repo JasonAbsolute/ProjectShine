@@ -63,6 +63,15 @@ public partial class GameData : Node
     /// </summary>
     public CharacterEntry SelectedCharacter { get; set; }
 
+    /// <summary>258: the colour picked on the Player Select for SelectedCharacter (an index into its Colors; 0 = the default look). Kept for the
+    /// session: a level reload, a miss and the way back to the selects all keep the colour; the Player Select starts on it again.</summary>
+    public int SelectedColor;
+
+    /// <summary>The picked colour's resource (null = the default look or a character with no colours).</summary>
+    public CharacterColor SelectedColorEntry =>
+        SelectedCharacter != null && SelectedCharacter.Colors != null && SelectedColor > 0 && SelectedColor < SelectedCharacter.Colors.Count
+            ? SelectedCharacter.Colors[SelectedColor] : null;
+
     /// <summary>Convenience for PlayerSpawner. Null when nothing is selected yet.</summary>
     public PackedScene SelectedCharacterScene => SelectedCharacter?.PlayerScene;
 
