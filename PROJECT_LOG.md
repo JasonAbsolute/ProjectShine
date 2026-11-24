@@ -16278,3 +16278,22 @@ by the ribs, a fist at the hip -- were fitted, shot and dropped. The legs, the l
 **Verified**: `stancering262.gd` (windowed, FLUDD hidden, 12 views: `anim176/shots262c/`) -- the knuckles toward the camera from the front, the rear arm out
 behind him in the side, back and high views; `introstance262.gd` (headless 8/8): the intro's look-about at 8.1 s, the drop-in at 10.1 s, the loop from
 10.6 s, the hold, the stick ending it. No C#.
+
+### 262d -- the stance's hands, second round: the lead fist turned the other way (a guard), the rear arm bent and chambered (feature/kingboo-casino, code `1803737`)
+
+**Jaysonn:** "back arm should be bent and his front fist is turned the wrong way his fingers should be fased inward to his face making his front fist look
+more battle ready".
+
+**The lead fist** (`FIST_TWIST_R` 90; 262c had -90). Settled by looking, not by the rig's maths: a 12-step sweep of the twist (-150..180 by 30) baked as
+variant clips and shot from his left-front (the side of the fist that faces his face) and from the front (`twistsweep262.gd`; the sheet in
+`anim176/shots262d/`). At 90 the curled fingers face his face, the knuckles the enemy, the thumb is up -- the guard. (`fist_probe262.py`, a palm-axis
+model read off the idle hand, disagreed with the renders by a quarter turn: a lesson -- read a hand's facing off a render, not off the bone's axes.)
+
+**The rear arm** (`REAR_TARGET` (5, -6, 8) about the left shoulder joint, `REAR_BEND` 90..125, `ELBOW_BACK` 12): the fist at the chest's side a little
+AHEAD of the shoulder (the chest leans 31 forward, so a fist "on the shoulder's line" sat behind the body in 262c), the elbow bent (the fit: swing 35,
+in -40, the elbow bent 105) and held well behind the shoulder: a chambered rear fist, the elbow out behind him. Legs, lean, head and the lead arm's
+place unchanged from 262b.
+
+**Verified**: `stancering262.gd` (windowed, FLUDD hidden, 12 views: `anim176/shots262d/`) -- both fists up from the front, the lead one's back of the hand
+to the camera with the thumb on top, the rear fist at his left side at chest height; the rear elbow back and the fist by the ribs from the stand-off
+side; `introstance262.gd` headless 8/8. No C#.
