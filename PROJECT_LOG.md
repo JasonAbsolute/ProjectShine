@@ -16069,3 +16069,22 @@ load on this machine); a GDScript error before `quit()` leaves the tree running 
 **Verified** (Mac, Godot 4.7.2 mono): build 0 errors; `starcheck256.gd` (headless, 15 s sampled) 13/13 -- each lift sweeps 494 deg in 15 s (32.9 deg/s),
 circles its rail's centre at 1.27..1.35 m, stays level, runs at 0.4 u a tick after its first node, the two turn opposite ways as their mirrored rails
 run; before the fix the same probe read 0.0 deg of yaw over 2 s. Windowed frames 3 s apart show the stars turning.
+
+### 257 -- A on a ledge is the game's quick hop: ma_hgjmp in place, no launch (feature/kingboo-casino, code `0c85db6`)
+
+**Jaysonn:** "we need to fix marios get up animations from the ledge when pressing A he should do a quick hop. right now its not like that he gets flung
+onto the platform".
+
+**The game.** hanging() on A -> HANG_JUMPING (MarioSpecial.cpp 457; on its own when a floor is within 100 u under the hang, 582), with the exert voice.
+hangJumping() (629) is waitProcess() -- no movement, no velocity -- plus ANIM_HGJMP, and WAIT on the clip's last frame; B drops him (LAND_SAFE_DOWN). It is
+ASCEND's shape (ma_hgup), which the port already did right: the clip carries the body up over the edge. The port's A path instead moved him out to the
+wall face and LAUNCHED him (17.8 m/s up, 8 m/s forward: a 3-m arc) into an airborne state that came down through the generic landing.
+
+**`assets/Mario.cs`:** SmsLedgeVault sets ledgeHopUp pinned (voice, no position change, no velocity); new TickLedgeHop = TickLedgeClimb's shape for
+ma_hgjmp (its length read from the clip, 0.50 s; ma_hgup is 1.10 s): the platform follow, B -> the passive drop, XZ eased from the hang to the stand spot,
+Y pinned, idle + ma_wait at the end. Both ledge branches tick the hop as they tick the climb; the old TickLedgeHang's A path goes through the vault too;
+the two launch constants are gone.
+
+**Verified** (Mac, headless, the Hillside course, Mario himself -- the game's own climb-down puts him in the hang): 12/12 -- ma_hgjmp plays for 0.50 s,
+he never rises over the hang height and his velocity never goes up, he ends idle on the top 0.48 m in from the hang at the ledge's height; B during the
+hop lets go into LAND_SAFE_DOWN.
