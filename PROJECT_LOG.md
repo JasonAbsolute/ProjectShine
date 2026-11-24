@@ -16122,3 +16122,8 @@ outlines left; feathered edges) re-hued to each alternate's cap colour read from
 the shading kept; skin, hair, eyes, mustache untouched; the M goes with the cap as on the atlases. `CharacterColor.HeadArt` (null = the entry's);
 `CharacterPoster` puts the colour's head on as the strip refreshes; `MarioEntry.tres` names the four. Verified 7/7 (the head art round the five colours
 and back, Luigi's unchanged) with the poster frames.
+
+### 258c -- the colour name under the dots is off (feature/kingboo-casino, code `83df6ca`)
+
+**Jaysonn:** "we dont need the text at the bottom sayin what color they are". `CharacterPoster.ColorShowName` (off): the swatch dots alone, centred in
+the strip's box under the head; the "Y / X" hint went with the name. Verified with the head-shot drive (7/7) and the poster frames.
