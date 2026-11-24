@@ -1,4 +1,4 @@
-[gd_scene load_steps=33 format=3 uid="uid://djpog221pfbhd"]
+[gd_scene load_steps=34 format=3 uid="uid://djpog221pfbhd"]
 
 [ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_level"]
 [ext_resource type="Script" uid="uid://bgx50vgdilhgc" path="res://assets/PlayerSpawner.cs" id="2_spawner"]
@@ -23,6 +23,7 @@
 [ext_resource type="PackedScene" uid="uid://cr166pmwl5j31" path="res://StarPlatform.tscn" id="21_normalvariant0"]
 [ext_resource type="PackedScene" uid="uid://ce12h7rgk2obv" path="res://Font/HudElements/ending_platofrom.tscn" id="22_normalvariant3"]
 [ext_resource type="Script" path="res://assets/Sms/SmsRailBlock.cs" id="23_railblock"]
+[ext_resource type="Script" uid="uid://bchkqmboa8bft" path="res://assets/Sms/SmsSplineLift.cs" id="25_splinelift"]
 [ext_resource type="PackedScene" uid="uid://cfm7oejwuaw6g" path="res://rotating_block.tscn" id="24_exrollcube"]
 [ext_resource type="PackedScene" uid="uid://cq7lh2ny4cfrk" path="res://nail.tscn" id="25_kugi"]
 [ext_resource type="PackedScene" uid="uid://ciuxr0opwr0bq" path="res://woodblock_wide.tscn" id="26_woodblocklong"]
@@ -425,15 +426,19 @@ WaitTime = 0.08333333
 
 [node name="StarLift0" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(5.937607, 0, 0, 0, 3.958405, 0, 0, 0, 5.937607, 116.8726, 67.16819, 2.686728)
-Waypoints = PackedVector3Array(-1.343364, 0, -1.343364, -2.686728, 0, 0, -1.343364, 0, 1.343364)
-MoveSpeed = 0.6448146
-Mode = 1
+script = ExtResource("25_splinelift")
+RailNodes = PackedVector3Array(8700, 5000, 200, 8600, 5000, 100, 8500, 5000, 200, 8600, 5000, 300)
+RailSpeeds = PackedFloat32Array(0.4, 0.4, 0.4, 0.4)
+ClosedLoop = true
+StartNode = 0
 
 [node name="StarLift1" parent="." instance=ExtResource("21_normalvariant0")]
 transform = Transform3D(-5.937607, 0, 0, 0, 3.958405, 0, 0, 0, -5.937607, 132.993, 67.16819, 2.686728)
-Waypoints = PackedVector3Array(1.343364, 0, -1.343364, 2.686728, 0, 0, 1.343364, 0, 1.343364)
-MoveSpeed = 0.6448146
-Mode = 1
+script = ExtResource("25_splinelift")
+RailNodes = PackedVector3Array(9900, 5000, 200, 10000, 5000, 100, 10100, 5000, 200, 10000, 5000, 300)
+RailSpeeds = PackedFloat32Array(0.4, 0.4, 0.4, 0.4)
+ClosedLoop = true
+StartNode = 0
 
 [node name="EndPlatform" parent="." instance=ExtResource("22_normalvariant3")]
 transform = Transform3D(2.662277, 0, 0, 0, 2.662277, 0, 0, 0, 2.662277, 163.8904, 68.51155, 2.686728)
