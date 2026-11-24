@@ -62,14 +62,23 @@ public partial class LevelSelect : Control
 
     /// <summary>Put the two players on the Sfx bus at the game's volume for their sound (SmsActorSound.LevelDb by the stream's file name); off = as set on the nodes.</summary>
     [Export] public bool SoundsAtGameLevel = true;
+    /// <summary>255 (Jaysonn: "A should select whatever the cursor is on and the control stick should move it left and right"): the pad's own actions
+    /// on this screen. Godot's ui_accept carries only Enter / Space and ui_cancel only Escape, so no pad button confirmed or went back; the stick
+    /// and the D-pad reach the hand through Godot's focus navigation (ui_left / ui_right carry axis 0 and the D-pad) and, when that did not take
+    /// the event (no poster focused, an event from the adapter's physics pump), through this screen's own handler. The left stick past
+    /// StickThreshold moves the hand one poster (once per push: it must come back inside StickRelease first); button_a confirms, button_b goes back.</summary>
+    [Export] public bool PadControls = true;
+    [Export(PropertyHint.Range, "0.2,0.9,0.05")] public float StickThreshold = 0.5f;
+    [Export(PropertyHint.Range, "0.0,0.6,0.05")] public float StickRelease = 0.3f;
     /// <summary>A build marker for the drives (read in the built DLL before a run).</summary>
-    public const string BuildMarker = "SMS251C_SELECT_SOUNDS";
+    public const string BuildMarker = "SMS255_LEVEL_SELECT_PAD_A";
 
     private Container _portraits;
     private Control _selectHand;
     private ColorRect _fadeRect;
     private int _highlighted = -1;
     private bool _confirming;
+    private int _stickLatch;   // the left stick's last push the hand answered: -1 left, +1 right, 0 centred (ready)
     private readonly System.Collections.Generic.List<CharacterPoster> _buttons = new();
 
     public override void _Ready()
@@ -311,21 +320,69 @@ public partial class LevelSelect : Control
             GD.PushError($"LevelSelect: could not load '{dest}' ({err}).");
     }
 
-    /// <summary>Left/right move the focus (the container's own navigation), accept confirms, cancel goes back -- a controller works without extra wiring.</summary>
+    /// <summary>The left stick (a pad on any device: Godot's own joypads, the GameCube adapter's 20+), taken here BEFORE Godot's focus navigation
+    /// sees it (so the two never both step on one push): past StickThreshold the hand moves one poster, and not again until the stick has come
+    /// back inside StickRelease.</summary>
+    public override void _Input(InputEvent @event)
+    {
+        if (!PadControls || _buttons.Count == 0 || @event is not InputEventJoypadMotion jm || jm.Axis != JoyAxis.LeftX)
+            return;
+        float v = jm.AxisValue;
+        if (Mathf.Abs(v) < StickRelease)
+            _stickLatch = 0;
+        else if (v >= StickThreshold && _stickLatch != 1)
+        {
+            _stickLatch = 1;
+            MoveHighlight(1);
+        }
+        else if (v <= -StickThreshold && _stickLatch != -1)
+        {
+            _stickLatch = -1;
+            MoveHighlight(-1);
+        }
+        GetViewport().SetInputAsHandled();
+    }
+
+    /// <summary>Left/right move the focus (the container's own navigation), accept confirms, cancel goes back -- the keyboard through Godot's ui_*
+    /// actions, a pad through button_a / button_b and the D-pad (255; the stick is _Input's).</summary>
     public override void _UnhandledInput(InputEvent @event)
     {
         if (_buttons.Count == 0 || !@event.IsPressed() || @event.IsEcho())
             return;
 
-        if (@event.IsActionPressed("ui_accept") && _highlighted >= 0)
+        if ((@event.IsActionPressed("ui_accept") || (PadControls && @event.IsActionPressed("button_a"))) && _highlighted >= 0)
         {
             Confirm(_highlighted);
             GetViewport().SetInputAsHandled();
         }
-        else if (@event.IsActionPressed("ui_cancel"))
+        else if (@event.IsActionPressed("ui_cancel") || (PadControls && @event.IsActionPressed("button_b")))
         {
             Back();
             GetViewport().SetInputAsHandled();
         }
+        else if (PadControls && @event.IsActionPressed("ui_right"))
+        {
+            MoveHighlight(1);        // the D-pad (ui_right carries it) when no poster had the focus
+            GetViewport().SetInputAsHandled();
+        }
+        else if (PadControls && @event.IsActionPressed("ui_left"))
+        {
+            MoveHighlight(-1);
+            GetViewport().SetInputAsHandled();
+        }
+    }
+
+    /// <summary>The hand one poster along (focus moves with it: FocusEntered -> Highlight, which slides the row); at the ends it stays.</summary>
+    private void MoveHighlight(int dir)
+    {
+        if (_buttons.Count == 0)
+            return;
+        int cur = _highlighted < 0 ? 0 : Mathf.Clamp(_highlighted, 0, _buttons.Count - 1);
+        int next = Mathf.Clamp(cur + dir, 0, _buttons.Count - 1);
+        if (_highlighted >= 0 && next == cur)
+            return;
+        _buttons[next].GrabFocus();          // FocusEntered -> Highlight(next)
+        if (_highlighted != next)
+            Highlight(next);                 // a poster that cannot take the focus still gets the hand
     }
 }
