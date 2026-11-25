@@ -16393,3 +16393,38 @@ dylib hidden) warns once with LibUsbHint and idles; 253's injected-report chain 
 D-pad + L click, a release, a controller gone, a short report refused); in the test level with no adapter open, button_r at 1.0 is the R click
 (SmsRClickNow), 0.5 is not, an injected click bit alone is, released is not. **Not yet tried with an adapter on the Mac** (none here): the one thing
 left to see -- plug it in (Wii U / Switch mode), the log should say "open: USB 057E:0337 through libusb (...)".
+
+### 266 -- the demo's round: Player Select -> Level Select -> a level -> Player Select -> Level Select ...; the game boots on the Player Select (feature/kingboo-casino, code `34c49dc`)
+
+**Jaysonn:** "it should be char -> level -> play level -> char -> level select and so on for the demo" -- and the demo runs from the repo on someone
+else's Windows laptop. Until now the game booted straight into the test level (run/main_scene), every finished level went back to the Level Select
+(the courses' Shines had the Level Select baked into ExitScene; the Exit Area and the game over's Continue fell back to GameData.LevelSelectScene), the
+Rematch's Shine gave control back in the arena (a dead end), and the Player Select was reached only through the pause menu's title option.
+
+**The boot** (`project.godot`): run/main_scene = `assets/CharacterSelect.tscn`. Only that line (the local `[filesystem]` blender line stays out of the
+commit: staged from HEAD's content by `flow266/patch_scenes266.py`).
+
+**The way back** -- one knob on the Level Select, `AfterLevelScene` (`assets/LevelSelect.cs`; default the Player Select, empty = back to the Level
+Select): where a level picked there goes when it is DONE. The pick writes it to `GameData.AfterLevelScene`; `GameData.LevelWayBack` is that, else
+`LevelSelectScene`, else "" (a level run on its own reloads itself, the Plaza's decideNextStage, as before). The three readers follow it: the
+Shine's exit with no destination of its own and the game over's Continue (`assets/Mario.cs`), EXIT AREA (`assets/Sms/Console/SmsPauseMenu.cs`).
+Each sets `FadeInFrom` (the demo's white, the fader's or the card's black) so the select screen it lands on fades in from what was on the screen --
+the Player Select only knew the episode select's white. `assets/CharacterSelect.cs`: arriving as a level's way back it spends `ReturnWithShine`
+(the Shine's white was its own fade in), so the Level Select reached through its fade to black fades in from black; `ReturnFromScene` is left for
+the Level Select's hand -- the poster of the level just left, through the Player Select in between.
+
+**The courses** -- the eleven level scenes' Shines (assets/Level.tscn, assets/secrect_level.tscn, Levels/Rico4Secrect/Skybox/Rico4Secret.tscn,
+Levels/Secret/*.tscn x 8) lose their baked `ExitScene` line (`ExitLevel` stays on): the destination is the Level Select's knob, one place to change.
+`assets/Sms/Rematch/RematchArena.tscn`: KingBoo.`ShineExitLevel` on -- the Rematch's Shine ends the level (the save card, the stage moves) instead
+of handing control back in the arena. **King Boo's normal fight keeps its Rematch chain** (KingBooArena.tscn BossTelesa.Rematch on, 157's design):
+King Boo -> the table shatters -> the Rematch -> its Shine -> the Player Select; turn `Rematch` off on BossTelesa for the game's Shine there.
+Left as the game has it: lives carry over a Shine's exit (TFlagManager); a game over resets them. Say so if each new player should start fresh.
+
+**Verified** (`flow266/flowdrive266.gd`, windowed 34/34): the main scene is the Player Select, A on it loads the Level Select; the knob reads the
+Player Select; stick right + A picks Hillside Cave, GameData.LevelSelectScene = the Level Select, AfterLevelScene / LevelWayBack = the Player
+Select, the pause menu's ExitAreaTarget = the Player Select, the course's Shine ExitLevel on with no ExitScene; Mario put on the Shine: the get demo
+runs (6.98 s, "moveStage -> res://assets/CharacterSelect.tscn"), the Player Select arrives fading in from the demo's white, ReturnFromScene =
+Hillside, ReturnWithShine and FadeInFrom spent; A -> the Level Select with the hand under Hillside Cave; Lives 0, Hillside again, killed on the
+floor through TakeDamage (8 hits), the card's "Continue | Return to Title Screen", A on Continue -> the Player Select, Lives -1, FadeInFrom spent;
+by inspection RematchArena's KingBoo.ShineExitLevel on, KingBooArena's BossTelesa.Rematch on, the eleven courses' Shines ExitLevel on with no
+ExitScene line. Shots in `flow266/shots/`.
