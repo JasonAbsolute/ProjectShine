@@ -16357,3 +16357,39 @@ res://assets/Level.tscn with Mario on the Plaza (y 2.9) and no BossTelesa, Roule
 PlayerSpawner/Mario, BossTelesa, the wall and three roulettes, FLUDD on, the death plane active; the intro runs 1 -> 2 -> 0 (659 + 180 ticks), Mario
 camera-locked through the ride, y 24.8 -> -1.8, the fight camera the room's DEFINITE_D2 kind (18), King Boo appearing 3.3 s after, no death; back on the
 Level Select the hand is under King Boo and A loads the fight's own scene, the way back `GameData.LevelSelectScene`. Shots in `kingboo264/shots/`.
+
+### 265 -- the GameCube adapter on the Mac (and Linux): read through libusb, as Dolphin does; the R click's stand-in back for every other pad (feature/kingboo-casino, code `c6e8459`)
+
+**The ask:** "did we do the proper stuff for the controller adaptor to run on mac?" -- no: 253's reader was Windows-only (WinUSB + setupapi P/Invokes;
+on a Mac the autoload logged "not Windows: the adapter reader is idle"), and in Wii U / Switch mode the adapter is a vendor-specific USB device, not
+a HID pad, so macOS and Godot's joypad layer see no controller at all. "can you make it work on mac?"
+
+**The reader** (`assets/Sms/Input/SmsGcAdapter.cs`): a second USB layer under the same code (`Backend`: WinUsb / LibUsb -- the report parsing, the
+calibration and the joypad events untouched and shared). On macOS and Linux the adapter (057E:0337) is opened through **libusb-1.0** the way
+Dolphin's GCAdapter does: libusb_open, auto-detach (Linux; a no-op on macOS), claim interface 0, the 0x13 start command on the OUT endpoint, the
+37-byte reports read on the thread with libusb_interrupt_transfer (250-ms timeouts so the loop sees `_run`), rumble through the same `Write`.
+macOS attaches no driver of its own to the adapter, so there is no Zadig step: plug in, play. The library is found by a `DllImport` resolver (the
+runtime's own search knows nothing of Homebrew's `/opt/homebrew/lib` or the project): `$SMS_LIBUSB`, next to the game's executable and
+`../Frameworks` (an exported .app), the project's `addons/libusb/macos/libusb-1.0.0.dylib`, Homebrew's, then the system search; none = one warning
+(`LibUsbHint`) and idle; an adapter seen but refused = `MacInUseHint` (another program holds it) / `LinuxHint` (Dolphin's udev rule). Readouts
+`BackendName`, `LibUsbLoaded`, `Discovery` ("libusb: N USB devices, M adapter(s)"); the rescan runs on every system now. **A 253 fix found by the
+drive:** a port that went away kept its last report's button bits as "sent", so a controller plugged back in with a button held never registered it;
+the port now counts as all released (as `ReleaseAll` had sent).
+
+**The R click** (`assets/Mario.cs`, `SmsRClick`): 253's `button_rclick` action is added to the map on every system by the autoload, and its mere
+presence switched off the game's stand-in (the trigger pulled past `RClickPull`, 0.98) -- so on a Mac, or with an Xbox pad or the Mayflash in PC
+mode anywhere, the R click (the stand-and-aim spray, the squat) never came. Now: the action when it is down, else the pull stand-in while no adapter
+reader is open (`SmsGcAdapter.Open`); with the adapter open nothing changes from 253. Readout `SmsRClickNow`.
+
+**The library** (`addons/libusb/`, new): `macos/libusb-1.0.0.dylib` -- libusb 1.0.30, Homebrew's arm64 build, install name `@rpath/...`, re-signed
+ad hoc (Apple silicon; Homebrew ships no Intel bottle any more); `macos/COPYING` (LGPL 2.1: loaded at run time, the game's own licence untouched);
+`README.md` (the search order, Linux's udev rule, the export step -- Godot copies no .dylib into the .app: put it in `Contents/MacOS/` after the
+export; without it the reader idles and the Mayflash still works in PC mode as an ordinary pad). Homebrew itself could not install here (its
+sandbox is refused inside this session), so the bottle was fetched and the dylib taken from it.
+
+**Verified** (`gc265/gcdrive265.gd`, headless on the Mac, 36/36): the autoload loads the project's dylib through the resolver, enumerates the bus
+(1 device, 0 adapters), reports "no adapter (057E:0337) present", nothing open, a 2-s rescan the same with no exception; the no-libusb path (the
+dylib hidden) warns once with LibUsbHint and idles; 253's injected-report chain unchanged (A X Z + the R click, the pull, the sticks, a half pull, the
+D-pad + L click, a release, a controller gone, a short report refused); in the test level with no adapter open, button_r at 1.0 is the R click
+(SmsRClickNow), 0.5 is not, an injected click bit alone is, released is not. **Not yet tried with an adapter on the Mac** (none here): the one thing
+left to see -- plug it in (Wii U / Switch mode), the log should say "open: USB 057E:0337 through libusb (...)".
