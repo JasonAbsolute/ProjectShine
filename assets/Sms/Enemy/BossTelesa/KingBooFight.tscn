@@ -1,0 +1,63 @@
+[gd_scene load_steps=11 format=3 uid="uid://d264kbfight"]
+
+[ext_resource type="Script" uid="uid://3aw1w481iqnu" path="res://assets/Level.cs" id="1_level"]
+[ext_resource type="Script" uid="uid://bgx50vgdilhgc" path="res://assets/PlayerSpawner.cs" id="2_spawner"]
+[ext_resource type="PackedScene" uid="uid://d332ak3mwu1a1" path="res://assets/Mario.tscn" id="3_mario"]
+[ext_resource type="PackedScene" uid="uid://d153arena" path="res://assets/Sms/Enemy/BossTelesa/KingBooArena.tscn" id="4_arena"]
+[ext_resource type="Script" uid="uid://7apae2q1c8iq" path="res://assets/Sms/SmsDeathPlane.cs" id="5_death"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_fight"]
+sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+ground_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
+
+[sub_resource type="Sky" id="Sky_fight"]
+sky_material = SubResource("ProceduralSkyMaterial_fight")
+
+[sub_resource type="Environment" id="Environment_fight"]
+background_mode = 2
+sky = SubResource("Sky_fight")
+tonemap_mode = 2
+glow_enabled = true
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_death264"]
+size = Vector2(90, 90)
+
+[sub_resource type="StandardMaterial3D" id="Mat_death264"]
+resource_name = "264: the death plane's sheet -- the editor's only (hidden in play)"
+transparency = 1
+cull_mode = 2
+shading_mode = 0
+albedo_color = Color(1, 0.12, 0.08, 0.3)
+
+[node name="KingBooFight" type="Node3D"]
+script = ExtResource("1_level")
+MarioPath = NodePath("PlayerSpawner/Mario")
+ShowGoText = false
+StageName = "Casino Delfino"
+ScenarioName = "King Boo Down Below"
+metadata/_sms_note = "Pass 264: KING BOO'S FIGHT (the game's casino boss fight, SMS 153 and on) in its OWN LEVEL SCENE -- the Level Select's King Boo poster loads this. Until 264 the arena (KingBooArena.tscn) was a piece of the test level (assets/Level.tscn) floating 37 m over the Plaza, with Mario's spawn moved into its air so the fall-in intro took him; the test level is the Level Select's Test poster now and its spawn is back on the Plaza. Here: the arena at the origin, the chosen character (PlayerSpawner: the Player Select's pick, Mario when none) spawned where he spawned over the arena in the test level (3.8 m off its axis, 12.2 m up: inside the room, in the intro's trigger radius and height band), the test level's sky, tonemap and sun so the room looks as it did there, and a death plane 30 m under the table as a safety net (the game's room has no floor and nothing can leave the table: its outer disc's rim is set 61 units into the wall). No intro pan (the boss's own FallDemo is the intro), no GO text, FLUDD on (the fight is sprayed)."
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_fight")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+transform = Transform3D(-0.866023, -0.433016, 0.250001, 0, 0.499998, 0.866027, -0.500003, 0.749999, -0.43301, 0, 0, 0)
+shadow_enabled = true
+
+[node name="KingBooArena" parent="." instance=ExtResource("4_arena")]
+
+[node name="PlayerSpawner" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7973862, 12.198406, 1.42942)
+script = ExtResource("2_spawner")
+FallbackCharacter = ExtResource("3_mario")
+
+[node name="DeathPlane" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -30, 0)
+script = ExtResource("5_death")
+MarioPath = NodePath("../PlayerSpawner/Mario")
+metadata/_sms_note = "Pass 264: a safety net under the fight room -- the game's delfinoBoss map.col has no death plane (its wall runs 1500 units under the table and the outer disc's rim is set into the wall, so nothing leaves the table); 30 m under the room's origin, well below the wall's bottom (-20 m), it only catches what the port's own collision lets through. The red Preview sheet shows it in the editor and is hidden in play."
+
+[node name="Preview" type="MeshInstance3D" parent="DeathPlane"]
+cast_shadow = 0
+mesh = SubResource("PlaneMesh_death264")
+surface_material_override/0 = SubResource("Mat_death264")

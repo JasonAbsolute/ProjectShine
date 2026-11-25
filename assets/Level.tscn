@@ -45,7 +45,6 @@
 [ext_resource type="PackedScene" uid="uid://d136gorogoro" path="res://assets/Sms/Enemy/Gorogoro.tscn" id="43_tm7kf"]
 [ext_resource type="PackedScene" uid="uid://d14akumokun" path="res://assets/Sms/Enemy/Kumokun.tscn" id="44_27p00"]
 [ext_resource type="PackedScene" uid="uid://dbwanwan1" path="res://assets/Sms/Enemy/BossWanwan.tscn" id="45_tm7kf"]
-[ext_resource type="PackedScene" uid="uid://d153arena" path="res://assets/Sms/Enemy/BossTelesa/KingBooArena.tscn" id="46_jmips"]
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_82gkg"]
 sky_horizon_color = Color(0.64625, 0.65575, 0.67075, 1)
@@ -232,7 +231,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -84.5004, -14.4019, 41)
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -86.2609, -14.4019, 41)
 
 [node name="Mario" parent="." unique_id=1241972682 instance=ExtResource("6_swhci")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.7973862, 49.337856, 182.16347)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 5.4623823, 20.642525)
 
 [node name="Sea" type="Area3D" parent="." unique_id=927641836 groups=["sms_water"]]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 62.4823, -20.054996, 0)
@@ -509,6 +508,3 @@ transform = Transform3D(1, 0, 0, 0, 0.13541271, -0.9907893, 0, 0.9907893, 0.1354
 
 [node name="BossWanwan" parent="." unique_id=1970505528 instance=ExtResource("45_tm7kf")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -113.17684, -14.886137, 64.75685)
-
-[node name="KingBooArena" parent="." unique_id=2006943446 instance=ExtResource("46_jmips")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 37.13945, 180.73405)

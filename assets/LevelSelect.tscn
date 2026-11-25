@@ -5,6 +5,7 @@
 [ext_resource type="Resource" path="res://assets/levels/RiccoTowerEntry.tres" id="4_RiccoTowerEntry"]
 [ext_resource type="Resource" path="res://assets/levels/KingBooEntry.tres" id="12_KingBooEntry"]
 [ext_resource type="Resource" path="res://assets/levels/RematchEntry.tres" id="13_RematchEntry"]
+[ext_resource type="Resource" path="res://assets/levels/TestEntry.tres" id="14_TestEntry"]
 [ext_resource type="PackedScene" uid="uid://bg72dlcmvwypi" path="res://assets/CharacterPoster.tscn" id="6_poster"]
 [ext_resource type="Texture2D" uid="uid://kfyytoolf68u" path="res://Font/CharacterSelect/background.png" id="7_bg"]
 [ext_resource type="Shader" uid="uid://dy4lyx2nlb5pf" path="res://assets/ArtGradient.gdshader" id="8_grad"]
@@ -106,7 +107,7 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1_script")
-Levels = [ExtResource("4_RiccoTowerEntry"), ExtResource("2_HillsideCaveEntry"), ExtResource("12_KingBooEntry"), ExtResource("13_RematchEntry")]
+Levels = [ExtResource("4_RiccoTowerEntry"), ExtResource("2_HillsideCaveEntry"), ExtResource("12_KingBooEntry"), ExtResource("13_RematchEntry"), ExtResource("14_TestEntry")]
 PosterScene = ExtResource("6_poster")
 SelectHandPath = NodePath("SelectHand")
 MoveSoundPath = NodePath("Sfx/Move")

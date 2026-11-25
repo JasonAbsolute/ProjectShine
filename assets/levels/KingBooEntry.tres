@@ -8,7 +8,7 @@
 [resource]
 script = ExtResource("1_script")
 DisplayName = "King Boo"
-ScenePath = "res://assets/Level.tscn"
+ScenePath = "res://assets/Sms/Enemy/BossTelesa/KingBooFight.tscn"
 Art = ExtResource("2_art")
 NameArt = ExtResource("3_name")
 StrokeArt = ExtResource("4_stroke")
