@@ -13998,7 +13998,19 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>MEANING_R, the GC trigger's click at the end of its travel: the button_rclick action when the map has one, else the
     /// pad's full pull (the analog is still the pressure; easing off the click keeps it -- the turbo's charge-then-go).</summary>
-    private bool SmsRClick() => InputMap.HasAction(SmsNames.Of("button_rclick")) ? Input.IsActionPressed(SmsNames.Of("button_rclick")) : _fluddR >= SmsParams.Squat.RClickPull;
+    /// <summary>The R trigger's click: the `button_rclick` action when it is down (the GameCube adapter's real click, 253), else -- while no adapter
+    /// reader is feeding that action (SmsGcAdapter not open: an Xbox pad, the Mayflash in its PC mode, a Mac without the adapter) -- the game's stand-in,
+    /// the trigger pulled past RClickPull. 265: before this the action's mere presence on the map (the autoload adds it on every system) switched the
+    /// stand-in off, so on a Mac, or with any other pad, the click never came.</summary>
+    private bool SmsRClick()
+    {
+        string act = SmsNames.Of("button_rclick");
+        if (InputMap.HasAction(act) && Input.IsActionPressed(act)) return true;
+        bool adapterFeeds = SmsGcAdapter.Instance != null && SmsGcAdapter.Instance.Open;
+        return !adapterFeeds && _fluddR >= SmsParams.Squat.RClickPull;
+    }
+    /// <summary>For drives: SmsRClick as Mario sees it this tick.</summary>
+    public bool SmsRClickNow => SmsRClick();
 
     /// <summary>gunExec() for one tick: the pressure, the nozzle's movement, the refill in water, the emit.</summary>
     private void SmsFluddGunExecTick()

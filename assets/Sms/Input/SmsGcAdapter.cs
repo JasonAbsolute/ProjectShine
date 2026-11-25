@@ -22,7 +22,12 @@ using Microsoft.Win32.SafeHandles;
 /// the scene's nodes, so Mario reads the same tick's values; InputEventsInProcess sends them from _Process instead).
 /// SETUP (once, Windows): the adapter's switch on "Wii U" / "Switch"; install the WinUSB driver on it with Zadig (zadig.akeo.ie: Options > List All
 /// Devices, pick "WUP-028" / the 057E:0337 device, driver WinUSB, Install) -- the same step Dolphin and RoA2 players do. With the driver missing the
-/// adapter is found but cannot be opened; the node says so once in the log (DriverHint). Windows only (the P/Invokes); elsewhere the node is idle.
+/// adapter is found but cannot be opened; the node says so once in the log (DriverHint).
+/// macOS and Linux (SMS 265): the same adapter read through libusb-1.0, as Dolphin's builds there do -- macOS attaches no driver of its own to
+/// 057E:0337, so there is nothing to install: the library is found next to the game's executable, in the project's addons/libusb/macos/ (a copy
+/// ships there), or Homebrew's (addons/libusb/README.md has the order; SMS_LIBUSB points at another copy); with none the node says so once
+/// (LibUsbHint) and stays idle. Linux also wants Dolphin's udev rule for the adapter (LinuxHint). The report parsing, the calibration and the
+/// events are the same code on every system; only the open / read / write underneath differ (Backend).
 /// Rumble: Rumble(port, on) writes the adapter's 0x11 command (RumbleAllowed).
 /// Knobs: Enabled, FirstDevice (20), StickRange (100 raw counts = full tilt; the sticks reach 80-105), StickDeadzone (raw counts about the origin),
 /// TriggerRest (auto from the first report) / TriggerFull (the raw pull that counts as 1.0; the click comes a little past it), AddRClickAction,
@@ -50,7 +55,7 @@ public partial class SmsGcAdapter : Node
     [Export] public bool RumbleAllowed = true;
     [Export] public bool DebugPrint = false;
 
-    public const string BuildMarker = "SMS253_GC_ADAPTER_B";
+    public const string BuildMarker = "SMS265_GC_ADAPTER_MAC";
     public const int Ports = 4;
     public const ushort Vid = 0x057E, Pid = 0x0337;
     private const byte EpIn = 0x81, EpOut = 0x02;
@@ -101,11 +106,15 @@ public partial class SmsGcAdapter : Node
             if (DebugPrint) GD.Print("[SMS gc adapter] button_rclick added to the map (joypad button 17, the R trigger's click)");
         }
         if (!Enabled || Engine.IsEditorHint()) return;
-        if (!OperatingSystem.IsWindows()) { _lastError = "not Windows: the adapter reader is idle"; return; }
         TryOpen();
     }
 
-    public override void _ExitTree() { Close(); if (Instance == this) Instance = null; }
+    public override void _ExitTree()
+    {
+        Close();
+        if (_ctx != IntPtr.Zero) { try { libusb_exit(_ctx); } catch { } _ctx = IntPtr.Zero; }
+        if (Instance == this) Instance = null;
+    }
 
     public override void _Process(double delta)
     {
@@ -113,7 +122,7 @@ public partial class SmsGcAdapter : Node
         if (!_open)
         {
             _rescan += delta;
-            if (_rescan >= RescanSeconds && OperatingSystem.IsWindows()) { _rescan = 0; TryOpen(); }
+            if (_rescan >= RescanSeconds) { _rescan = 0; TryOpen(); }
         }
         if (InputEventsInProcess) Pump();
         if (DebugPrint && _open)
@@ -165,7 +174,7 @@ public partial class SmsGcAdapter : Node
                 if (!s.Connected) { _origin[p].Set = false; ReleaseAll(p, was); }
                 if (DebugPrint) GD.Print($"[SMS gc adapter] port {p + 1}: {(s.Connected ? "connected" : "gone")} (device {dev})");
             }
-            if (!s.Connected) { _sent[p] = s; continue; }
+            if (!s.Connected) { _sent[p] = default; continue; }     // 265: the port counts as all released (ReleaseAll sent that), not the gone report's stale button bits -- else a controller plugged back in with a button held never registered it
             var o = _origin[p];
             Button(dev, JoyButton.A, was.A, s.A); Button(dev, JoyButton.B, was.B, s.B); Button(dev, JoyButton.X, was.X, s.X); Button(dev, JoyButton.Y, was.Y, s.Y);
             Button(dev, JoyButton.Start, was.Start, s.Start); Button(dev, JoyButton.RightShoulder, was.Z, s.Z);
@@ -245,10 +254,129 @@ public partial class SmsGcAdapter : Node
         return $"port {port + 1}: {(s.Wireless ? "WaveBird" : "wired")} A{(s.A ? 1 : 0)} B{(s.B ? 1 : 0)} X{(s.X ? 1 : 0)} Y{(s.Y ? 1 : 0)} Z{(s.Z ? 1 : 0)} St{(s.Start ? 1 : 0)} Lc{(s.LClick ? 1 : 0)} Rc{(s.RClick ? 1 : 0)} D{(s.DUp ? "U" : "")}{(s.DDown ? "D" : "")}{(s.DLeft ? "L" : "")}{(s.DRight ? "R" : "")} stick {s.StickX},{s.StickY} c {s.CStickX},{s.CStickY} L {s.TriggerL} R {s.TriggerR}";
     }
 
-    // ---- the USB side (WinUSB) ---------------------------------------------------------------------------------------------------------------------
+    // ---- the USB side: WinUSB on Windows (253), libusb on macOS and Linux (265) ------------------------------------------------------------------
+    private enum Backend { None, WinUsb, LibUsb }
+    private Backend _backend;
+    /// <summary>Which USB layer holds the adapter: "WinUSB", "libusb", or "" while none is open.</summary>
+    public string BackendName => _backend == Backend.WinUsb ? "WinUSB" : _backend == Backend.LibUsb ? "libusb" : "";
+    private const uint ReadTimeoutMs = 250;      // the read comes back empty after this so the loop can see _run; the adapter reports every 8 ms anyway
+
     private void TryOpen()
     {
         if (_open) return;
+        if (OperatingSystem.IsWindows()) TryOpenWinUsb(); else TryOpenLibUsb();
+    }
+
+    // ---- libusb (macOS, Linux) -----------------------------------------------------------------------------------------------------------------------
+    private IntPtr _ctx = IntPtr.Zero, _dev = IntPtr.Zero;      // the libusb context; the open device handle
+    private bool _libusbMissing;
+    /// <summary>The libusb library the reader loaded ("" before the first try, or when none loaded).</summary>
+    public static string LibUsbPath { get; private set; } = "";
+    /// <summary>LibUsbPath as an instance readout (a static is not reachable through Node.Get from a drive).</summary>
+    public string LibUsbLoaded => LibUsbPath;
+    public const string LibUsbHint = "the game reads the GameCube adapter through libusb on this system, and no libusb-1.0 could be loaded: it looks next to the game's executable, in the project's addons/libusb/macos/, and in Homebrew's /opt/homebrew/lib (brew install libusb) -- or set SMS_LIBUSB to a libusb-1.0 library's full path (addons/libusb/README.md)";
+    public const string MacInUseHint = "the GameCube adapter is plugged in but libusb could not take it: another program has it open (Dolphin, Slippi, Delfinovin or another adapter tool) -- close it and the game takes the adapter within a couple of seconds";
+    public const string LinuxHint = "the GameCube adapter is plugged in but could not be opened: let your user at it with Dolphin's udev rule -- /etc/udev/rules.d/51-gcadapter.rules: SUBSYSTEM==\"usb\", ENV{DEVTYPE}==\"usb_device\", ATTRS{idVendor}==\"057e\", ATTRS{idProduct}==\"0337\", MODE=\"0666\" -- then replug";
+
+    private void TryOpenLibUsb()
+    {
+        if (_libusbMissing) return;
+        try
+        {
+            EnsureLibUsbResolver();
+            if (_ctx == IntPtr.Zero)
+            {
+                int ri = libusb_init(out _ctx);
+                if (ri != 0) { _ctx = IntPtr.Zero; Hint($"libusb_init failed ({LibUsbError(ri)})"); return; }
+            }
+            nint n = libusb_get_device_list(_ctx, out IntPtr list);
+            if (n < 0) { Hint($"libusb_get_device_list failed ({LibUsbError((int)n)})"); return; }
+            try
+            {
+                int seen = 0; string err = "";
+                for (int i = 0; i < n; i++)
+                {
+                    IntPtr dev = Marshal.ReadIntPtr(list, i * IntPtr.Size);
+                    if (libusb_get_device_descriptor(dev, out LibUsbDeviceDescriptor d) != 0) continue;
+                    if (d.idVendor != Vid || d.idProduct != Pid) continue;
+                    seen++;
+                    int r = libusb_open(dev, out IntPtr h);
+                    if (r != 0) { err = $"libusb_open failed ({LibUsbError(r)})"; continue; }
+                    libusb_set_auto_detach_kernel_driver(h, 1);       // Linux: the kernel's own driver off the interface while we hold it; macOS: not supported, harmless
+                    r = libusb_claim_interface(h, 0);
+                    if (r != 0) { err = $"libusb_claim_interface failed ({LibUsbError(r)})"; libusb_close(h); continue; }
+                    byte[] start = { 0x13 };
+                    r = libusb_interrupt_transfer(h, EpOut, start, 1, out _, ReadTimeoutMs);
+                    if (r != 0) { err = $"the start command failed ({LibUsbError(r)})"; libusb_release_interface(h, 0); libusb_close(h); continue; }
+                    _dev = h; _backend = Backend.LibUsb; _open = true; _run = true; _lastError = ""; _driverHinted = false;
+                    Discovery = $"libusb: {n} USB devices, {seen} adapter(s); open through {LibUsbPath}";
+                    _thread = new Thread(ReadLoop) { IsBackground = true, Name = "SmsGcAdapter" };
+                    _thread.Start();
+                    GD.Print($"[SMS gc adapter] open: USB {Vid:X4}:{Pid:X4} through libusb ({LibUsbPath})");
+                    return;
+                }
+                Discovery = $"libusb: {n} USB devices, {seen} adapter(s) ({LibUsbPath})";
+                if (seen == 0) { _lastError = "no adapter (057E:0337) present"; return; }
+                Hint(err);
+            }
+            finally { libusb_free_device_list(list, 1); }
+        }
+        catch (DllNotFoundException) { _libusbMissing = true; Hint("libusb-1.0 not found"); }
+        catch (EntryPointNotFoundException ex) { _libusbMissing = true; Hint($"the libusb that loaded lacks {ex.Message}"); }
+    }
+
+    private static bool _resolverSet;
+    private const string LibUsb = "libusb-1.0";
+    /// <summary>The runtime's own search knows nothing of Homebrew's /opt/homebrew/lib or the project's addons/ copy: this resolver tries those
+    /// (LibUsbCandidates, in order) for the "libusb-1.0" imports and leaves every other import alone. Set once per assembly load.</summary>
+    private static void EnsureLibUsbResolver()
+    {
+        if (_resolverSet) return;
+        _resolverSet = true;
+        try { NativeLibrary.SetDllImportResolver(typeof(SmsGcAdapter).Assembly, ResolveNative); }
+        catch (InvalidOperationException) { /* another resolver already on this assembly: the runtime's default probing then */ }
+    }
+    private static IntPtr ResolveNative(string name, System.Reflection.Assembly asm, DllImportSearchPath? path)
+    {
+        if (name != LibUsb) return IntPtr.Zero;
+        foreach (string c in LibUsbCandidates())
+        {
+            if (c == "" || (c.Contains('/') && !System.IO.File.Exists(c))) continue;
+            if (NativeLibrary.TryLoad(c, out IntPtr h)) { LibUsbPath = c; return h; }
+        }
+        return IntPtr.Zero;      // the runtime's default probing then; DllNotFoundException when that fails too
+    }
+    private static System.Collections.Generic.IEnumerable<string> LibUsbCandidates()
+    {
+        string env = System.Environment.GetEnvironmentVariable("SMS_LIBUSB") ?? "";
+        if (env != "") yield return env;
+        string exe = OS.GetExecutablePath();
+        string exeDir = exe != "" ? (System.IO.Path.GetDirectoryName(exe) ?? "") : "";
+        if (OperatingSystem.IsMacOS())
+        {
+            const string dylib = "libusb-1.0.0.dylib";
+            if (exeDir != "") { yield return System.IO.Path.Combine(exeDir, dylib); yield return System.IO.Path.GetFullPath(System.IO.Path.Combine(exeDir, "..", "Frameworks", dylib)); }
+            yield return ProjectSettings.GlobalizePath("res://addons/libusb/macos/" + dylib);
+            yield return "/opt/homebrew/opt/libusb/lib/" + dylib; yield return "/opt/homebrew/lib/" + dylib;
+            yield return "/usr/local/opt/libusb/lib/" + dylib; yield return "/usr/local/lib/" + dylib;
+            yield return dylib;
+        }
+        else
+        {
+            if (exeDir != "") yield return System.IO.Path.Combine(exeDir, "libusb-1.0.so.0");
+            yield return ProjectSettings.GlobalizePath("res://addons/libusb/linux/libusb-1.0.so.0");
+            yield return "libusb-1.0.so.0"; yield return "libusb-1.0.so";
+        }
+    }
+    private static string LibUsbError(int r)
+    {
+        try { return $"{r} {Marshal.PtrToStringAnsi(libusb_error_name(r))}: {Marshal.PtrToStringAnsi(libusb_strerror(r))}"; }
+        catch { return r.ToString(); }
+    }
+
+    // ---- WinUSB (Windows) ---------------------------------------------------------------------------------------------------------------------------
+    private void TryOpenWinUsb()
+    {
         var paths = FindDevicePaths();
         if (paths.Count == 0) { _lastError = "no adapter (057E:0337) present"; return; }
         string err = "";
@@ -262,7 +390,7 @@ public partial class SmsGcAdapter : Node
                 uint timeout = 250; WinUsb_SetPipePolicy(usb, EpIn, PIPE_TRANSFER_TIMEOUT, 4, ref timeout);
                 byte[] start = { 0x13 };
                 if (!WinUsb_WritePipe(usb, EpOut, start, 1, out _, IntPtr.Zero)) { err = $"the start command failed ({Marshal.GetLastWin32Error()})"; WinUsb_Free(usb); file.Dispose(); continue; }
-                _file = file; _usb = usb; _open = true; _run = true; _lastError = "";
+                _file = file; _usb = usb; _backend = Backend.WinUsb; _open = true; _run = true; _lastError = "";
                 _thread = new Thread(ReadLoop) { IsBackground = true, Name = "SmsGcAdapter" };
                 _thread.Start();
                 GD.Print($"[SMS gc adapter] open: {path}");
@@ -280,7 +408,53 @@ public partial class SmsGcAdapter : Node
         _lastError = err;
         if (_driverHinted) return;
         _driverHinted = true;
-        GD.PushWarning($"[SMS gc adapter] {err}: {(DriverInstalled ? InUseHint : DriverHint)} [{Discovery}]");
+        string what = OperatingSystem.IsWindows() ? (DriverInstalled ? InUseHint : DriverHint) : _libusbMissing ? LibUsbHint : OperatingSystem.IsMacOS() ? MacInUseHint : LinuxHint;
+        GD.PushWarning($"[SMS gc adapter] {err}: {what} [{Discovery}]");
+    }
+
+    // ---- the read thread, the writes, the close: the same over either layer ---------------------------------------------------------------------------
+    /// <summary>One interrupt read of the IN endpoint: the bytes read, or -1 (timeout: nothing in ReadTimeoutMs, read again; else the error).</summary>
+    private int Read(byte[] buf, out bool timeout, out string err)
+    {
+        timeout = false; err = "";
+        switch (_backend)
+        {
+            case Backend.WinUsb:
+            {
+                if (WinUsb_ReadPipe(_usb, EpIn, buf, (uint)buf.Length, out uint got, IntPtr.Zero)) return (int)got;
+                int e = Marshal.GetLastWin32Error();
+                timeout = e == ERROR_SEM_TIMEOUT || e == ERROR_IO_PENDING;
+                err = e.ToString();
+                return -1;
+            }
+            case Backend.LibUsb:
+            {
+                int r = libusb_interrupt_transfer(_dev, EpIn, buf, buf.Length, out int got, ReadTimeoutMs);
+                if (r == 0) return got;
+                timeout = r == LIBUSB_ERROR_TIMEOUT || r == LIBUSB_ERROR_INTERRUPTED;
+                err = LibUsbError(r);
+                return -1;
+            }
+        }
+        err = "no USB layer open"; return -1;
+    }
+    /// <summary>One interrupt write to the OUT endpoint (the adapter's commands: 0x13 start, 0x11 rumble).</summary>
+    private bool Write(byte[] cmd, out string err)
+    {
+        err = "";
+        switch (_backend)
+        {
+            case Backend.WinUsb:
+                if (WinUsb_WritePipe(_usb, EpOut, cmd, (uint)cmd.Length, out _, IntPtr.Zero)) return true;
+                err = Marshal.GetLastWin32Error().ToString(); return false;
+            case Backend.LibUsb:
+            {
+                int r = libusb_interrupt_transfer(_dev, EpOut, cmd, cmd.Length, out _, ReadTimeoutMs);
+                if (r == 0) return true;
+                err = LibUsbError(r); return false;
+            }
+        }
+        err = "no USB layer open"; return false;
     }
 
     private void ReadLoop()
@@ -290,13 +464,12 @@ public partial class SmsGcAdapter : Node
         int failures = 0;
         while (_run)
         {
-            bool ok = WinUsb_ReadPipe(_usb, EpIn, buf, (uint)buf.Length, out uint got, IntPtr.Zero);
-            if (!ok)
+            int got = Read(buf, out bool timeout, out string err);
+            if (got < 0)
             {
-                int e = Marshal.GetLastWin32Error();
-                if (e == ERROR_SEM_TIMEOUT || e == ERROR_IO_PENDING) continue;      // nothing in 250 ms: the loop checks _run and reads again
+                if (timeout) continue;                 // nothing in ReadTimeoutMs: the loop checks _run and reads again
                 if (++failures < 5) continue;
-                _lastError = $"the read failed ({e}): the adapter is gone";
+                _lastError = $"the read failed ({err}): the adapter is gone";
                 CallDeferred(nameof(Lost));
                 return;
             }
@@ -313,8 +486,17 @@ public partial class SmsGcAdapter : Node
     private void Close()
     {
         _run = false;
+        if (_backend == Backend.LibUsb)
+        {
+            // the read thread may sit in a transfer of up to ReadTimeoutMs: let it come back before the handle goes (a close under a transfer is
+            // undefined in libusb). Lost() is deferred from that thread, which returns right after, so this is a short wait.
+            if (_thread != null && _thread.IsAlive && Thread.CurrentThread != _thread) _thread.Join((int)ReadTimeoutMs * 3);
+            if (_dev != IntPtr.Zero) { try { libusb_release_interface(_dev, 0); libusb_close(_dev); } catch { } _dev = IntPtr.Zero; }
+        }
         if (_usb != IntPtr.Zero) { try { WinUsb_Free(_usb); } catch { } _usb = IntPtr.Zero; }
         _file?.Dispose(); _file = null;
+        _thread = null;
+        _backend = Backend.None;
         _open = false;
     }
 
@@ -324,7 +506,7 @@ public partial class SmsGcAdapter : Node
         if (!_open || !RumbleAllowed || port < 0 || port >= Ports) return;
         var cmd = new byte[] { 0x11, 0, 0, 0, 0 };
         cmd[1 + port] = (byte)(on ? 1 : 0);
-        WinUsb_WritePipe(_usb, EpOut, cmd, 5, out _, IntPtr.Zero);
+        Write(cmd, out _);
     }
 
     // ---- Windows ---------------------------------------------------------------------------------------------------------------------------------
@@ -438,4 +620,27 @@ public partial class SmsGcAdapter : Node
     [DllImport("winusb.dll", SetLastError = true)] private static extern bool WinUsb_ReadPipe(IntPtr h, byte pipeId, byte[] buffer, uint length, out uint transferred, IntPtr overlapped);
     [DllImport("winusb.dll", SetLastError = true)] private static extern bool WinUsb_WritePipe(IntPtr h, byte pipeId, byte[] buffer, uint length, out uint transferred, IntPtr overlapped);
     [DllImport("winusb.dll", SetLastError = true)] private static extern bool WinUsb_SetPipePolicy(IntPtr h, byte pipeId, uint policyType, uint valueLength, ref uint value);
+
+    // ---- libusb-1.0 (macOS, Linux; 265) -- the synchronous API, as Dolphin's GCAdapter uses it -------------------------------------------------------
+    private const int LIBUSB_ERROR_TIMEOUT = -7, LIBUSB_ERROR_INTERRUPTED = -10;
+    /// <summary>libusb_device_descriptor: the USB device descriptor's 18 bytes (every field on its natural alignment).</summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct LibUsbDeviceDescriptor
+    {
+        public byte bLength, bDescriptorType; public ushort bcdUSB; public byte bDeviceClass, bDeviceSubClass, bDeviceProtocol, bMaxPacketSize0;
+        public ushort idVendor, idProduct, bcdDevice; public byte iManufacturer, iProduct, iSerialNumber, bNumConfigurations;
+    }
+    [DllImport(LibUsb)] private static extern int libusb_init(out IntPtr ctx);
+    [DllImport(LibUsb)] private static extern void libusb_exit(IntPtr ctx);
+    [DllImport(LibUsb)] private static extern nint libusb_get_device_list(IntPtr ctx, out IntPtr list);
+    [DllImport(LibUsb)] private static extern void libusb_free_device_list(IntPtr list, int unrefDevices);
+    [DllImport(LibUsb)] private static extern int libusb_get_device_descriptor(IntPtr dev, out LibUsbDeviceDescriptor desc);
+    [DllImport(LibUsb)] private static extern int libusb_open(IntPtr dev, out IntPtr handle);
+    [DllImport(LibUsb)] private static extern void libusb_close(IntPtr handle);
+    [DllImport(LibUsb)] private static extern int libusb_set_auto_detach_kernel_driver(IntPtr handle, int enable);
+    [DllImport(LibUsb)] private static extern int libusb_claim_interface(IntPtr handle, int interfaceNumber);
+    [DllImport(LibUsb)] private static extern int libusb_release_interface(IntPtr handle, int interfaceNumber);
+    [DllImport(LibUsb)] private static extern int libusb_interrupt_transfer(IntPtr handle, byte endpoint, byte[] data, int length, out int transferred, uint timeoutMs);
+    [DllImport(LibUsb)] private static extern IntPtr libusb_error_name(int code);
+    [DllImport(LibUsb)] private static extern IntPtr libusb_strerror(int code);
 }
