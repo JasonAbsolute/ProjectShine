@@ -16328,3 +16328,32 @@ darker, as it does on the GameCube.
 0.42 / 0.3) from x 14.3 to the foot at 15.96, then off it; the wall: 2.38 m down to the floor and dead there; a stream on one spot: 235 landings, 119 merges,
 one puddle at most. Hillside with a wall between the camera and Mario: occluded, the alpha 37.5 of 128 after a second and 110 after five, the overlay on
 12 of 12 meshes, the spray's silhouette pass on; the wall gone: 110 -> 59 in two seconds, off, the overlays gone. Shots in `water263/shots/`.
+
+### 264 -- King Boo's fight in its own scene (KingBooFight.tscn), and a Test poster for the test level (feature/kingboo-casino, code `214de34`)
+
+**Jaysonn:** "make one more level called test. which holds the level we have been testing everyhitng in and make sure the king boo fight (normal) lives in
+its own scene".
+
+**The fight scene** -- `assets/Sms/Enemy/BossTelesa/KingBooFight.tscn` (new): a level scene rooted on `Level.cs` (StageName "Casino Delfino", ScenarioName
+"King Boo Down Below", ShowGoText off: the room has no GO!), `KingBooArena.tscn` (the casino room: the slot, the three roulettes, King Boo, the wall; 153 and
+on) instanced at the origin, a `PlayerSpawner` at (3.80, 12.20, 1.43) -- the old test-level spawn (3.80, 49.34, 182.16) minus the arena's old offset
+(0, 37.14, 180.73), so the boss's FallDemo intro (the ride down on the disc, then the slot) still fires from the same place over the room -- the test
+level's sky, tonemap and sun, and an `SmsDeathPlane` at y -30 as a safety net (the game's delfinoBoss map.col has no death plane; its wall runs 1500 units
+under the table). The Level Select's King Boo poster (`assets/levels/KingBooEntry.tres`) now loads this scene instead of Level.tscn.
+
+**The test level** -- `assets/Level.tscn`: the KingBooArena instance (and its ext_resource) is gone; Mario's spawn is back on the Plaza at (0, 5.46, 20.64),
+where it stood before the fight moved in (153). Nothing else in it changed: the Cataquacks, the fruit, the crates, the 1-up tower, the secret-course doors
+are as they were. It is the fifth poster, "Test" -- `assets/levels/TestEntry.tres` (ScenePath res://assets/Level.tscn, the Shine stroke, a yellow paint),
+listed last in `assets/LevelSelect.tscn`: Ricco Tower, Hillside Cave, King Boo, Rematch, Test.
+
+**The art** -- `Font/LevelSelect/name_test.png` ("TEST" along the arc in a pastel yellow, 242's lettering: `kingboo264/gen_art264.py` on
+`select242/gen_art242.py`) and `art_test.png` (a 512 square of the drive's Plaza shot: Mario among the Cataquacks, the 1-up tower, the pineapple, the crate;
+the HUD hidden for the photo), with their .import files. No C# changed.
+
+**Verified** (`kingboo264/kingboo264.gd`, windowed 27/27): the Level Select shows five posters, Test fifth and King Boo third, the hand starting under the
+first (read off the poster's modulate: `CharacterPoster` keeps its highlight private, and its 1.06 scale is reset by the HBoxContainer's first layout
+pass -- a tiny pre-existing thing: the first poster is not scaled up until the hand moves) and four stick pushes putting it under Test; A on Test loads
+res://assets/Level.tscn with Mario on the Plaza (y 2.9) and no BossTelesa, Roulette00 or KingBooArena anywhere in it; KingBooFight.tscn loads with Mario at
+PlayerSpawner/Mario, BossTelesa, the wall and three roulettes, FLUDD on, the death plane active; the intro runs 1 -> 2 -> 0 (659 + 180 ticks), Mario
+camera-locked through the ride, y 24.8 -> -1.8, the fight camera the room's DEFINITE_D2 kind (18), King Boo appearing 3.3 s after, no death; back on the
+Level Select the hand is under King Boo and A loads the fight's own scene, the way back `GameData.LevelSelectScene`. Shots in `kingboo264/shots/`.
