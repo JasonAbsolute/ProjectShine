@@ -47,6 +47,11 @@ public partial class LevelSelect : Control
     /// <summary>Cancel (B / Escape) goes back to this scene; empty = no way back from here.</summary>
     [Export(PropertyHint.File, "*.tscn")] public string BackScene = "res://assets/CharacterSelect.tscn";
 
+    /// <summary>266: where a level picked here goes when it is DONE -- its Shine's exit, the pause menu's Exit Area, the game over's Continue (each
+    /// when it has no destination of its own). The Player Select by default: the demo's round is character -> level -> play -> character -> level.
+    /// Empty = back to this screen. The hand still lands under the level just left when this screen comes round again (GameData.ReturnFromScene).</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string AfterLevelScene = "res://assets/CharacterSelect.tscn";
+
     /// <summary>251b (Jaysonn: "the sound of when you pick yes or no for dialog option box as the sound it makes picking the levels"): the player that
     /// clicks when the hand moves to another level -- the talk balloon's yes / no cursor, MSD_SE_SY_E3_MENU_CURSOR (Sfx/Move). Swap its stream for
     /// another System sound (SELECT_COMMON is the yes / no pick itself). Empty = silent.</summary>
@@ -271,7 +276,12 @@ public partial class LevelSelect : Control
         }
 
         if (GameData.Instance != null)
-            GameData.Instance.LevelSelectScene = SceneFilePath;   // the level's way back: a Shine's exit / the Exit Area with no destination of their own
+        {
+            GameData.Instance.LevelSelectScene = SceneFilePath;   // the Level Select he picked this level on
+            // 266: the level's way back -- a Shine's exit / the Exit Area / the game over's Continue with no destination of their own: the
+            // AfterLevelScene knob (the Player Select: the demo's round), or this screen when it is empty
+            GameData.Instance.AfterLevelScene = SmsReturnSpot.ScenePath(AfterLevelScene);
+        }
         if (ConfirmSound != null && ConfirmSound.Stream != null) ConfirmSound.Play();   // 251b / 251c: A -- a talk box comes up (TALK_MODE_IN)
         GD.Print($"LevelSelect: {entry.DisplayName} -> {dest}");
 

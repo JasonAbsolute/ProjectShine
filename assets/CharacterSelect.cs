@@ -91,7 +91,13 @@ public partial class CharacterSelect : Control
             Highlight(0);
         }
 
+        // 266: this screen is a finished level's way back now (the Level Select's AfterLevelScene): a Shine's exit leaves ReturnFromScene for the
+        // Level Select's hand (the poster of the level just left) and ReturnWithShine for its fade from the Shine demo's white -- the white is spent
+        // HERE (FadeInFrom below), so the Level Select, reached through this screen's fade to black, fades in from black as it should
+        if (GameData.Instance != null) GameData.Instance.ReturnWithShine = false;
+
         // SMS pass 127: arriving from the episode select the screen is white (its startWipe(0xf) with the white fader): fade in from it
+        // (266: and from a finished level's last screen -- the Shine demo's white, the Exit Area's or the game over's black)
         if (GameData.Instance != null && GameData.Instance.FadeInFrom.HasValue && _fadeRect != null)
         {
             Color from = GameData.Instance.FadeInFrom.Value;

@@ -88,6 +88,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 25, 10)
 
 [node name="KingBoo" parent="." unique_id=1328069139 instance=ExtResource("5_boo")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, -8)
+ShineExitLevel = true
 
 [node name="BooSpawn" type="Marker3D" parent="." unique_id=1667765807]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 8, -8)

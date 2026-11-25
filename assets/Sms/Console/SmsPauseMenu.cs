@@ -83,7 +83,7 @@ public partial class SmsPauseMenu : CanvasLayer
     [Export] public string ExitAreaScene = "";
     /// <summary>242: where EXIT AREA goes -- the scene's own ExitAreaScene, else the Level Select this level was picked on (GameData.LevelSelectScene);
     /// "" = no EXIT AREA item, as Delfino Plaza's menu.</summary>
-    public string ExitAreaTarget => ExitAreaScene != "" ? ExitAreaScene : (GameData.Instance?.LevelSelectScene ?? "");
+    public string ExitAreaTarget => ExitAreaScene != "" ? ExitAreaScene : (GameData.Instance?.LevelWayBack ?? "");   // 266: the Level Select's way back (its AfterLevelScene, else itself)
     /// <summary>1 = the blo's 480 lines on the window's height.</summary>
     [Export] public float Size = 1.0f;
     [Export] public AudioStreamPlayer PauseOn, CursorMove, NotNow;
@@ -594,6 +594,7 @@ public partial class SmsPauseMenu : CanvasLayer
                 // SMS pass 119: decideNextStage + moveStage without a shine: the next level starts him at its return spot for this one
                 GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
                 GameData.Instance.ReturnWithShine = false;
+                GameData.Instance.FadeInFrom = Colors.Black;   // 266: the screen is the fader's black; the select screen fades in from it (the Player Select has no fade of its own)
             }
             GetTree().ChangeSceneToFile(SmsReturnSpot.ScenePath(ExitAreaTarget));
         }

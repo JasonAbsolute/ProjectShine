@@ -15601,7 +15601,7 @@ public partial class Mario : CharacterBody3D
         {
             GameData.Instance?.RestoreFromSave(); // TFlagManager::restore()
             dest = SmsReturnSpot.ScenePath(GameOverContinueScene);
-            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelSelectScene);
+            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelWayBack);   // 266: the Level Select's AfterLevelScene (the Player Select), else the Level Select
             if (dest == "") dest = title;
         }
         if (GameData.Instance != null)
@@ -15609,6 +15609,7 @@ public partial class Mario : CharacterBody3D
             GameData.Instance.Lives = -1;
             GameData.Instance.CameFromMiss = false;
             GameData.Instance.ReturnFromScene = null; GameData.Instance.ReturnWithShine = false;
+            GameData.Instance.FadeInFrom = Colors.Black;   // 266: the card save's black mask is the screen; the select screen fades in from it
         }
         if (dest == "") dest = ProjectSettings.GetSetting("application/run/main_scene").AsString();
         if (SmsDebugPrint)
@@ -20620,7 +20621,7 @@ public partial class Mario : CharacterBody3D
         {
             string dest = SmsReturnSpot.ScenePath(shine.ExitScene);   // 119b: the editor saves the File export as uid://, resolved to the path
             if (dest == "") dest = SmsReturnSpot.ScenePath(SmsFluddModel.FindChild<SmsPauseMenu>(this)?.ExitAreaScene);
-            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelSelectScene);   // 242: the Level Select he picked this level on stands in for the stage he would return to
+            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelWayBack);   // 242 / 266: the Level Select's way back (its AfterLevelScene -- the Player Select -- else itself) stands in for the stage he would return to
             if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s behind the white: moveStage -> {(dest != "" ? dest : "this level again (the Plaza's decideNextStage)")}");
             EmitSignal(SignalName.SmsShineGetExit, dest);
             if (GameData.Instance != null)
@@ -20629,6 +20630,9 @@ public partial class Mario : CharacterBody3D
                 // this one, with the shine pose; no spot for it = the plain start, as the Plaza's own reload
                 GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
                 GameData.Instance.ReturnWithShine = true;
+                // 266: the screen is the demo's white (SmsShineGetFadeColor); a select screen the way back lands on fades in from it (the Level
+                // Select did that on its own from ReturnWithShine; the Player Select reads FadeInFrom). A level reloaded instead starts its own way.
+                if (dest != "") GameData.Instance.FadeInFrom = SmsShineGetFadeColor;
             }
             if (dest != "") GetTree().ChangeSceneToFile(dest); else GetTree().ReloadCurrentScene();
             return;

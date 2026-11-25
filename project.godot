@@ -15,7 +15,7 @@ compatibility/default_parent_skeleton_in_mesh_instance_3d=true
 [application]
 
 config/name="ProjectShine"
-run/main_scene="res://assets/Level.tscn"
+run/main_scene="res://assets/CharacterSelect.tscn"
 config/features=PackedStringArray("4.7", "C#", "Forward Plus")
 boot_splash/show_image=false
 boot_splash/image="uid://d3enyfqepubhr"
