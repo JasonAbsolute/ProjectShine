@@ -12,6 +12,9 @@ using Godot;
 /// (and the game's football) answers back: Mario freezes 2 frames (mKickFreezeTime) and nothing else; the pickup stays B (a TAKE). The body's
 /// own bounce / roll (the PhysicsMaterial profile below) is this port's, not the game's ball physics. LEGACY RETIRED: the durian-only kick
 /// (Kick* exports: read by nothing, kept so the scenes load).
+/// Pass 234: the ROLL is at the game's rate (SmsRollLikeTheGame: |vxz| / (the game's body radius x Size) x 2 radians a tick, as calcCurrentMtx), and the
+/// red pepper rolls like every other fruit -- the "SMS quirk: it never spins" lock this file carried was not in the game (TMapObjBall::calcCurrentMtx has
+/// no type check; the casino's peppers are TResetFruit of the RedPepper data, rolled like the rest).
 /// Pickup is B only: Mario's SmsFindTakeTarget (the game's canTake: the hit cylinders overlap within 80 + the fruit's radius,
 /// within 60 degrees of his face) looks through the "pickable" group while B is held. No auto-pickup on contact.
 /// Durian is the exception — it cannot be carried, only kicked.
@@ -95,15 +98,10 @@ public partial class Fruit : RigidBody3D
 			AddToGroup("pickable");
 		}
 		SmsBallSetup();
-
-		// Red Pepper: SMS quirk — it never spins when thrown or kicked. Lock all
-		// angular axes at the physics-server level and snap rotation to identity.
-		if (Type == FruitType.RedPepper)
-		{
-			LockRotation = true;
-			Rotation = Vector3.Zero;
-			AngularVelocity = Vector3.Zero;
-		}
+		// (Pass 234: the red pepper's "SMS quirk -- it never spins when thrown or kicked" LockRotation went: the game has no such rule. TMapObjBall::calcCurrentMtx
+		// (MapObjBall.cpp 318) rolls the model of EVERY ball object whose velocity is over the min speed, with no type check, and the casino's peppers are
+		// TResetFruit of the RedPepper data (scene.bin class ResetFruit) -- they tumble out of King Boo's mouth like the coconuts. Under the ball sim the lock
+		// was a no-op anyway (the sim rolls the model child, not the body); with SmsBallPhysics off the pepper now spins under Godot's physics like the rest.)
 
 		ApplyPhysicsProfile();
 	}
@@ -209,7 +207,7 @@ public partial class Fruit : RigidBody3D
 				Mass = 0.3f;
 				GravityScale = 0.4f; // very floaty
 				LinearDamp = 1.2f;
-				AngularDamp = 0.0f; // n/a (rotation locked)
+				AngularDamp = 0.5f; // 234: it spins now (the lock went); a little damping so a kicked one settles
 				bounce = 0.15f;
 				friction = 0.5f;
 				break;
@@ -305,6 +303,16 @@ public partial class Fruit : RigidBody3D
 	[Export] public bool SmsHitScaleFromModel { get; set; } = true;
 	/// <summary>The hit cylinders' scale (see SmsHitScaleFromModel).</summary>
 	public float SmsHitScale => SmsHitScaleFromModel && _bGeomR > 0f ? _bGeomR * SmsUnits.UnitsPerMetre / _ball.BodyRadius : Size;
+	/// <summary>Pass 234 (Jaysonn 2026-11-18: "when king boo spits fruit out they don't rotate? or maybe the chili pepper doesn't?"): the ROLL turns the model at
+	/// the GAME's rate -- TMapObjBall::calcCurrentMtx (MapObjBall.cpp 318-337): |vxz| / (mBodyRadius x the scale) x 2 radians a tick about the axis across the
+	/// motion, the body radius the game's per type (coconut / papaya 40, durian 45, pepper / pine / banana 50 units; the casino's spit scale 1.5), whatever size
+	/// the model is. false = passes 115-233's: the collision SPHERE's radius -- your models being about half the game's, that spun them 1.3-2.2x faster than the
+	/// game's (the durian 12 turns a second out of King Boo's mouth: a blur that read as no spin at all).</summary>
+	[Export] public bool SmsRollLikeTheGame { get; set; } = true;
+	/// <summary>The roll's radius, metres (see SmsRollLikeTheGame).</summary>
+	public float SmsRollRadius => SmsRollLikeTheGame ? SmsUnits.UnitsToMetres(_ball.BodyRadius * Size) : _bGeomR;
+	/// <summary>The roll's turn for a tick at a horizontal speed (units a tick), radians: the game's dist / R x 2.</summary>
+	public float SmsRollAnglePerTick(float speedUnits) => SmsUnits.UnitsToMetres(speedUnits) / Mathf.Max(0.01f, SmsRollRadius) * 2f;
 	/// <summary>keepDistance's hold-off radius about the axis, units: the scaled damage radius + Mario's 50.</summary>
 	public float SmsHoldOffRadiusU => _ball.DamageRadius * SmsHitScale + SmsParams.Mario.KeepDistanceRadius;
 	/// <summary>DEVIATION knob (pass 115): true = this fruit answers Mario's body the way the game's DURIAN does (a run-in pushes it, a rising jump
@@ -501,7 +509,7 @@ public partial class Fruit : RigidBody3D
 			Vector3 axis = Vector3.Up.Cross(dir);                                 // getVerticalVecToTargetXZ: the direction turned +90 deg about Y = up x d, WORLD space
 			if (axis.LengthSquared() > 1e-8f)
 			{
-				float ang = SmsUnits.UnitsToMetres(sp) / _bGeomR * 2f;           // his sphere's radius: the model rolls (x2, the game's own factor)
+				float ang = SmsRollAnglePerTick(sp);                                   // 234: the game's radius (SmsRollLikeTheGame; off = his sphere's), x2 the game's own factor
 				// calcCurrentMtx concatenates the roll in WORLD space (MTXConcat(rot, anmMtx)); the model child's Basis is in the BODY's frame, and the
 				// body keeps whatever orientation it last had (Mario's hand at a throw: the sim moves GlobalPosition only) -- so the axis goes through
 				// the body's inverse basis (pass 115c: a thrown fruit spun about a yawed axis)

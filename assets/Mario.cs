@@ -144,8 +144,13 @@ public partial class Mario : CharacterBody3D
     [Export]
     public int StartingLives = 4;
     private int _lives;
-    /// <summary>Where a miss with no life left goes (the game: the save / title flow). Empty: the stage reloads with the lives reset.</summary>
-    [Export] public string GameOverScene = "";
+    /// <summary>262: an OVERRIDE -- where a miss with no life left goes instead of the game's game-over dialog. Empty (the default): the game's flow --
+    /// the card save's "Continue / Return to Title Screen" window over the black screen (SmsCardSave PURPOSE_GAME_OVER); Continue restores the
+    /// save and goes to <see cref="GameOverContinueScene"/>, Return to Title Screen to the card save's TitleScene (the Player Select).</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string GameOverScene = "";
+    /// <summary>262: where the game over's "Continue" goes -- the game's Delfino Plaza with the saved progress (MarDirectorDirect.cpp 386: the flags
+    /// restored, stage 1). Empty: the Level Select this course was picked on (GameData.LevelSelectScene), else the title.</summary>
+    [Export(PropertyHint.File, "*.tscn")] public string GameOverContinueScene = "";
     /// <summary>The miss jingle's slot (the game starts a BGM as the Miss state begins and waits for it before the stage moves). 213: filled by his sound
     /// node with MSD_BGM_MISS (k_miss.com, 4.5 s) on the Music bus when empty.</summary>
     [Export] public AudioStreamPlayer MissJingle;
@@ -285,6 +290,25 @@ public partial class Mario : CharacterBody3D
     // S2: the tank and the spray (see SmsFluddGunExecTick)
     private SmsWaterDrops _fluddDrops;                             // TModelWaterManager
     private readonly Skeleton3D[] _fluddNozzleSkel = new Skeleton3D[4];
+
+    // 263: TSilhouette (MarioUtil/DrawUtil.cpp) -- Mario drawn through the map as a flat silhouette while the camera's view of him is blocked
+    [ExportGroup("SMS (263): the silhouette through the map")]
+    /// <summary>Off = no silhouette: hidden behind the map he is simply hidden.</summary>
+    [Export] public bool SmsSilhouette = true;
+    /// <summary>The stage's silhouette colour (gpSunMgr->getSilhouetteColor(); TSilhouette::load's default (0, 0x27, 0x77), a deep blue). The alpha is the
+    /// silhouette's own, below.</summary>
+    [Export] public Color SmsSilhouetteColor = new Color(0f, 0x27 / 255f, 0x77 / 255f);
+    /// <summary>mOccludedAlpha: the alpha (of 255) the silhouette chases while he is hidden (128); 0 once he is seen again.</summary>
+    [Export(PropertyHint.Range, "0,255")] public float SmsSilhouetteOccludedAlpha = 128f;
+    /// <summary>mAlphaApproachRate: the share of the gap closed each game frame (30 a second): 0.01 -- a slow fade in and out (a third of the way in a second).</summary>
+    [Export(PropertyHint.Range, "0.001,1")] public float SmsSilhouetteApproachRate = 0.01f;
+    [ExportGroup("")]
+    private float _smsSilAlpha;                                      // mSilhouetteAlpha, 0..255
+    private ShaderMaterial _smsSilMat;
+    private bool _smsSilOn;
+    /// <summary>263, for the drives: the silhouette's alpha (0..255) and whether its material is on his meshes.</summary>
+    public float SmsSilhouetteAlpha => _smsSilAlpha;
+    public bool SmsSilhouetteOn => _smsSilOn;
     private readonly int[][] _fluddMuzzleBone = new int[4][];     // null_G_muzzle (and the hover's null_G_muzzle2)
     private int _fluddWater = SmsParams.Fludd.Spray.AmountMax;    // mCurrentWater
     private int _fluddPressure = 0;                               // mCurrentPressure: R x 150
@@ -973,6 +997,7 @@ public partial class Mario : CharacterBody3D
     // timers for climb/hopup
     private float ledgeClimbT = 0f;
     private float ledgeClimbDur = 0.55f; // will auto-fill from animation if found
+    private float ledgeHopDur = 0.35f;   // 257: the hop's length, ma_hgjmp's (auto-filled); the climb's is ma_hgup's
 
     // TUNING (these are "world units" — adjust once and you're done)
     // --- LEDGE GRAB (scaled) ---
@@ -983,8 +1008,7 @@ public partial class Mario : CharacterBody3D
     private const float LEDGE_STAND_UP = 0.004443f; // 0.01 * SCALE_FIX
     private const float LEDGE_STAND_FORWARD = 0.444264f; // 1.0 * SCALE_FIX
 
-    private const float LEDGE_HOP_UP_VEL = 17.770573f; // 40 * SCALE_FIX
-    private const float LEDGE_HOP_FWD_SPEED = 7.996758f; // 18 * SCALE_FIX
+    // (257: the hop's launch constants LEDGE_HOP_UP_VEL 17.77 / LEDGE_HOP_FWD_SPEED 8.0 are gone -- HANG_JUMPING is ma_hgjmp played in place, like ASCEND's ma_hgup)
 
     private const int LEDGE_REGRAB_COOLDOWN_FRAMES = 10;
     private int ledgeRegrabCooldown = 0;
@@ -1769,6 +1793,14 @@ public partial class Mario : CharacterBody3D
         // underneath them - which is why Luigi's eyes never closed.
         if (Profile != null)
             ApplyProfile(Profile);
+        // 258: the colour picked on the Player Select, over the profile's body (before the eyes and the body overlay cache the materials)
+        var pickedColor = GameData.Instance?.SelectedColorEntry;
+        if (pickedColor?.BodyTexture != null)
+        {
+            int n = ApplyBodyTexture(pickedColor.BodyTexture, pickedColor.BodyTextureMatch);
+            if (SmsDebugPrint)
+                GD.Print($"[SMS color] '{pickedColor.DisplayName}' ({pickedColor.BodyTexture.ResourcePath.GetFile()}) on {n} body surfaces");
+        }
 
         //Setting up anything related to sleeping
         SetupSleeping();
@@ -1810,6 +1842,9 @@ public partial class Mario : CharacterBody3D
         var hgup = animPlayer.GetAnimation(SmsNames.Of("ma_hgup"));
         if (hgup != null)
             ledgeClimbDur = (float)hgup.Length;
+        var hgjmp = animPlayer.GetAnimation(SmsNames.Of("ma_hgjmp"));
+        if (hgjmp != null)
+            ledgeHopDur = (float)hgjmp.Length;   // 257: HANG_JUMPING runs for ma_hgjmp's length, as ASCEND runs for ma_hgup's
 
         if (hangAnchor == null)
             GD.PushError(
@@ -3046,11 +3081,11 @@ public partial class Mario : CharacterBody3D
             wasOnFloor = false;
             return;
         }
-        if (UseSmsPhysics && IsOnFloor() && (stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb))
+        if (UseSmsPhysics && IsOnFloor() && (stateOfMario == MarioState.ledgeHang || stateOfMario == MarioState.ledgeClimb || stateOfMario == MarioState.ledgeHopUp))
         {
             // Entered from the top (DESCEND): pinned states never call MoveAndSlide, so IsOnFloor() is still the stale true
             // of the last step on the platform and the grounded branch would stand him up. Same handling as the airborne
-            // branch gives a hang that started in the air.
+            // branch gives a hang that started in the air. 257: the hop (HANG_JUMPING) is pinned like the climb.
             if (stateOfMario == MarioState.ledgeHang)
             {
                 TickLedgeHang(delta, LstickVec);
@@ -3058,7 +3093,7 @@ public partial class Mario : CharacterBody3D
                 wasOnFloor = false;
                 return;
             }
-            bool climbDone = TickLedgeClimb(delta);
+            bool climbDone = stateOfMario == MarioState.ledgeHopUp ? TickLedgeHop(delta) : TickLedgeClimb(delta);
             Velocity = Vector3.Zero;
             wasOnFloor = climbDone;
             return;
@@ -4156,8 +4191,12 @@ public partial class Mario : CharacterBody3D
 
             if (stateOfMario == MarioState.ledgeHopUp)
             {
-                // hop-up behaves like airborne after the initial impulse
-                // (gravity already applies because we don't skip it for ledgeHopUp)
+                // 257: HANG_JUMPING is pinned at the ledge while ma_hgjmp plays (hangJumping(): waitProcess, the clip, WAIT at its end), the
+                // same as the climb -- no gravity, no MoveAndSlide (the vault's launch is gone)
+                bool hopDone = TickLedgeHop(delta);
+                Velocity = Vector3.Zero;
+                wasOnFloor = hopDone;
+                return;
             }
 
             // try to START a ledge grab if we're not already doing ledge stuff
@@ -5194,6 +5233,7 @@ public partial class Mario : CharacterBody3D
 
     public override void _Process(double delta)
     {
+        SmsSilhouetteTick(delta); // 263: TSilhouette -- his silhouette through the map while the camera's view of him is blocked
         UpdateStepVisual((float)delta);
         UpdateRunBob((float)delta);
         UpdateHeadLock((float)delta);
@@ -7662,29 +7702,65 @@ public partial class Mario : CharacterBody3D
         }
     }
 
-    /// <summary>HANG_JUMPING: the vault onto the ledge (the port's hop, kept).</summary>
+    /// <summary>HANG_JUMPING (MarioSpecial.cpp 457 / 582 / 629): A on the ledge (or a floor within 100 u below the hang) -- the quick hop up. In the
+    /// game it is ANIM_HGJMP played where he hangs with waitProcess() under it (no launch, no velocity: the clip itself carries the body up
+    /// over the edge) and WAIT on its last frame, the same shape as ASCEND's ma_hgup. Until 257 the port fired a LAUNCH here instead
+    /// (vy 17.8 m/s, 8 m/s forward: a single-jump's height out of a hang, "flung onto the platform"); now the hop is the pinned,
+    /// animation-driven move the climb is (TickLedgeHop: XZ eased from the hang to the stand spot over ma_hgjmp's length, Y pinned). The
+    /// exert voice (MSD_SE_MV15_EXERT_INST_01) plays on the way in.</summary>
     private void SmsLedgeVault(string why)
     {
         if (SmsDebugPrint)
-            GD.Print($"[SMS ledge] vault ({why})");
+            GD.Print($"[SMS ledge] hop up: HANG_JUMPING, ma_hgjmp ({why})");
         _smsHangMovingAnim = false;
         animPlayer.SpeedScale = 1f;
+        SmsPlaySlot(ExertVoice);   // startVoice(MSD_SE_MV15_EXERT_INST_01), the take's grunt
         stateOfMario = MarioState.ledgeHopUp;
         SetMarioState(stateOfMario);
-        Vector3 fwdOntoLedge = -ledgeWallNormal;
-        // start from the wall face, not the hang anchor 0.34 m inside the wall, or the depenetration shoves him; and refresh
-        // the floor state (stale while pinned) so the next frame runs the airborne branch
-        Vector3 outXZ = ledgeHangPos + ledgeWallNormal * (capRadiusWorld + 0.02f);
-        GlobalPosition = new Vector3(outXZ.X, ledgeHangPos.Y, outXZ.Z);
-        Velocity = Vector3.Zero;
-        MoveAndSlide();
+        ledgeClimbT = 0f;
         velocity = Vector3.Zero;
-        velocity.Y = LEDGE_HOP_UP_VEL;
-        velocity.X = fwdOntoLedge.X * LEDGE_HOP_FWD_SPEED;
-        velocity.Z = fwdOntoLedge.Z * LEDGE_HOP_FWD_SPEED;
+        Velocity = Vector3.Zero;
+    }
+
+    /// <summary>hangJumping(): one frame of the hop. Pinned at the hang like the climb (TickLedgeClimb), ma_hgjmp playing, the body eased from
+    /// the hang spot to the stand spot over the clip's length (the game's clip carries the root; the port's visual-root lock keeps the clip in
+    /// place, so the body is moved here as the climb's is); B lets go into the passive drop (mInput &amp; 0x4 -> LAND_SAFE_DOWN); the last frame =
+    /// WAIT. True when done.</summary>
+    private bool TickLedgeHop(double delta)
+    {
+        if (!UpdateLedgePlatformPositions())
+        {
+            ExitLedgeHangToFall();
+            return false;
+        }
+        velocity = Vector3.Zero;
+        if (UseSmsPhysics && Input.IsActionJustPressed(SmsNames.Of("button_b")))
+        {
+            SmsHangLetGo(false, "B during the hop");
+            return false;
+        }
+        LockArmatureVisualRoot();
+        ledgeClimbT += (float)delta;
+        float dur = ledgeHopDur > 0.01f ? ledgeHopDur : 0.35f;
+        float t = Mathf.Clamp(ledgeClimbT / dur, 0f, 1f);
+        float s = t * t * (3f - 2f * t);
+        Vector3 lerpedPos = ledgeHangPos.Lerp(ledgeStandPos, s);
+        GlobalPosition = new Vector3(lerpedPos.X, ledgeHangPos.Y, lerpedPos.Z);
+        armature.Rotation = new Vector3(0f, BaseYawFromDir(-ledgeWallNormal), 0f);
+        if (t < 1f)
+            return false;
         ledgePinned = false;
         _ledgePlatformBody = null;
         ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
+        stateOfMario = MarioState.idle;
+        animPlayer.Play(SmsNames.Of("ma_wait"));
+        SetMarioState(stateOfMario);
+        LockArmatureVisualRoot();
+        velocity = Vector3.Zero;
+        Velocity = Vector3.Zero;
+        landingEnteredThisContact = true;
+        suppressLandingFrames = 2;
+        return true;
     }
 
     /// <summary>hanging(): one frame of the hang. Runs after the pin; returns having set the animation.</summary>
@@ -9615,23 +9691,10 @@ public partial class Mario : CharacterBody3D
             return;
         }
 
-        // A = quick get up / hop
+        // A = quick get up / hop (257: the animated hop, the same on both physics paths)
         if (Input.IsActionJustPressed(SmsNames.Of("button_a")))
         {
-            // play hop anim and give impulse
-            stateOfMario = MarioState.ledgeHopUp;
-            SetMarioState(stateOfMario);
-
-            // hop upward + forward onto ledge (uses current rotated wall normal)
-            Vector3 fwdOntoLedge = -ledgeWallNormal; // onto platform
-            velocity = Vector3.Zero;
-            velocity.Y = LEDGE_HOP_UP_VEL;
-            velocity.X = fwdOntoLedge.X * LEDGE_HOP_FWD_SPEED;
-            velocity.Z = fwdOntoLedge.Z * LEDGE_HOP_FWD_SPEED;
-
-            ledgePinned = false;
-            _ledgePlatformBody = null;
-            ledgeRegrabCooldown = LEDGE_REGRAB_COOLDOWN_FRAMES;
+            SmsLedgeVault("A");
             return;
         }
     }
@@ -11290,6 +11353,44 @@ public partial class Mario : CharacterBody3D
         }
     }
 
+    /// <summary>258: the alternate colour picked on the Player Select (GameData.SelectedColorEntry, a CharacterColor) -- its body atlas on every
+    /// surface of Mesh_0 whose albedo path contains the colour's BodyTextureMatch ("ma_mdl1_0": the cap, shirt, overalls, shoes, buttons and
+    /// emblem; the eyes and the gloves are other atlases). Over a profile's own body texture when there is one (the override's albedo is read,
+    /// not the mesh's). Runs after ApplyProfile and before anything that caches the body's materials (SetupSleeping, the body overlay's Bind), so
+    /// the eyes' swaps and the damage fog see the coloured body. Public for the Player Select's preview and the drives.</summary>
+    public int ApplyBodyTexture(Texture2D body, string match)
+    {
+        if (body == null || string.IsNullOrEmpty(match))
+            return 0;
+        var mesh = GetNodeOrNull<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
+        if (mesh?.Mesh == null)
+            return 0;
+        int swapped = 0;
+        for (int i = 0; i < mesh.Mesh.GetSurfaceCount(); i++)
+        {
+            var active = (mesh.GetSurfaceOverrideMaterial(i) ?? mesh.Mesh.SurfaceGetMaterial(i)) as StandardMaterial3D;
+            if (active?.AlbedoTexture == null || !active.AlbedoTexture.ResourcePath.Contains(match))
+                continue;
+            var mat = (StandardMaterial3D)active.Duplicate();
+            mat.AlbedoTexture = body;
+            mat.ResourceName = $"{active.ResourceName} ({body.ResourcePath.GetFile()})";
+            mesh.SetSurfaceOverrideMaterial(i, mat);
+            swapped++;
+        }
+        return swapped;
+    }
+
+    /// <summary>The surfaces of Mesh_0 wearing <paramref name="match"/> in their albedo's path right now (for the drives).</summary>
+    public int SmsBodyTextureCount(string match)
+    {
+        var mesh = GetNodeOrNull<MeshInstance3D>("Armature/Skeleton3D/Mesh_0");
+        if (mesh?.Mesh == null) return 0;
+        int n = 0;
+        for (int i = 0; i < mesh.Mesh.GetSurfaceCount(); i++)
+            if (mesh.GetActiveMaterial(i) is StandardMaterial3D std && std.AlbedoTexture != null && std.AlbedoTexture.ResourcePath.Contains(match)) n++;
+        return n;
+    }
+
     private void UpdateCarryRunBlend(float dt)
     {
         // NOTE: AnimationTree activation is now handled by SetMarioState()
@@ -12919,7 +13020,60 @@ public partial class Mario : CharacterBody3D
         if (!_fluddReady || _fluddDrops == null) return;
         int n = SmsUnits.TicksFor(delta, ref _fluddTickAccum);
         _fluddDrops.MarioPos = GlobalPosition;
+        _fluddDrops.LCamera = _camera != null && _camera.IsLCamera;   // 263: unk5D88[1] -- a landing under the L camera keeps fewer puddles
         for (int i = 0; i < n; i++) _fluddDrops.Tick();
+    }
+
+    /// <summary>263: TSilhouette::perform (DrawUtil.cpp 100): each game frame the alpha chases mOccludedAlpha (128) while MARIO_FLAG_OCCLUDED is on (the camera's
+    /// view of him blocked: SunshineCamera.MarioOccluded, its ray from the eye to his waist standing in for the game's framebuffer peek) and 0 otherwise, by
+    /// mAlphaApproachRate (0.01) of the gap -- here per rendered frame scaled to the game's 30 a second. While it is above zero his silhouette material
+    /// (Fx/silhouette.gdshader: the flat colour, drawn only behind what is nearer) rides every mesh under his skeleton as a material_overlay (the body, the
+    /// hands the hand table swaps, FLUDD), and his water joins (SmsWaterDrops.SetSilhouette: drawSilhouette). The director runs the silhouette list only
+    /// while the alpha is above zero or he is occluded (MarDirectorDirect.cpp 170): the same gate.</summary>
+    private void SmsSilhouetteTick(double delta)
+    {
+        if (!SmsSilhouette)
+        {
+            if (_smsSilOn) SmsSilhouetteApply(false);
+            _smsSilAlpha = 0f;
+            _fluddDrops?.SetSilhouette(0f, SmsSilhouetteColor);
+            return;
+        }
+        bool occluded = _camera != null && _camera.MarioOccluded && Visible && stateOfMario != MarioState.dead;
+        float target = occluded ? SmsSilhouetteOccludedAlpha : 0f;
+        float k = 1f - MathF.Pow(1f - Mathf.Clamp(SmsSilhouetteApproachRate, 0.001f, 1f), (float)(delta * 30.0));   // 0.01 of the gap a 30-Hz frame, whatever the frame rate
+        _smsSilAlpha += k * (target - _smsSilAlpha);
+        if (!occluded && _smsSilAlpha < 0.5f) _smsSilAlpha = 0f;   // the fade's tail: gone
+        bool on = _smsSilAlpha > 0f;
+        if (on != _smsSilOn || on) SmsSilhouetteApply(on);
+        _fluddDrops?.SetSilhouette(_smsSilAlpha / 128f, SmsSilhouetteColor);
+    }
+
+    /// <summary>The overlay on (every MeshInstance3D under the skeleton that lacks it: the hands come and go) or off (every one that has it), the colour's alpha set.</summary>
+    private void SmsSilhouetteApply(bool on)
+    {
+        var skel = skeleton ?? GetNodeOrNull<Skeleton3D>("Armature/Skeleton3D");
+        if (skel == null) return;
+        if (on)
+        {
+            if (_smsSilMat == null)
+            {
+                var sh = GD.Load<Shader>("res://assets/Sms/Fx/silhouette.gdshader");
+                if (sh == null) { SmsSilhouette = false; GD.PushWarning("[SMS silhouette] no shader at res://assets/Sms/Fx/silhouette.gdshader: off"); return; }
+                _smsSilMat = new ShaderMaterial { ResourceName = "sms silhouette", Shader = sh };
+            }
+            _smsSilMat.SetShaderParameter("color", new Color(SmsSilhouetteColor.R, SmsSilhouetteColor.G, SmsSilhouetteColor.B, Mathf.Clamp(_smsSilAlpha / 255f, 0f, 1f)));
+            foreach (Node n in skel.FindChildren("*", "MeshInstance3D", true, false))
+                if (n is MeshInstance3D mi && mi.MaterialOverlay != _smsSilMat && mi.Visible) mi.MaterialOverlay = _smsSilMat;
+            if (!_smsSilOn && SmsDebugPrint) GD.Print($"[SMS silhouette] on: hidden from the camera, the silhouette fades in toward {SmsSilhouetteOccludedAlpha:F0}");
+        }
+        else
+        {
+            foreach (Node n in skel.FindChildren("*", "MeshInstance3D", true, false))
+                if (n is MeshInstance3D mi && mi.MaterialOverlay == _smsSilMat) mi.MaterialOverlay = null;
+            if (_smsSilOn && SmsDebugPrint) GD.Print("[SMS silhouette] off");
+        }
+        _smsSilOn = on;
     }
 
     private void SmsFluddTick(double delta)
@@ -12959,7 +13113,10 @@ public partial class Mario : CharacterBody3D
         _fluddKeyN = keyN;
         _fluddAFrame = Input.IsActionJustPressed(SmsNames.Of("button_a")) || Input.IsActionJustPressed(SmsNames.Of("key_space"));
         if (_fluddDrops != null)
+        {
             _fluddDrops.MarioPos = GlobalPosition;
+            _fluddDrops.LCamera = _camera != null && _camera.IsLCamera;   // 263: unk5D88[1]
+        }
         for (int i = 0; i < n; i++)
         {
             SmsFluddUpperTick();
@@ -13841,7 +13998,19 @@ public partial class Mario : CharacterBody3D
 
     /// <summary>MEANING_R, the GC trigger's click at the end of its travel: the button_rclick action when the map has one, else the
     /// pad's full pull (the analog is still the pressure; easing off the click keeps it -- the turbo's charge-then-go).</summary>
-    private bool SmsRClick() => InputMap.HasAction(SmsNames.Of("button_rclick")) ? Input.IsActionPressed(SmsNames.Of("button_rclick")) : _fluddR >= SmsParams.Squat.RClickPull;
+    /// <summary>The R trigger's click: the `button_rclick` action when it is down (the GameCube adapter's real click, 253), else -- while no adapter
+    /// reader is feeding that action (SmsGcAdapter not open: an Xbox pad, the Mayflash in its PC mode, a Mac without the adapter) -- the game's stand-in,
+    /// the trigger pulled past RClickPull. 265: before this the action's mere presence on the map (the autoload adds it on every system) switched the
+    /// stand-in off, so on a Mac, or with any other pad, the click never came.</summary>
+    private bool SmsRClick()
+    {
+        string act = SmsNames.Of("button_rclick");
+        if (InputMap.HasAction(act) && Input.IsActionPressed(act)) return true;
+        bool adapterFeeds = SmsGcAdapter.Instance != null && SmsGcAdapter.Instance.Open;
+        return !adapterFeeds && _fluddR >= SmsParams.Squat.RClickPull;
+    }
+    /// <summary>For drives: SmsRClick as Mario sees it this tick.</summary>
+    public bool SmsRClickNow => SmsRClick();
 
     /// <summary>gunExec() for one tick: the pressure, the nozzle's movement, the refill in water, the emit.</summary>
     private void SmsFluddGunExecTick()
@@ -15332,8 +15501,8 @@ public partial class Mario : CharacterBody3D
     /// miss BGM, and the fader's request -- the death wipe (10, Hx_Test2) 2.2 s on, the iris (2) 2.0 s on for a hell death, or with no
     /// life left the game-over wipe (0xD) 2.0 s on. Once the fader is fully out and the BGM has ended (or 1200 of its frames have passed)
     /// the stage moves: lives left -> the miss flag (0x30002) and decideNextStageOfMiss + moveStage, the same stage from its start with no
-    /// intro and a plain 0.4 s fade in (Level.cs); none left -> the save / title flow (GameOverScene; empty: this stage again, lives
-    /// reset). Mario keeps flying his FIRE_DOWN or lying in his pose meanwhile, as in the game.
+    /// intro and a plain 0.4 s fade in (Level.cs); none left -> the game over's card save (262: the "Continue / Return to Title Screen" window
+    /// on the black screen, SmsGameOverFinish; GameOverScene overrides it). Mario keeps flying his FIRE_DOWN or lying in his pose meanwhile, as in the game.
     /// </summary>
     private void SmsMissTick()
     {
@@ -15377,9 +15546,9 @@ public partial class Mario : CharacterBody3D
         if (!(faded && bgmDone))
             return;
         _smsMissTicks = int.MinValue;
-        SmsActorSound.DemoModeOut("the stage moves"); // 216: the next stage's MSound::initSound restores every category (here before the load: the statics outlive the scene)
         if (_lives >= 0)
         {
+            SmsActorSound.DemoModeOut("the stage moves"); // 216: the next stage's MSound::initSound restores every category (here before the load: the statics outlive the scene)
             if (GameData.Instance != null)
                 GameData.Instance.CameFromMiss = true; // TFlagManager 0x30002: the next load is a miss's
             if (SmsDebugPrint)
@@ -15389,12 +15558,63 @@ public partial class Mario : CharacterBody3D
         }
         if (GameData.Instance != null)
             GameData.Instance.Lives = -1; // a new game's lives next time
-        if (SmsDebugPrint)
-            GD.Print($"[SMS miss] game over -> {(GameOverScene != "" ? GameOverScene : "this stage, lives reset")}");
         if (GameOverScene != "")
-            GetTree().ChangeSceneToFile(GameOverScene);
+        {
+            // his override: straight there
+            SmsActorSound.DemoModeOut("the game over: the override scene");
+            if (SmsDebugPrint)
+                GD.Print($"[SMS miss] game over -> {GameOverScene} (GameOverScene)");
+            GetTree().ChangeSceneToFile(SmsReturnSpot.ScenePath(GameOverScene)); // the editor saves the File export as uid://; resolved
+            return;
+        }
+        // 262: the game's (MarDirectorDirect.cpp 430-438): startWipe(WIPE_FADE_IN, 0.3) -- the fader lets go over 0.3 s under the card save's black
+        // mask -- and STATE_CARD_SAVE with PURPOSE_GAME_OVER: the "Continue / Return to Title Screen" window on the black screen, the game stopped
+        // (startDisappearStar / startDisappearCoin take the HUD's counters off meanwhile: under the mask here, not ported). The quiet (demoModeIn)
+        // holds till the stage moves, as in the game: the card save's sounds are the system's (category 4), which it never muted.
+        SmsCardSave card = SmsCardSave.Current;
+        if (card != null && !card.IsOpen)
+        {
+            _smsFader?.FadeIn(0.3f);
+            if (SmsDebugPrint)
+                GD.Print("[SMS miss] game over: the card save (PURPOSE_GAME_OVER) -- Continue / Return to Title Screen");
+            void OnDone(int next) { card.Finished -= OnDone; SmsGameOverFinish(next); }
+            card.Finished += OnDone;
+            card.Open(SmsCardSave.Purpose.GameOver, pauseTree: true, screenFaded: true);
+            return;
+        }
+        SmsGameOverFinish(1); // no card save in this scene: the title at once
+    }
+
+    /// <summary>262: after the game over's window (TMarDirector::STATE_CARD_SAVE, MarDirectorDirect.cpp 383-407). getNextState 0 = "Continue":
+    /// TFlagManager::restore() (the progress back to the last save: GameData.RestoreFromSave), MSF_UNK30001, and the Plaza (stage 1; the intro stage
+    /// with no shine) -- here <see cref="GameOverContinueScene"/>, else the Level Select this course came from, else the title; 1 = "Return to Title
+    /// Screen": APP_STATE_DONE -- the card save's TitleScene (the Player Select). The lives stay -1 (a new game's next time); the miss's quiet ends as
+    /// the stage moves (the next initSound).</summary>
+    private void SmsGameOverFinish(int next)
+    {
+        SmsActorSound.DemoModeOut(next == 1 ? "the game over: to the title" : "the game over: continue");
+        string title = SmsCardSave.Current?.TitleScene ?? "";
+        string dest;
+        if (next == 1)
+            dest = title;
         else
-            GetTree().ReloadCurrentScene();
+        {
+            GameData.Instance?.RestoreFromSave(); // TFlagManager::restore()
+            dest = SmsReturnSpot.ScenePath(GameOverContinueScene);
+            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelWayBack);   // 266: the Level Select's AfterLevelScene (the Player Select), else the Level Select
+            if (dest == "") dest = title;
+        }
+        if (GameData.Instance != null)
+        {
+            GameData.Instance.Lives = -1;
+            GameData.Instance.CameFromMiss = false;
+            GameData.Instance.ReturnFromScene = null; GameData.Instance.ReturnWithShine = false;
+            GameData.Instance.FadeInFrom = Colors.Black;   // 266: the card save's black mask is the screen; the select screen fades in from it
+        }
+        if (dest == "") dest = ProjectSettings.GetSetting("application/run/main_scene").AsString();
+        if (SmsDebugPrint)
+            GD.Print($"[SMS miss] game over: {(next == 1 ? "Return to Title Screen" : "Continue (the save restored)")} -> {dest}");
+        GetTree().ChangeSceneToFile(dest);
     }
 
     /// <summary>
@@ -20401,6 +20621,7 @@ public partial class Mario : CharacterBody3D
         {
             string dest = SmsReturnSpot.ScenePath(shine.ExitScene);   // 119b: the editor saves the File export as uid://, resolved to the path
             if (dest == "") dest = SmsReturnSpot.ScenePath(SmsFluddModel.FindChild<SmsPauseMenu>(this)?.ExitAreaScene);
+            if (dest == "" && GameData.Instance != null) dest = SmsReturnSpot.ScenePath(GameData.Instance.LevelWayBack);   // 242 / 266: the Level Select's way back (its AfterLevelScene -- the Player Select -- else itself) stands in for the stage he would return to
             if (SmsDebugPrint) GD.Print($"[SMS shine] demo over at {SmsShineGetEndTime:F2} s behind the white: moveStage -> {(dest != "" ? dest : "this level again (the Plaza's decideNextStage)")}");
             EmitSignal(SignalName.SmsShineGetExit, dest);
             if (GameData.Instance != null)
@@ -20409,6 +20630,9 @@ public partial class Mario : CharacterBody3D
                 // this one, with the shine pose; no spot for it = the plain start, as the Plaza's own reload
                 GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
                 GameData.Instance.ReturnWithShine = true;
+                // 266: the screen is the demo's white (SmsShineGetFadeColor); a select screen the way back lands on fades in from it (the Level
+                // Select did that on its own from ReturnWithShine; the Player Select reads FadeInFrom). A level reloaded instead starts its own way.
+                if (dest != "") GameData.Instance.FadeInFrom = SmsShineGetFadeColor;
             }
             if (dest != "") GetTree().ChangeSceneToFile(dest); else GetTree().ReloadCurrentScene();
             return;

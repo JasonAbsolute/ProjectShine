@@ -14173,7 +14173,7 @@ down two not one; the drive's clear now takes the rising ones too -- run ez 68 /
 logs, the shots and the tasks deleted.
 
 **Deviations:** not ported -- `mAnmSound->stop()` and the Yoshi kill (no Yoshi); the NORMAL death's dead demo (the eye held, the fov closing on him over
-343 ticks): a death on the floor keeps its camera as before; no miss jingle (Mario's `MissJingle` slot is empty, for every miss in the port) and the boss
+343 ticks) -- PORTED IN 216 (CtrlNormalDeadDemo; this line stood uncorrected till 262); no miss jingle (Mario's `MissJingle` slot is empty, for every miss in the port) and the boss
 music runs on to the reload. The plane is a flat plane with no edges (the game's is a floor polygon of the death type under him): under this arena
 nothing else is there, so it is the same. The regression and shot drives turn it off (a rim flake, the fake hit's knock off the rim, would reload the
 arena mid-run); the fall drive tests it. The scene's two notes were corrected after the runs (text only: "25 m under the floor's top" -> "about 26 m
@@ -14920,3 +14920,1511 @@ the logs and the tasks deleted. The HUD and death-camera drives were not run: no
 spots stand). The volley's marks come down at most 23.1 m out (was 24.4) -- only a Mario within 2 m of the edge sees the difference. A Boo over the
 void (dropped or landed there) floats in at its march speed rather than vanishing. `StoneRadius` is one number for a round arena; another shape
 would want `StoneRadiusOverride` or a new measure.
+
+### 230 -- the King Boo REMATCH, part 75: the CASINO FIGHT's sounds checked, and every actor sound FADES BY THE GAME'S OWN RULE for it -- a placed Shine's hum is heard within 16 m and gone at 48 m (it hummed across the whole level at half volume), King Boo's DOWN and his vanishes play flat wherever the camera is; the one casino sound the game has and the port lacks is the hover hum, a DSP oscillator voice the baker cannot render (feature/kingboo-rematch, code `65e5d5c`)
+
+**Jaysonn**: "Check which casino-fight sounds are still missing" and "the shine can be heard from the start. should only hear it when close to one or
+when it spawns in".
+
+**The Shine's hum.** 155 gave every actor sound ONE distance curve: full within 1200 u of the camera, a straight fade to silence at 12000 u (161 m, the
+largest of MSHandle's category distances). The game fades each sound by ITS OWN rule (`MSHandle::setSeDistanceVolume` / `calcVolume`): a sound whose
+JAISoundInfo sw bits carry `JAISeSwBit_NoDistanceVolume` (0x2) plays FLAT at any distance; the rest fade from 1200 u to silence at their CATEGORY's
+distance (`smSeCategory` by the id's top digit: enemies, bosses, objects and NPCs 6000 u; FLUDD, Mario and his voice 8000; system 12000; environment
+7000) times the sound's curve factor (sw bits 16-18: 1 = 4/3, 2 = 5/3, 3 = 2, 4 = 3/4, 5 = 1/2, 6 = 1/4, 7 = the category's short range 150 / 500 u).
+`MSD_SE_SHINE_EXIST` (0x81C1: category 8, curve 5) is full within 16 m and GONE at 3600 u = 48 m; the port faded it to 161 m, so a Shine 80 m across
+the level hummed at half volume from the first frame. The bake record (`out154/sms_sfx.json`) carries every SE's sw bits;
+`tools/projectshine/sound154/swbits230_all.py` lists the non-default ones: King Boo's DISAPPEAR, DOWN, ESCAPE, FRUIT_HIT, RLT_DOWN, RLT_SET, THANKYOU
+and V_APPEAR, the Sleepy Boo's EATEN and the Shine's appear chime are FLAT; the box Boo's FIX fades to 102 m (x4/3), the Chain Chomp's REBURN1 to 145 m
+(x2), the Shine's hum to 48 m (x1/2); Mario's voices (x5/3) go through SmsMarioSound, flat by Jaysonn's choice, untouched.
+
+**The fix.** **`assets/Sms/Sound/SmsActorSound.cs`**: `GameDistanceRule` (static, on): `SilentUnitsFor(se)` = the category's distance by the id times
+the curve factor from a table of the non-default sounds (`DistanceCurve`: -1 flat, 1-7 the selector), `FullVolumeUnits` + that fade;
+`DistanceDbFor(se, units)` the game's straight line to silence (-80 dB past it; 0 for a flat sound). `DistanceTick` sets every channel by its OWN sound's
+rule (`SetBase` too, from the last camera distance); `DistanceDb` reports the default-curve value. A sound the table does not know is an enemy's
+(category 2). Off = 155's one curve (`SilentUnits`, still the fallback).
+
+**The casino fight's sounds**, checked against bosstelesa.cpp's every `startSoundActor` and the btelesa / telesa bas tables (155's work stands): the
+laugh, the fruit hit, the down, the vanishes, the thank-you, the spicy fire loop, the three fanfares, the slot's drums (OBJ_SLOT_SPIN, SLT_STOP), the
+discs' three speeds (RLT_MOVE1 / 2 / 3), the intro's rumble and chuckle (RLT_DOWN, RLT_SET, V_LAUGH1B), the clips' own (V_APPEAR, SPICY_HIT, DAMAGE,
+LICK, V_ROLL, BREATHE, V_LAUGH2), the Boo attackers' appear / vanish / crush / fix and the glass break -- all wired. NOT in the port:
+`MSD_SE_EN_TELESA_FLY`, the hover hum of King Boo (btelesa_wait f0, pitch 0.64) and of every Boo (telesa_wait f0) -- bank 0 program 0xF7 is a DSP
+OSCILLATOR voice (`JASBankMgr::noteOnOsc`: a logical channel of type 2 on waveform 7, no sample), which sms_audio.py cannot render; and
+`MSD_SE_BS_TELESA_SLT_LAND`, the slot machine's thump at the appear's frame 78 -- never heard in the game either, the clip being 59 frames long (231
+moves it to a frame the clip has).
+
+**Verified:** the casino drive v231 (deleted before the commit; headless, in the rematch arena): C84 the rule's numbers -- the hum silent at 3600 u,
+the DOWN never, the laugh and the slot's rattle at 6000, the Shine Get chime at 12000, the FIX at 7600, an unknown sound at 6000; the hum 0 dB at
+1000 u, -6.02 at 2400, -80 at 3700; the DOWN 0 dB at 50000 u -- and C85 a ShineSprite placed 70 m from the camera: its hum loop plays at -84 dB (its
+own -4 dB level and -80: silent), moved to 30 m it sits 4.9 dB under its 10-m level (the rule's -4.92), at 10 m at its level and counted audible --
+2 / 2 (run e; runs a-d built the drive). The regression drive 68 / 68 (ga), the shine hud quiet run 8 / 8 (aj). The clean rebuild 0 errors; the
+drive, the logs, the shots and the tasks deleted. The save file is unchanged.
+
+**Deviations:** Mario's own sounds stay flat (154b, Jaysonn's call: the game fades them too). Every other actor sound now fades exactly as the game's
+tables say; a sound not in the bake record (a loop the scripts name by hand) fades as an enemy's.
+
+### 231 -- the King Boo REMATCH, part 76: the CASINO FIGHT touched up -- the slot machine comes up BOLTED to King Boo (no more seconds-long climb after a spit, nor when the tongue is sprayed as he pops up), his body goes WITH the death's burst (a sixth-size body no longer sits there through the wait to the Shine), the fanfare's CONFETTI is the game's (125 squares of 0.8 m raining over the table for 6 s, in frame, no shadows), and the slot machine's landing thump finally fires (feature/kingboo-rematch, code `572614e`)
+
+**Jaysonn**: "king boo model lingers when dying"; "slot machine still struggles to follow king boo -- if mario is spraying king boo's area before he
+pops up he will teleport into the right spot (i think this is how it should be which is good but double check) however the slot will slowly come into
+frame"; "confetti is not right we can barely see it"; "double check that the fight and set pieces are working as should".
+
+**The slot.** The game hangs the machine at (his joint - 700) + mHoseiPosY, and the hosei is left wherever the last SPIT's drop-away took it:
+`TNerveBossTelesaSpitSlotItem` takes 100 u a tick off it from tick 200 to 600 (the port measured -52100 u), nothing resets it, and it only DECAYS back --
+x 0.96 a tick through the appear clip, x 0.99 a tick through the roll (slotStart). So after the first spit the machine comes back on an exponential
+tail: a normal appear lands it seconds late, and the tongue sprayed early in the appear (his collision is on from the appear's first tick, in the game
+too) cuts him to the roll at his rest pose -- the "teleport", the game's own -- while the machine crawls up at x 0.99. **`assets/Sms/Enemy/SmsBossTelesa.cs`**:
+`SlotSnapsAtAppear` (on) zeroes the hosei as the appear begins: the machine rides jnt_body up bolted to it (153h / j's ride) and the roll's cut takes
+it to the seat in the same frame. Off = the game's tail. And the landing: `TNerveBossTelesaAppear` checks frame 78 of btelesa_appear for the shake and
+`MSD_SE_BS_TELESA_SLT_LAND`, but the clip is 59 frames long (its .bck; the glb's 59 keys), so neither ever came -- `SlotLandFrame` (56; 78 = the
+game's, silent) puts the thump and the shake where his body settles onto the machine.
+
+**The death.** btelesa_down ends with jnt_body scaled to 0.15 / 0.11 / 0.17 (the glb's last key) and the game holds that pose through the 240 nerve
+ticks to the Shine, inside the ms_btls_down burst; the port's burst is thinner and the little body showed through it. `HideBodyAtBurst` (on): the
+body (and the ambient effects, the drool) hidden the tick the burst fires -- the down clip's last frame -- and kept hidden through the wait. Off = the
+game's hold.
+
+**The confetti.** 153b's BtlsFubuki.tscn was a cloud of 180 scraps of 0.14 x 0.2 m thrown UP from a 4-m box over the slot for 2.6 s -- hard to see
+from the room's camera. ms_btls_fubuki.jpa (jpa_dump.py): a 900-u circle 2207 u over the STAGE ORIGIN (1707 u, 23 m, over the table's face at y 500)
+rains 1.25 squares a frame for 100 frames, each 60 u (0.8 m), 180 frames of life, falling 15 u a frame at first and drifting at 3.5 once the air
+resistance (0.98 a frame) has them, spinning 9 degrees a frame, opaque with a hard alpha test, white / yellow / red.
+**`assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn`** rebuilt from it: a 12-m ring, 125 pieces of 0.8 m, 6 s (+-30 %), spawned over 3.3 s, the fall
+4.5 m/s easing to 1.6 (a directional velocity curve), a 1-1.6 m/s random drift damped away, spinning +-430 deg/s, white / yellow / red per piece,
+shrinking out over the last quarter, no shadows (the first cut's squares cast black diamonds over the table). `ConfettiHeightUnits` (1000): the game's
+1707 is 10 m above the frame's top from the room's fixed camera -- its rain is seen only in its last seconds at the top edge -- so the port starts it
+at 13.4 m over the face, the frame's top, over his crown, and it falls in view past him and the machine to the table; 1707 = the game's placement,
+650 = 153's.
+
+**Verified:** the casino drive v231 (deleted before the commit; headless and windowed at 1930 x 1086 in the rematch arena, KingBooArena.tscn
+instanced 80 m over its middle as the 153 drive did, Rematch off, no intro ride): C86 the first appear -- the hosei 0 as it begins, the machine shown
+and bolted (lag 0 u from its tenth tick, 0 at the landing frame 57 where the thump fired once, 0 half a second after); C88 the fanfare (the tongue
+sprayed, ForceResult Fruit) -- one confetti burst at his x / z, 13.4 m over the discs' face, 125 pieces of 0.80 m for 6.0 s, one shot; shots 50a-b
+(1 s and 2.5 s in: the squares raining round him, no shadows); C87 Jaysonn's case -- after the spit the hosei read -52100 u; ForceHide, HideWait, the
+tongue sprayed on the appear's THIRD tick: the roll a tick later and the machine within 5 u of its seat the SAME tick, its worst lag through the roll
+0 u (it used to climb for seconds); C89 the down forced (one hit point, spicy) -- the body shown through all 198 ticks of the down clip, hidden on
+the burst's tick (frame 198 of 199), kept hidden, the Shine 120 ticks (2 s) after with the body still hidden; shot 50d the burst without the body --
+4 / 4 with 230's two (run e; runs a-d built the drive: the game's frame 78 found unreachable, a 57 landing missed on a tick boundary, the ring shape
+mis-numbered as POINTS and drawing nothing, the confetti shadows). The regression drive 68 / 68 (ga), the shine hud quiet run 8 / 8 (aj). The clean
+rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. The save file is unchanged.
+
+**Deviations, all knobs:** `SlotSnapsAtAppear` (the game's hosei tail), `HideBodyAtBurst` (the game's held body), `SlotLandFrame` 56 (the game's
+silent 78), `ConfettiHeightUnits` 1000 (the game's 1707, out of frame); the confetti's fixed per-piece colour (the game's flicker white-yellow-red every
+12 frames) and its shrink-out (the game's scale runs 1 to 0 over the whole life). Not changed: the Shine comes 240 nerve ticks after the burst, which
+the port's nerves run at 120 Hz -- 2 s where the game, at 30 frames a second, waits 8; nothing but the burst's smoke is on screen either way.
+
+### 232 -- the King Boo REMATCH, part 77: the casino slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING BUBBLES (TBubble, the game's dead code: its shipped slot can never land Mixed, and its own kill cylinder would have popped them where they were born); they sink to the table, spread, rise and grow, hurt and pop on touch, pop into a LARGE WATER BOTTLE when hosed, and split into three children that walk at Mario when their time runs out (feature/kingboo-casino, code `1331ba7` + 232b `8851d26`)
+
+**Jaysonn**: "Port the Mixed result's hot-spring bubbles".
+
+**The game.** `TBossTelesa::generateSlotItem`: a slot result of -1 (`TTelesaSlot::getSlotResult`: the three drums on three DIFFERENT faces) doubles
+`SlotItemNum` (6 -> 12) and spits `manNameTable[0]`, the bubble manager's `TBubble` (bosstelesa.cpp 80-395; `map/params/enemy/bubble.prm` in
+delfinoBoss.szs, read by `tools/projectshine/npc82/enemy128/prm_file.py`: LiveTime 1000, NumDivision 3, MaxScale 2, AddPosBase 200, RateExpand 1.001,
+DeadHeight 200, the walker's body scale 1.5..1.8, attack 90 x 120, damage 80 x 140, march 0.8..1.5, turn 3..5). The shipped game never shows one: the
+slot's HitCollectRate 1.0 holds every drum to the first drum's target, so the faces never differ; and had they, `TBossTelesaKillSmallEnemy`'s cylinder
+(400 x 300 at the table's middle, every HIT_CATEGORY_ENEMY body in it killed, on from the first frame to his death) would have taken all twelve the
+frame `calcRootMatrix` pinned them to their float height under his mouth. Built, parametered, modelled (`btelesa_osenbubbles_ind.bmd`, a 79-vertex
+dome of 143 u on one joint scaled 1.43, with three bck clips) and never seen.
+
+**The port.** **`assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs`** (new; a species on SmsSmallEnemy) + **`OsenBubble.tscn`**: the game's rules --
+twelve out of the mouth on the 24-degree fan (the second six on round to his back: the game kept the fan's step for the doubled count) at 5-10 u a
+tick (`FirstBubbleSp` x 0.5..1); a bubble FLOATS with its centre `FloatHeightUnits` (150) over the floor under it plus a rise of 1 u a tick to
+`AddPosBaseUnits` (200) -- `TBubble::calcRootMatrix` + unk1CC: 2 m to 4.7 m over the table in its first 1.7 s -- and bobs with its wait clip; GROWS
+x`RateExpand` (1.001) a tick from 1.5..1.8 to `MaxScale` (2.0: 5.5 m across); never lands (the game's gravity never brings the pinned centre down, so
+its spit velocity is never zeroed); after `LiveTime` (1000 nerve ticks, 8.3 s) it SPLITS -- the split clip's swell, then `NumDivision` (3) children at
+its point while the pool (`MaxAlive` 30) has room, each with a random +-2 u a tick drift, no rise, a fresh body scale; a child walks at Mario at 0.8 x
+its march for 40 ticks, coasts on its drift (x0.98) to 80, then walks at him for good; TOUCHED (the attack cylinder, 90 x 120 x its scale from its
+centre up -- over a standing Mario's head: the player jumps into them) it sends the common damage and pops; HOSED while it waits (`behaveToWater`) it
+pops and a LARGE water bottle (`FullRefill`, alive 1200 ticks: killByTimer 0x4B0) appears; jumped on it pops; the death is the split clip's swell and
+the common puff. No sounds (the game's bas table has none for its clips). The three bck clips are replayed from their keys on the one joint
+(`tools/projectshine/npc82/sirena151/bubble_keys232.py`: birth 60 frames -- the dome blows up from nothing with a jelly wobble -- the wait 40 looped
+with a squash-and-stretch and a +-10 u bob, the split 2: 1 -> 1.3); the dome is drawn with **`OsenBubble.gdshader`** from the bmd's MAT3
+(`tools/projectshine/rematch157/j3d_mat232.py`): the picture behind it refracted through the ind map and remapped between tevreg1's dark red and
+tevreg0's lavender, the rim alpha of N_btelesa_bubble, the N_btelesa_bubble_spe highlight -- with `Refraction` ON; OFF (the default, 232b) it draws
+the game's own picture: `TBubble::init` asks `SMS_ChangeTextureAll` for the screen texture under a name the model has not (`H_ma_rak_dummy`), so the
+dummy's flat (0, 172, 232) blue stays in the remap -- a pale blue bubble, where the refracted screen in this dark red room read as red jelly (shots 51c
+against 51f). **`assets/Sms/Enemy/SmsBossTelesa.cs`**: `SlotForce.Mixed`, `BubbleScene` (empty = OsenBubble.tscn), `SpawnBubble` / `BubblesSpat` (kind 0
+of generateSlotItem; not in the spit list, as the game's kind 0 is not in mSpitObjs); `KillSmallEnemies` lets a bubble through. **`SmsTelesaSlot.cs`**:
+`ForcedResult` Mixed holds each drum to its own face (FRUIT / COIN / ENEMY -- no one face reads -1). **`assets/Sms/Items/SmsWaterBottle.cs`**:
+`LifeTicksOverride`. Two things the base did not give it: its own floor ray (`BubbleGroundY`, casting through actors' bodies -- the base's took the
+first body it met, and twelve spat together or three children born at one point stacked skyward on one another's tops, each tick higher) and
+collision exceptions with every enemy body (ACTOR_TYPE_EFFECT_OBJ: no pushes -- the field blocked its own walk and sat on his body). The glb's image
+URI re-pointed at `N_btelesa_bubble.png` (the rip named a file it does not have; `tools/projectshine/rematch157/glb_uri232.py`).
+
+**Verified:** the casino drive v232 (deleted before the commit; headless and windowed at 1930 x 1086 in the rematch arena, KingBooArena.tscn instanced
+80 m over its middle, 230 / 231's six checks kept): C90 a forced Mixed round -- the drums on 2 / 0 / 1 (result -1), the third fanfare (no confetti),
+twelve bubbles spat within 4 m of the mouth at 5.7-9.5 u a tick, all sinking; C91 1 s on all twelve sunk to their float height (error 0.00 m) and
+growing (1.72-1.97); 2.5 s on all risen the full 200 u, at MaxScale 2.00, on the wait clip, their spit spent (under 0.5 u a tick), 4.6-10 m from the
+middle over 208 degrees; C92 the bubble farthest out brought down to a child's height, Mario 2.5 m downhill of it with the pack handed to him (the
+rematch arena's Level has no FLUDD) and the discs stilled, R in the squat with the stick down (the plain standing stream points 27 degrees DOWN, at the
+floor it cleans): popped 0.12 s in by his drops, a FULL water bottle at the floor under it (0.01 m off its floor) alive 1200 ticks, Mario unhurt; C93
+the LiveTime out 8.3 s after the spit: 11 of 11 parents split, 19 children made (the pool's 30 less the dying parents), 18 alive 2 s on, all generation
+1 at the float height, the field never over 30; the nearest child 5.6 -> 2.6 m from Mario in 2 s (the walk's 1.5 m/s); C94 Mario dropped into a child:
+HP 7 -> 6, popped 2 ticks on, no bottle -- 11 / 11 (run l; runs f-k built it: ten was twelve (SlotItemNum 6), the game's kill cylinder, the base's
+ground ray, the shader's non-constant uniform defaults, and the drive's own lessons -- a `Put` is undone by the roulette ride (`SmsRideApply` puts him
+back on the disc's deck every tick: `SmsCarryTo` instead), the turning discs carry Mario off any mark, a Mario dropped in from above TRAMPLES the
+bubble, the table is a dish whose faces fall 2 m toward the middle). Shots 51a-f (the spit, afloat at 1 s, risen at 2.5 s, the game's flat blue,
+hosed with the bottle, the children). The regression drive 68 / 68 (gc; gb's one miss was a wandering Bomb Boo touching Mario during a wall check),
+the shine hud quiet run 8 / 8 (ak). The clean rebuild 0 errors; the drive, the logs, the shots and the tasks deleted. The save file is unchanged.
+
+**Deviations, each a knob on the scene with the game's value as its off state:** `SpitSinkSeconds` 0.8 (the game pins a spat bubble to its float
+height on its first frame -- a jump cut from 15 m up at his mouth; here it sinks there, eased), `SpitDrag` 0.985 (the game's spat bubble is airborne
+for ever and slides at the spit speed to the room's wall; here the spit decays and the twelve hang 4-10 m round the table), `FaceCamera` (the dome
+turned to the camera; the game's turns with the walker's heading -- a half-shell seen from the side), `BottleOnFloor` (the bottle at the floor under
+the bubble; the game's hangs 50 u over where the bubble floated, 2-5 m up), `Refraction` (off by default, 232b: the game's flat blue; on = the
+material's intent, the screen behind it). Not knobs: the kill cylinder lets bubbles through (without it the round cannot exist), and the bubbles' bodies pass through one another and his. Open:
+the float height -- the risen parents (4.7 m) are past the plain hose's reach; the game's numbers (`AddPosBaseUnits` 200) are kept, the hover nozzle
+or a jump reaches them, and the children float at 2 m.
+
+### 233 -- the King Boo REMATCH, part 78: the casino fanfare's CONFETTI at the jpa's own 60 Hz and look (0.5-m alpha-tested squares fluttering along their fall, 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s), and the rematch's ENTRANCE -- King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own camera (the shot moves to his spot after the dive; he rises through the stone over 1.6 s on the tell; control back once he is up) instead of the appear clip's 17-m leap under the game camera that read as a pop (feature/kingboo-casino, code `561521a` + 233b `5d412b1`: the
+entrance's defaults BACK to the intro's own leap under the game camera -- Jaysonn: "no it's not supposed to be a cutscene. he should just use the
+animation of him coming from under in the intro" -- both 233 changes kept as knobs, off; + 233c `3a7f4eb`: the body CARRIED up through the stone under the
+intro's appear clip, Jaysonn on 233b: "no he just appears, he's not like coming from the ground naturally"; + 233d `a54f214`: the ENTRANCE work
+UNDONE at Jaysonn's word -- both rematch scripts back to 232b's, the fight's rise 182's leap as before 233; the confetti stays)
+
+**Jaysonn**: "can you make the confetti look better its just like pixel blocks right now. also when the rematch starts kingboo kinda just appears
+after going underground again".
+
+**The confetti.** 231 built `BtlsFubuki.tscn` from `ms_btls_fubuki.jpa`'s numbers but read each jpa frame as 1/30 s (gen_fx.py's own header: a jpa
+frame is 1/60 -- the game calcs the particle manager twice a rendered frame) and drew each piece as a flat billboard: 0.8-m squares facing the camera,
+falling at 4.5 m/s easing to 1.6 over 6 s, one colour per piece. Pixel blocks. The jpa (`jpa_dump.py`; noclip's JPA.ts for the calc types): BSP1 shape
+DIRECTION (the quad's Y along its motion) with rot Y (it spins ABOUT that axis -- a square tumbling end over end as it falls, the flutter); base size
+1.2 x 50 = a 60-u quad, but alpha = texA x prmA under the alpha test GREATER 200, so only `P_msm_shikaku_i`'s 255 core draws: a 10/16 square of the
+quad, 37.5 u = 0.50 m, crisp-edged (the texture's 136 / 119 / 68 rim never passes); dir 15 u a FRAME down (12.1 m/s) under airResist 0.98 a frame and
+a 0.07 u/frame^2 gravity field (they meet at 2.8 m/s, the excess decaying with a 0.83-s time constant), omni 4 (3.2 m/s any way), two Random fields
+kicking the velocity; life 180 frames = 3.0 s +-30 %, 1.25 pieces a frame for 100 frames (125 over 1.67 s); the prm colour keys (0) 207,207,207 ->
+(4) 231,231,87 -> (8) 159,48,48 -> (12) 207,207,207 over 12 frames with calc 2 = REVERSE (a 24-frame ping-pong by each piece's AGE, lerped, no random
+phase: the pieces are out of step by their birth frames) -- every piece cycles grey / yellow / red five times in its fall; ESP1 alpha out from 0.875
+of life, which under the alpha test is a POP at about 0.90 (every texel fails once prmA < 201); rotate 0.05 half-turns a frame (540 deg/s) x (1 +-
+0.625), either way, from a random angle. **`tools/projectshine/rematch157/gen_fubuki233.py`** writes **`assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn`**
+from those: `particle_flag_align_y` + `rotate_y` (the piece's Y along its velocity, spinning about it), a 0.504-m QuadMesh, alpha scissor (no
+blending, as the jpa's BLEND ONE / ZERO + alpha test), a `color_ramp` of 83 points (the ping-pong by age with the pop at 0.90),
+`vertex_color_is_srgb` (the keys are the jpa's 0-255 values: without the flag 159,48,48 drew as pink), the fall as a directional velocity curve 12.1
+-> 2.8 m/s, the omni 1.6-3.2 m/s, spin 202-878 deg/s, lifetime 3 s +-30 %, explosiveness 0.44 (the 100-frame emission), 125 pieces, no shadows.
+**`SmsBossTelesa.cs`**: `ConfettiHeightUnits` 1000 -> 1125 (15.1 m over the discs' face: what a piece falls in its 3 s, so the rain starts just over
+the frame's top and pops at the table; 1707 = the game's, 1000 = 231's half-speed rain, 650 = 153's).
+
+**The entrance.** The intro director (174) ended the cutscene `AfterSinkSeconds` after King Boo's dive: the game camera cut back behind Mario and he
+rose for the fight at his BooSpawn spot under it, by the casino appear clip's own LEAP (182: jnt_body from -17.4 m to +11.1 m over the node in 0.35 s
+at 0.6x, then back) -- a new entrance drive (`SmsIntroShotDrive`, the game view snapped every 0.2 s from the dive: run a) shows the body 17.6 m UNDER
+the floor one shot and 8.1 m over it the next, off the frame's top by the third, then dropping back to the hover: from behind Mario, 18 m away, he
+shot out of the floor and off the top of the picture in two frames and was simply there when the eye caught up. A pop. **`assets/Sms/Rematch/
+SmsKingBooRematch.cs`**: `SpawnRiseLeap` (NEW knob; 233 shipped it off, 233b ON by default = the intro's own leap): with it off the fight's rise is a slow EMERGENCE -- after the tell (`RiseTellSeconds` 0.7: the glow
+pulsing on the stone, the wisps) his node rises straight up through the stone over `SpawnRiseSeconds` (1.2 -> 1.6) on 174's smoothstep lerp, on his
+WAIT clip (no leap pose), the floor burst, the kick, the glow's swell and the stars as his body breaks the surface (`RiseFxTick`, as before) and his
+appear cry there (`SpawnCry`; with `RiseFx` off, as he starts up), settling at his hover with no overshoot; `ReadyForFight` from `QuietReadyWhenUp`
+once the rise is done (the wait clip never ends). On = 182's leap. The intro cutscene's own surface keeps the leap (its side camera frames it).
+`SpawnRiseTotalSeconds` for the director. **`assets/Sms/Rematch/SmsRematchIntro.cs`**: `RiseInCutscene` (NEW knob; 233 shipped it on, 233b OFF by default:
+"it's not supposed to be a cutscene" -- 174's cut back to the game camera at the dive stands): with it on the camera STAYS through his
+rise -- after the dive's pause the shot moves to his BooSpawn spot (`Phase.Rising`; `BeginRiseShot`: a side two-shot of Mario and the spot like the
+surface's, `RiseCamSide` 22 m off the line between them, `RiseCamHeight` 4.6, the aim `RiseCamAim` 0.6 following his body up, pushing in a little;
+run b at 16 m stood him too big in frame as he came up) and he is spawned rising under it; `AfterRiseSeconds` (0.3) after his ReadyForFight the game
+camera and Mario's control come back (`EndCutscene`; FightReady then). A during the rise skips the rest (he goes on rising under the game camera). The
+music's cue (`FightCueSeconds` 7.5) marks the rise shot's CUT (`FightStartAt`: the same beat the cutscene used to end on, so the planner and C26 are
+untouched); `ControlBackAt` (new readout) says when the player got him back, 2.6 s later. Off = 174's. `SkipCutscene` / `EndCutscene` / `SpawnBoo`
+reworked for the new phase (`BooSpawnSpot` factored; the ReadyForFight handler `OnRoseForFight` serves both paths).
+
+**Verified:** the entrance drive (deleted before the commit; windowed at 1930 x 1086): run c -- IntroSunk, 0.3 s, the cut to his spot (the cutscene
+camera at 22 m off the line), the tell with the glow and the wisps (introT -0.69), the node rising from 7 m under over 1.6 s, the break 0.76 s in
+with the burst and the stars, the body never over its hover, Wait at introT 1.60 with ReadyForFight, the game camera back 0.3 s later (Done); shots
+54d-k: the glow ring and wisps, the crown breaking the stone under the burst, him rising framed whole beside Mario, up, the game view. The casino
+shot drive (run h, 11 / 11 with C88 brought to the 233 numbers: 125 pieces of 0.504 m for 3.0 s one shot at 15.1 m over the face at his x / z,
+align_y, rotate_y, the 83-point ramp, sRGB): shots 50a-b -- squares of mixed grey / yellow / red fluttering edge-on and face-on over the machine and
+him, crisp. The regression drive 68 / 68 (gd; C0c the cutscene's rise effects, C26 the fight on the music's cue, both green), the shine hud quiet run
+8 / 8 (al: the cutscene skipped by A -- the skip path). The clean rebuild 0 errors; the drive, its runner copy, the logs, the shots and the tasks
+deleted; the save file untouched. Not touched: Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn, KingBooRematch.tscn
+(the editor's unique_id churn), SmsHiddenCoin.cs, the .tres / .import churn).
+
+**Knobs:** BossTelesa -- `ConfettiHeightUnits` 1125 (the game's 1707 is out of frame). KingBooRematch -- `SpawnRiseLeap` (233b: ON = the intro's own
+leap, the default; off = 233's emergence), `SpawnRiseSeconds` 1.6 (the emergence's length). RematchIntro -- `RiseInCutscene` (233b: OFF; on = the rise
+shot), `RiseCamSide` 22, `RiseCamHeight` 4.6, `RiseCamAim` 0.6, `AfterRiseSeconds` 0.3. **Deviations:** the emergence and the rise shot are the port's
+and both are OFF (233b); the confetti's start height 1125 u against the game's 1707 (which the room's camera never sees) stays a knob. **233b, for the
+record:** the one thing that differs between the intro's rise and the fight's is the camera -- the cutscene's side camera, 22 m off, sees the whole leap
+(the body tops out 4.4 m over his hover); the game camera behind Mario has the frame's top edge about 1.5 m over his hover at that spot (the drive's
+UnprojectPosition: the body at 9.9 m at screen y 36 of 1086, at 13.9 m at y -84), so the top of the leap, and his crown whenever he hovers, is out of
+frame. That is what read as a pop; not changed (Jaysonn's call after playing it: `RiseLeapDamp` 0.6 trims the overshoot for both rises). Verified 233b:
+the entrance drive run d -- 174 / 182's flow to the tick (the tell at introT -0.69 under the game camera, the leap's top 13.9 m at 0.59 s, Wait and
+ReadyForFight at 1.64 s, FightReady at once); the regression 68 / 68 (ge); the shine hud quiet run 8 / 8 (am).
+**233c -- the body CARRIED (Jaysonn on 233b: "no he just appears, he's not like coming from the ground naturally").** The leap is the pop: the
+appear clip's own translation takes the body from under the floor to past the hover in 4 frames and out of the game camera's frame by 0.25 s (the
+numbers above) -- nothing of him is seen rising; a flash, then he is there. `SmsKingBooRematch.cs`: `SpawnRise` (NEW enum knob, replaces 233b's bool;
+`SpawnRiseLeap` a read-only alias): **Clip Carried** (the default) -- after the tell the appear clip plays its pose (the squash and stretch, at
+`IntroAppearClipSpeed`), and each tick the node is placed so the BODY joint sits on a smoothstep curve from `IntroSinkDepth` under the floor up to the
+hover over the clip's 1.6 s (`RiseCarriedTick`: node.y = curve - the clip's lift of the body over the node, read off the pose -- the 17-m leap taken out);
+the body crosses the floor about 0.8 s in and rises the 8.5 m to the hover over the next 0.85 s, never over it; the burst, the kick and the stars as it
+breaks the surface, the cry there (`StartAppearClip(cry)`: the carried rise's cry at the break; the node on the curve's start from the clip's first
+frame). **Clip Leap** = 182's (the intro's surface keeps it; `_riseCarried` reset there). **Emergence** = 233's curve on the wait clip. Verified: the
+entrance drive run e under the game camera -- the body -5.3 m at 0.19 s, -1.4 at 0.59, +4.1 at 0.99 (over the floor, the burst and the stars on), +8.6
+at 1.39, Wait at 1.64, its highest 9.99 (the hover's bob); shots 54e-k (the glow and the wisps, the crown breaking the stone under the burst, him half
+up with the ring and the stars, up); the regression 68 / 68 (gf); the shine hud quiet run 8 / 8 (an). Knobs: `SpawnRise` (Clip Carried / Clip Leap /
+Emergence); the carried rise's length is the clip's at `IntroAppearClipSpeed` (0.6: 1.6 s). Deviation: the carried rise is the port's.
+**233d -- UNDONE (Jaysonn, after 233c: "ok no just undo what i said about him coming up. let just undo this and go back to fruit").**
+`SmsKingBooRematch.cs` and `SmsRematchIntro.cs` are checked out from 232b's log commit `8ef659c` byte for byte (the diff against it empty) --
+233 / 233b / 233c touched no other line of them, so this takes out exactly the entrance: `SpawnRise` / `SpawnRiseLeap`, the carried rise
+(`RiseCarriedTick`), `SpawnCry` and the cry flag, `SpawnRiseTotalSeconds`, the emergence (`SpawnRiseSeconds` back to 1.2); `RiseInCutscene`,
+`Phase.Rising`, `BeginRiseShot`, the rise camera knobs, `AfterRiseSeconds`, `ControlBackAt`, `BooSpawnSpot`, `OnRoseForFight`. The fight's rise is
+182's again: the tell (the glow and the wisps), the casino appear clip's own leap out of the floor under the game camera, the burst, the stars
+and his cry, `RiseLeapDamp` 0.6 on the overshoot; the cutscene ends `AfterSinkSeconds` after his dive as 174 had it. The confetti (`BtlsFubuki.tscn`,
+`ConfettiHeightUnits` 1125) stays. Verified: the clean rebuild 0 errors; the DLL carries none of the entrance symbols and still ConfettiHeightUnits;
+no drive run (the files are the 232b bytes that passed 232's 68 / 68). The entrance drive, its runner, logs, shots and task deleted. Not touched:
+Jaysonn's live edits (he had `visible = false` on RematchArena's KingBoo node in his unsaved scene -- the "he doesn't show" of the evening -- and
+fixed it himself). **Next:** the fruit (Jaysonn:
+"they look weird and roll around oddly", "oddly shiny", "the chili pepper doesn't rotate") -- the research is in
+`tools/projectshine/rematch157/plan234.md`: the port's fruit materials are PBR plastic (roughness 0.5, specular 0.5) where the game's are flat-lit;
+the game rolls EVERY fruit including the pepper (`TMapObjBall::calcCurrentMtx`; the pepper is a ResetFruit in the casino's scene.bin -- the port's
+"the pepper never spins" lock is not in the source); the pepper scene's mesh has its origin at its BASE with a default 0.5-m collision sphere, so it
+pivots about its end and, yawed 90, rolls about its own long axis -- no visible spin.
+
+### 234 -- the King Boo REMATCH, part 79: the FRUIT -- matte like the game's (every fruit scene's material roughness 1 / specular 0: the game's _fruit1 and _mat_togarasi are a vertex-lit toon ramp over the texture, no specular term), the ROLL at the game's rate (SmsRollLikeTheGame: |vxz| / (the game's body radius x Size) x 2 radians a tick, as TMapObjBall::calcCurrentMtx -- the port's smaller collision spheres spun them 1.3-2.2x faster, a blur that read as no spin), and the red pepper rolling like the rest (the "SMS quirk: it never spins" lock was not in the game) (feature/kingboo-casino, code `25f9b25`)
+
+**Jaysonn**: "the fruit just feel off in terms of looks they look oddly shiny? and i think when king boo spits fruit out they don't rotate? or maybe
+the chili pepper doesn't?"
+
+**The game** (`delfinoBoss.szs` -> `mapobj/fruitcoconut / fruitpapaya / fruitpine / fruitdurian / fruitbanana / redpepper.bmd` via gcm_tools.py;
+the materials by bmd_matfull153.py, the joints and vertex bounds by the new `tools/projectshine/rematch157/fruit234/bmd_geo234.py`; MapObjBall.cpp;
+TMarDirector::direct / TLiveActor::moveObject). Every fruit's material (`_fruit1`; the pepper's `_mat_togarasi`) is two TEV stages: the fruit
+texture and a TOON ramp (`H_toon_2_4i`, I4 32x32) looked up by the lit vertex colour (a type-10 SRTG texgen) -- a flat two-tone shade over the
+texture, no specular at all; the port's StandardMaterial3D had roughness 0.5 and the default specular 0.5, a PBR gloss band on every coconut and
+papaya (Mario's own materials sit at specular 0.19, the FLUDD's at 0: the fruit were the shiniest things in the room). `calcCurrentMtx` (318) rolls
+the model of EVERY ball object whose |vx| or |vz| is over the min speed (0.3 u a tick): the joint-0 matrix gets a turn of |vxz| / mBodyRadius x 2
+RADIANS (TRotation3f::setRotate is sin / cos) about the horizontal axis across the motion, concatenated on last tick's matrix (the roll accumulates),
+the translation (x, bottom + mBodyRadius, z); it runs from control(), which runs with bind() in moveObject() on EVERY 120-Hz simulation tick
+(direct(): dt = 600 / vsync, a tick per 5 units of it; the perform list's gate bits are never set). No type check: the pepper rolls (the casino's
+peppers are TResetFruit of the RedPepper data, turned 90 degrees about Y at the spit, the first at double speed). The body radii: coconut / papaya
+40, durian 45, pepper / pine / banana 50 units, x the scale (1.5 at the spit). Only the banana (-50 x m11 upright) and the pine (-10 x (1 - m11))
+correct the model's height. The pepper's geometry has its origin at its BASE (y 0..111 u, 146 long: a chili about 183 u long and 50 thick, tilted
+37 degrees; a rigid single-joint model, DRW1 direct), so the game puts the stem end at the ball's centre and the rod lies where the roll left it --
+at rest it floats, or pokes through the table. Jaysonn's pepper glb is the same geometry (the mesh matches the bmd: origin at the base, x the glb's
+1/100.8), so the port already did what the game does there. (233's "Next" note had the pepper "rolling about its own long axis -- no visible spin":
+wrong -- the rod is tilted off that axis and windmills; what hid the spin was its speed.)
+
+**The port, measured** (the casino drive's new fruit watch, run a, 16 fruit spat): every fruit rolled on every moving tick about the right axis at
+exactly the sim's rule -- metres(|vxz|) / HIS SPHERE's radius x 2 a tick. His models are about half the game's and his spheres with them: coconut
+0.475 m against the game's 0.806 (x1.70 the game's spin), durian 0.415 against 0.907 (x2.18), pineapple 0.498 against 1.008 (x2.02), pepper 0.75
+against 1.008 (x1.34), papaya 0.855 against 0.806 (x0.94). A durian out of King Boo's mouth turned 12 times a second (90 degrees a tick), a coconut
+60-70 degrees a tick: at 60 frames a second nothing of the turn can be followed -- a blur, "they don't rotate". The pepper's "never spins"
+LockRotation (Fruit.cs, Jaysonn's Oct-2 file) was a no-op under the ball sim (the sim rolls the model child, not the body) and live with
+SmsBallPhysics off.
+
+**The fix.** `assets/Fruit.cs`: `SmsRollLikeTheGame` (NEW knob, on) -- the roll's radius is the game's body radius x Size (`SmsRollRadius`;
+`SmsRollAnglePerTick` = metres(|vxz|) / R x 2), whatever the model's size: the game's angular rate; off = 115-233's sphere radius. The red pepper's
+LockRotation block went (with SmsBallPhysics off its AngularDamp 0 -> 0.5 so a kicked one settles). `fruit_banana / fruit_coconut / fruit_durian /
+fruit_pineapple / fruit_red_pepper / fruitpapaya.tscn` (the project root): the material's roughness 0.5 -> 1.0 (Godot's default: the line goes) and
+`metallic_specular` 0.5 -> 0.0 (`fruit234/matte234.py`).
+
+**Verified** (the casino drive, deleted before the commit; windowed 1280 x 720, run c, 16 fruit): C95 every fruit rolls on every moving tick about
+the axis across its motion (|dot| > 0.98 on 2110 of 2121 frames: the rest the frames of a wall bounce), the two peppers included (7.0 and 10.1
+turns), at the game's rate within 6 % (16 of 16; a tick's turn now 15-24 degrees in flight, the game's numbers to the tick); C96 16 of 16 matte;
+C97 the 14 round fruit all at rest within 5 s, their lowest vertex within 0.24 m of the table (the coconuts and durians within 7 cm; the papaya's
+own sphere, 0.57 against a model 0.675 tall at Size 1, puts it 16 cm under upright or 10 cm over on its side; the pineapple's 0.5 against 0.63:
+21-24 cm under) -- the peppers +0.62 m (the rod up, the stem end a body radius over the table) and -0.67 m (the rod down through the table), the
+game's own. Shots 55a-f: the spit at 0.3 / 1 / 3 / 7 s from Mario's side and low from the side, close-ups of a pepper, a coconut, a durian and a
+papaya at rest -- matte, on the table. The rest of the casino drive as before (C84-C92 green; C93's "nearest child nearer by 0.5 m or more" came
+out at exactly 0.5 and C94's touch popped the bubble with Mario's HP 7 -> 7, as in 233's run g: the 232 drive's own flakes -- Mario's drop into a
+child -- not the fruit, which are gone by then). The regression drive 68 / 68 (gg), the shine hud quiet run 8 / 8 (ao). Clean rebuild 0 errors;
+the drive, the runner copy, the logs, the shots and the tasks deleted; the save file untouched. Not touched: Jaysonn's live edits and his fruit
+SIZES (the scenes' scales and collision spheres).
+
+**Knobs:** Fruit -- `SmsRollLikeTheGame` (on; off = the sphere's radius, the old faster spin). The look is the scenes' materials (roughness /
+specular in the inspector; Diffuse Mode = Toon would give the game's two-tone shade). **Deviations:** none new -- the materials follow the game's
+(no specular), the roll radius is the game's, the pepper's base pivot is the game's own (a knob to centre it can come if he wants it sitting on the
+table); the papaya's and pineapple's spheres (his) sit them a little into the table.
+
+### 235 -- the King Boo REMATCH, part 80: the casino table's BREAK without the glass -- the shards carry the discs' own material (MatchMaterial: metallic 1 / specular 0.5 / roughness 1, the unshaded surface, the vertex colours, the gold's 7 x 7 UV tiling, the linear filter; 157's shader hard-coded a non-metal at roughness 0.9, so the whole table turned pale and glossy the moment the shards replaced it), the cracks are dark seams with no glow (CrackGlow 1.6 -> 0, CrackDarken), and the shards dissolve in the opaque pass instead of blending (feature/kingboo-casino, code `cbd5bfd`)
+
+**Jaysonn**: "the glass breaking at the end of the fight. i don't want it to shine like glass or change the color i just want the effect breaking."
+
+**What shone and what changed colour** (a new shatter drive at the room's fixed eye; the discs' materials read off the scene). The casino discs
+(rulet00 / 01 / 02.glb) are StandardMaterial3Ds with metallic 1.0, specular 0.5, roughness 1.0 (the glb's defaults), one surface Unshaded with vertex
+colours, the gold rim tiled 7 x 7 by `uv1_scale`, texture filter Linear (no mipmaps). `FloorShatter.gdshader` drew the shards with roughness 0.9 and
+Godot's defaults for the rest (metallic 0, specular 0.5): a non-metal lit diffusely with a specular band -- the frame the shards took the discs'
+place the table went pale and glossy (a 48-level mean difference over the table), the gold bowl's banding gone (the tiling), and the whole thing
+read as glass; the cracks were EMISSIVE (crack_color (0.85, 0.97, 1) x crack_glow 1.6: bright pale-blue lines all over the table as they spread, then
+glowing edges on every flying shard); the fade was a blend, the table in the transparent pass from the first crack.
+
+**The fix.** `FloorShatter.gdshader`: uniforms for the material (metallic, specular, roughness, their textures and channels, unshaded,
+emission_color, vertex_color_srgb, uv1_scale / uv1_offset), the albedo sampled with filter_linear as the discs do; an Unshaded surface drawn as
+EMISSION = its colour with ALBEDO 0; the seams darken the colour by `crack_dark` (0.6) with `crack_glow` 0 by default; the fade an alpha-scissor
+DISSOLVE (a per-cell speckle cut against the fade) so the material stays in the OPAQUE pass -- the depth prepass and the lighting path of the disc it
+replaces. `SmsFloorShatter.cs`: `MatchMaterial` (NEW knob, on) copies each disc surface's StandardMaterial3D into those uniforms (off = 157's look);
+`CrackDarken` (NEW, 0.6); `CrackGlow` 1.6 -> 0.
+
+**Verified** (the shatter drive, deleted before the commit; windowed 1280 x 720; the arena's sky clock HELD on frame 60 so the lights stand still --
+the rematch's lights follow its sky's 5-s cycle, and two frames half a second apart differ by 10-17 levels on their own, which hid the real
+difference for three runs): C99 the discs' own models shown again for a few frames at 0.2 s into the crack and then the shards: the two frames
+differ by 0.27 of 255 on average over the table (the worst row 2.3: the first seams at the centre; 157's shader: 48); C98 the three discs taken (347
+cells, 2312 triangles), the cracks 1.4 s, the break 0.5 s later, the shards gone by 2.4 s. Shots 56a-g: the table before, the shards in place (the same
+table), the cracks half way and at the rim (dark seams, the colours untouched), the break at 0.3 / 1.0 / 1.8 s (the pieces lifting and tumbling in
+the table's own colours, no lit edges). The regression drive 68 / 68 (gh), the shine hud quiet run 8 / 8 (ap), both on the tree with 236. Clean
+rebuild 0 errors; the drive, the runner copy, the logs, the shots and the tasks deleted; the save file untouched.
+
+**Knobs** (FloorShatter under the casino's RematchExit): `MatchMaterial` (on), `CrackDarken` 0.6 (0 = no visible cracks, the table just breaks),
+`CrackGlow` 0 (157's 1.6 = the lit-glass look), `CrackColor`, `CrackWidth`, the timing, the flight, the sound (MSD_SE_OBJ_GLASS_BREAK stays).
+**Deviation:** the shatter itself is the port's (157) -- the game puts its Shine over the table.
+
+### 236 -- the King Boo REMATCH, part 81: the pause menu's selection sparks round the WHOLE circle -- the shader's angle step followed the dumped rate (14) while the emitter fired the circle's division (10, pass 132), so the ten sparks covered 10/14 of the circle with a 103-degree gap; the step is now the burst's own count (JPAEmitter.cpp 415: (i << 16) / mEmitCount), set by the menu from the emitter's amount (feature/kingboo-casino, code `afeee08`)
+
+**Jaysonn**: "the pause screen effects of the rectangles coming out of the hovering option -- the effects are spaced out wrong and need to make a full
+circle rather than 3/4."
+
+**The bug.** `ms_2d_pause_sel` is a FixedInterval Circle emitter: an emit frame creates the volume's DIVISION (JPAEmitter.cpp 697: numToCreate =
+mVolumeSubdivision, 10) and each particle's angle is (idx << 16) / mEmitCount (415) -- ten sparks 36 degrees apart, all the way round. Pass 89 wrote
+the shader from the dumped RATE (14): `count = 14`, angle = i x 360 / 14; pass 132 corrected the node's amount to the division (10) without touching
+the shader's `count`: ten sparks at 14-way spacing = 257 degrees of circle, a 103-degree gap -- the 3/4 circle.
+
+**The fix.** `PauseSparks.tscn`: `shader_parameter/count` 14 -> 10. `SmsPauseMenu.cs`: SparksAt sets `count` from the emitter's Amount at every
+burst, so the two cannot drift apart again. `PauseSparks.gdshader`: the default 10 and the header's reading corrected.
+
+**Verified** (the pause drive, deleted before the commit; windowed: the rematch arena, the intro skipped, Start pressed, the first burst at bounce 3 of
+the pulse): C100 the emitter's amount 10, one shot, explosiveness 1, the shader's count 10; shots 57a-c at 4 / 9 / 14 frames into the burst -- ten
+yellow streaks flying out all round CONTINUE's ellipse, no gap. The regression drive 68 / 68 (gh), the shine hud quiet run 8 / 8 (ap). No knobs
+added; no deviation (the game's own geometry).
+
+### 237 -- the SECRET COURSES, part 1: the Secret of Ricco Tower (Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) laid out as the game lays it out and under the game's own sky -- every piece at coro_ex2's scene.bin position, rotation and scale (MsMtxSetTRS), his piece scenes scaled to the game's model sizes, the umaibou spinning at the game's rates, the three rail blocks tumbling along their scene.ral rails (new assets/Sms/SmsRailBlock.cs, the game's TRailBlock), the game's start camera as the intro pan, the sky dome the game's sky.bmd with its btk / brk running in a shader (feature/kingboo-casino, code `cfd6c07`)
+
+**Jaysonn**: "i want you to also go and clean up the two other levels of rico4 secret and bianco 3 secret. i think both skyboxes need to be redone. and i
+want you to position the level how it is in game. i should have a lot set up so should be just a lot of clean up work?" -- "Keep it all on the casino
+branch since its more touch up related." The demo for 2026-11-26: his starting room -> these two secret courses -> the King Boo fight -> the rematch.
+
+**Which courses.** His Rico4Secret.tscn is coro_ex2 (the Secret of Ricco Tower: the start island, ten umaibou sticks, the two blue walls, three rail
+blocks, four nails, the tilted sticks down to the end); his assets/secrect_level.tscn is coro_ex1 (the Hillside Cave Secret: the stair blocks, the
+pillar, the grid of shuffling lifts, the EX roll cubes, the spinning stars, the bridge, the banana tree). The ISO on the PC is a mod (its coro_ex1 is
+rebuilt); the layouts come from the VANILLA extraction (E:/fromC/Documents/FinModelUtility-main/.../extracted/data/scene/<stage>/map: scene.bin,
+scene.ral, camera/startcamera.bck, map/sky.bmd / .btk / .brk), read by tools/projectshine/rematch157/secret237/secret_data237.py the way the game
+reads them (TActor::load: name, TRS, the character string, the light map; TMapObjBase::load: the individual name; TRailMapObj::load: the rail name,
+the lift's float, the wood block's tint ints; TRollBlock::load: the roll speed int).
+
+**The layout** (tools/projectshine/rematch157/secret237/gen_level237.py writes the scene). Every placed object is re-emitted at the game's position
+(74.44 u = 1 m), rotation and scale -- MsMtxSetTRS (MathUtil.cpp): rows of Rz(roll) Ry(yaw) Rx(pitch) S, which Godot's Transform3D takes as written --
+with HIS piece scenes, each root scaled by the game's scale x the ratio of the game's model size to his glb's units (his umaibou glb is the model at
+0.01209 per unit -> x 1.1111 for the game's scale 1; his island x 3.41, the rail block x 0.896 for the game's scale 2, the nails x 1.068, the end
+platform x 2.66, his woodblock_wide.tscn IS the game's WoodBlockLong (200 x 200 x 600 u, x 0.235) and his woodblocklong.tscn IS the game's
+WoodBlockLarge (800 x 200 x 800, x 0.401)). The wood blocks take the scene.bin's tints (the walls (100, 150, 255), the big platforms (200, 200, 80),
+the end bridge (255, 255, 200)). The course runs along +X; Mario starts at (-7200, 4700, 0) u -- 400 u over the island -- facing +X (PlayerSpawner and
+MarioSpawnPoint: Godot's forward is -Z, so the basis is Ry(-90)). His plumbing is kept at the new places: the Level root and its paths, the
+ShineTimer (his AutoStart) and TimerHud, the environment (black background now, his ambient and glow) and light, the transition rects, the switch
+(its ShineTimerPath / CameraPath fixed to ../ShineTimer and ../PlayerSpawner/Mario/CamController -- they pointed at a Mario node the scene no longer
+has) and its eight coin spots at the game's red coins, the Shine (his sprite, its exit to Level.tscn) at the game's Shine, the red-coin Shine's spot,
+the two 1-ups (his scene at his size), his FluddItem on the island.
+
+**The movers.** The umaibou (TRollBlock) spin about their own Z -- the stick's axis -- at the scene.bin's speed x 0.01 degrees a frame: 25 / 30 / 20 / 35
+= 7.5 / 9 / 6 / 10.5 degrees a second (his MovingPlatform's SpinAxis (0, 0, 1), SpinSpeed; he had 40). The three rail blocks are the game's TRailBlock
+(MapObjRailBlock.cpp), ported as **assets/Sms/SmsRailBlock.cs** (new): the block walks its rail node to node at each node's own speed (TRailNode mSpeed
+x 0.01 u a frame: 1.2 / 1.0 / 1.4) and turns by each node's pitch / yaw / roll over the segment that reaches it, spread evenly, about the WORLD axes
+(calcRootMatrix = RotRPH(the step so far) x the turns banked at the nodes) -- R1_1 rolls 90 degrees per 600 u, R1_2 270 = -90 the short way
+(MsAngleDiff), R1_3 100 per 800 u so it lands 10 degrees off square each pass; a dead end turns it back (TGraphWeb::getShortestNextIndex: one
+connection = back; at the start the nearest connected node, the lower index on a tie, so R1_2's block sets off toward -Z). Knobs are the rail's own
+numbers: RailNodes (u, the parent's frame), RailTurns (degrees), RailSpeeds (u per frame), ClosedLoop, StartNode, StartTowards (-1 = the game's
+pick), SpeedScale 1. The umaibou's old spin (40 degrees a second) and his rails' slide (MovingPlatform waypoints) go.
+
+**The sky.** Map/Sky.cpp's TSky: the stage's sky.bmd follows the CAMERA's position (rotation fixed; the Corona yaw spin is stage 15 only), drawn unlit
+with its "sky" btk / brk. models/Sms/Sky/RiccoSecret/sky_ricco_secret.glb is the rip's dome (_VRsph, radius 90000 u, 555 verts) cleaned to one unskinned
+mesh with no textures (gen_sky237.py), instanced at 1/74.44 in assets/Sms/Sky/SkyRiccoSecret.tscn with no shadow and a custom AABB the camera is always
+inside (in the mesh's own units -- the first run culled the dome whenever the origin left the frame, because the AABB had been written in metres under
+the 1/74.44 parent). **SmsSkyRiccoSecret.gdshader** draws the one material as its TEV reads (bmd_mat_dump): glow sheet (P_casino_glow2mm, texgen 0:
+scale 10, offset (0, -0.06)) x C0 x the 8-bit Mario sheet (B_crasicmario, texgen 1), blend ONE + ONE over black -- the vertex shader re-centres the
+dome on CAMERA_POSITION_WORLD (skip_vertex_transform), the fragment runs sky.btk's 600-frame loop from TIME (the pattern's scale 1.25 for frames 0-299
+then 2.5, its translation stepping 1/16 every 37.5 frames) and sky.brk's C0 (white, then (100, 255, 255) at frame 300: the yellow Mario goes green and
+the red dims for the second half, as the game's does); the maths in the game's gamma space, linearised at the end so the screen shows the game's
+numbers. The textures are the rip's PNGs (I8 as grey + alpha, RGB565 as RGB), imported lossless with mipmaps. His Rico4SecretSkybox dome (a re-creation
+of the same mesh with a Godot material, scale 0.19) and the ProceduralSky (never shown: his background mode was Colour) go. The TSky code also draws a
+blue GX sphere (0, 0x12, 0xEE) behind everything -- the disc's screenshots show BLACK behind both skies (the Ricco dome's darkest pixels are 0, the
+Hillside sky's floor is the dome's own C1 plus the star sheet's haze), so the background is black.
+
+**The intro.** map/camera/startcamera.bck (479 frames at 30 = 16 s): joint 0 is the camera's interest (it starts ON the Shine and ends on Mario's start),
+joint 1 the eye riding it (its y scale 50 = the fovy -- TCameraBck::updateDemo), its rotation the look-at frame itself (no roll). intro_pan keys the
+IntroCamera's position and YXZ rotation every 3 frames (the eye = interest + the eye joint, the rotation from the look direction, the yaw unwrapped),
+fov 50; RESET at frame 0; the iris opens over 0.4 s and the vertical barn door closes over the last 0.47 s as before; spawn_wipe unchanged.
+
+**Verified** (a layout shot drive -- secretshot237.gd, a GDScript SceneTree runner, deleted before the commit -- windowed 1280 x 720, the level loaded,
+its rects and HUD hidden, nine eyes along the course shot twice 9 s apart): the island with the switch and his FLUDD, the sticks, the two blue walls with
+the yellow platform between them, the three rail blocks mid-tumble (RailBlock0 5.4 m along and 60.5 degrees over after 11 s = 0.48 m/s and 5.4
+degrees/s, the game's 1.2 u a frame and 90 per 16.7 s), the nails' platform, the tilted sticks, the end bridge, platform and Shine, the overview
+matching the game's course end to end, the dome's blue dots with the red / yellow Mario (and the green / dim-red second half). The regression drive 68 / 68
+(gi), the shine hud quiet run 8 / 8 (aq), both on the tree with 238. dotnet build 0 errors; the drive, the runner, the logs, the shots and the tasks
+deleted; the save file untouched.
+
+**Knobs:** the sky shader's speed / brightness / texture matrices / tints; SmsRailBlock's rail numbers and SpeedScale; the umaibou's SpinSpeed.
+**Deviations:** the invisible board NPC and the 100-coin Shine are not placed (the port has neither); his 1-up and Shine sprite keep his sizes; the game's
+blue backdrop sphere is left out (see above); his FluddItem and ShineTimer AutoStart are his, kept.
+
+### 238 -- the SECRET COURSES, part 2: the Hillside Cave Secret (assets/secrect_level.tscn) laid out as the game lays it out and under the game's own sky -- every piece at coro_ex1's scene.bin position, rotation and scale, the nineteen shuffling lifts and the five stair blocks on their scene.ral rails (his MovingPlatform fed the rails' speeds and waits), the four EX cubes rolling their loops (SmsRailBlock), the spinning and circling star platforms, the game's start camera as the intro pan, the EXskyDarkTrain sky.bmd with its nine materials, its 8000-frame btk and its brk running in one shader (feature/kingboo-casino, code `cde8cf0`)
+
+**The layout** (gen_level237.py, the same way). The start island stretched 1.5 x along the course (scale (1.5, 1, 1), rot Y -90), two palms (his
+PalmTree.tscn scaled 0.755 to palmNormal's 1290-u height -- a different palm model; the game's palmNormal.bmd is not in the project), the five stair
+blocks (WoodBlockLarge at scale (1, 2.5, 1.5), the game's five tints from (250, 230, 200) down to (210, 150, 120)), the green pillar (WoodBlockLong,
+rot X 90, scale (6, 6, 3), (200, 255, 200)), the nineteen lifts and three fixed blocks (his normal_block.tscn = NormalBlock.bmd at the game's scale 2:
+x 1.0745), the four EX roll cubes (his rotating_block.tscn = EXRollCube.bmd 800 u: x 3.678), the four nails, the two nails' platforms and the long
+dark-green bridge (WoodBlockLarge 5 / 6 / 7, (200, 255, 200) and (10, 80, 10)), the three big spinning stars and the two circling ones (his
+StarPlatform.tscn = normalvariant0.bmd: x 3.96), the two white blocks (WoodBlockLarge 8 / 9), the end platform with the banana tree (his
+banana_tree.tscn at the game's size, x 0.135), the 1-up, the switch and its eight coin spots, the Shine and the red-coin Shine's spot. Mario starts at
+(-6100, 3900, 200) u facing +X. His Mario instance becomes a PlayerSpawner (the character select's way, as Rico4Secret has it) with the ShineTimer and
+TimerHud at the root (his timer had no AutoStart here: kept so); his hidden marioHUD, his papaya (not in the game) and the website sky go.
+
+**The movers** (his MovingPlatform.cs with the rails' numbers). A lift or stair block is a TNormalLift on a two-node rail (flags 0x800): ping-pong between
+the nodes, speed = the node's yaw x 0.01 u a frame (TNormalLift::control), wait = the node's pitch in frames (readRailFlag) -- blk00: 400 u along +Z at
+2 u a frame with 60 frames' rest at each end; the stairs (kaidan0-4): 1000 u across at 4 u a frame, 60 frames' rest, the top one 300 u down at 3 with
+100; the lifts' speeds 1 - 3.5 u a frame and waits 10 - 100 frames, each its own. The two circling stars (S_block00 / 01, four-node loops 141 u a side)
+go round at 0.4 u a frame (Mode Loop, the first leg to the lower-index node as the game picks). The three big stars (rollvariant0 = the star stood on
+edge: Rx(-90) of his flat normalvariant0, so the game's Rz(0) Ry(90) Rx(90) on it is Ry(90) on his, scale 2 x 3.96) spin about the vertical at 0.4
+degrees a frame (TRollBlock about its own Z = world -Y: SpinAxis (0, -1, 0), 12 degrees a second). The four EX cubes are SmsRailBlocks on the closed
+rails: EXCube0 a slide round a rectangle at 4 u a frame (no turn), EXCube1 a rounded rectangle turning 34 then 56 degrees over each corner at 10 and 6 u
+a frame, EXCube2 two cubes half a loop apart (nodes 0 and 3) yawing 60 / 90 as they go at 6 u a frame -- each setting off toward its nearest connected
+node as the game does.
+
+**The sky.** models/Sms/Sky/HillsideSecret/sky_hillside_secret.glb: the rip's sky.bmd (EXskyDarkTrain, 1441 verts, nine materials; the same sky.bmd
+(md5 86302a5c) serves coro_ex0 / ex1 / ex6, rico_ex0 / ex1, mam_ex0) cleaned to one unskinned mesh of nine surfaces, keeping its vertex colours and
+both UV sets; **SmsSkyHillsideSecret.gdshader** draws each surface's TEV (`mode` per material, all added over black, the dome riding with the camera,
+gamma-space maths): 0 the dome _o28 = clamp(gradient x C0 (12, 44, 77)) + C1 (12, 20, 4) x (1 - gradient) + the stars (B_sters on texgen 0, drifting
+(1, 1) over the 8000-frame loop) x the vertex colour, the lot x the vertex alpha (blend SRCALPHA + ONE); 1 the four rail silhouettes (B_exsky_Rail x
+matColor (5, 24, 102) / (47, 43, 14) / (41, 27, 6) / (12, 19, 11), texgen scales (1.25, 0.75) / (1.5, 1) / (1.75, 1), Tx 0 -> 1 over frames 0-4000 then
+still; ONE + INVSRCCLR, which over this dark sky is adding); 2 the train (B_exsky_Train clamped, centre (1, 1), x the vertex colour x C0 / 2, sky.brk's
+1000-frame C0 (16, 40, 83) -> (165, 45, 26) -> (40, 98, 7), Tx -1.333 -> 10 over frames 0-4000 -- one crossing a loop -- and Sy breathing 1 -> 1.15
+every 50 frames); 3 the cloud band (B_exsky_Silen repeating x alpha 133/255, Sx breathing 1 -> 0.9; SRCALPHA + ONE); 4 the aeroplane (B_exsky_Aplane
+clamped x the vertex colour x (24, 73, 36), scale (0.5, 1), Tx -1 -> 10 over frames 0-4000; ONE + ONE); 5 the ground silhouette (B_exsky_Silen clamped
+x (81, 15, 0); ONE + ONE). Nine ShaderMaterials (assets/Sms/Sky/HillsideSecretSky_*.tres) on the surfaces of SkyHillsideSecret.tscn. His testFromWebsite
+dome (the same mesh from a model site with hand-coloured copies of the sheets, static, rotated by SkyboxRotator.cs) goes.
+
+**The intro.** The game's startcamera.bck (479 frames): the Shine held, the sweep back over the course, Mario's island; fovy 50.
+
+**Verified** (the layout shot drive, windowed 1280 x 720, nine eyes twice 9 s apart): the island and palms with the switch, the stairs mid-slide, the
+pillar's two nails, the lift grid shuffling, the cubes rolling the dark-green bridge (RollCube1 112 degrees over after its corners, the EXCube2 pair at
+the same yaw half a loop apart), the stars spinning, the two white blocks and the end platform with the tree and the Shine; the overview from above
+matching the game's course; the sky the disc screenshot's -- the dark green-grey star field with the nebula haze, the blue top rail and the olive
+ones, the stars drifting. The regression drive 68 / 68 (gi), the shine hud quiet run 8 / 8 (aq). dotnet build 0 errors; the drive, the runner, the logs,
+the shots and the tasks deleted; the save file untouched.
+
+**Knobs:** the sky shader's speed / brightness and each material's colours; SmsRailBlock's rail numbers and SpeedScale; every lift's MoveSpeed / WaitTime
+(the rails'). **Deviations:** the palms are his PalmTree at the game's height; his 1-up and Shine sprite keep his sizes; his lift cubes keep his gold
+texture (the game's NormalBlock is orange); the board NPC and the 100-coin Shine are not placed; his papaya is gone.
+
+### 239 -- the SECRET COURSES, part 3: the Hillside Cave Secret's lift cubes ORANGE like the game's and its palms the game's own palmNormal -- normal_block.tscn's mesh is the rip's NormalBlock.bmd glb with the game's vertex colours (the inset panels (188, 37, 0), the frame (255, 170, 42)) that the TEV multiplies into the gold sheet, which his Blender re-export had lost; the new assets/Sms/Map/PalmNormal.tscn is the game's palm with the trunk, the game's stand-on quad and the leaves as collision and his PalmTreeGrab climb zone (feature/kingboo-casino, code `077f0bc`)
+
+**Jaysonn** (from the 238 report's options): "Make the lift cubes orange like the game, Import the game's palm for Hillside."
+
+**The cubes.** The game's NormalBlock.bmd material (_o3, the rip's shader read back) draws the gold sheet B_nomalBlock2 x the VERTEX COLOUR (plus a lit
+second channel): the inset panels carry (188, 37, 0) and the frame (255, 170, 42), so the cubes come out orange with a pale frame. His normalBlock.glb
+(a Blender re-export) has every vertex colour white -- his material's vertex_color_use_as_albedo had nothing to multiply, and the cubes showed the bare
+gold sheet. `normal_block.tscn` keeps his root (the AnimatableBody3D, MovingPlatform.cs, his collision box, the uid) and swaps the skeleton_root mesh
+for an instance of models/Sms/Map/normalblock/normalblock.glb (the rip's model cleaned to one unskinned mesh, 200 u, at his 0.0250049 so every
+placement's scale holds) with one StandardMaterial3D: the game's sheet, the vertex colours (sRGB), roughness 0.5 as his. Only secrect_level.tscn
+uses the piece.
+
+**The palms.** models/Sms/Map/palmnormal/palmnormal.glb is the rip's palmNormal.bmd (the trunk and twelve leaves, 1290 u, vertex-coloured, the
+leaf sheet alpha-cut at 0.5 as its TEV discards), cleaned to one unskinned mesh. `assets/Sms/Map/PalmNormal.tscn` (new, gen_pieces239.py): a
+metre-space root; the model at 1/74.44 with one material (the sheet x the vertex colours, alpha scissor 0.5, both faces); TrunkBody = a trimesh of
+the trunk's 122 triangles plus the game's own stand-on quad from palmnormal.col (an SMS .col: vertex count / offset, group count / offset; a 150-u
+square at 1118 u = 15.0 m, where the game lets Mario stand in the crown); LeafBody = the leaves' 516 triangles, both faces, on his leaf layer
+(collision_layer 4, mask 0, as his PalmTree); GrabZone = his PalmTreeGrab.cs with the trunk's own numbers (TrunkTopY 14.13 m, LeafLandY 15.02 m,
+TrunkRadiusBottom 1.30 + 0.5 m, TrunkRadiusTop 0.78 + 0.5 m, a cylinder the trunk's height). secrect_level.tscn's two palms are this scene at the
+game's placement (rot Y 90, scale 1); his PalmTree.tscn is untouched (nothing else in the course used it).
+
+**Verified** (the layout shot drive, deleted before the commit; windowed 1280 x 720): the lift grid orange with pale frames -- the disc screenshot's --
+and the two palms on the island with the game's splayed crowns. No C# changed (the arena drives were not re-run). The runner, the logs, the shots
+and the tasks deleted; the save file untouched.
+
+**Deviations:** the palm's leaves do not dip when landed on (his PalmLeaf.cs bends the per-leaf bones his own export had; the game's TMapObjTree sways
+them) -- the trunk and the crown are climbable and standable as the game's; the game's twelve per-leaf collision files are joint-space and are replaced
+by the leaves' own triangles.
+
+### 240 -- the SECRET COURSES, part 4: the palm's leaves DIP when Mario lands or stands on them, the game's way -- each of the twelve leaves is its own node on the crown joint the bmd gives it and swings about that joint's X on TMapObjTree's damped spring (new assets/Sms/Map/SmsPalmLeaves.cs: the touch impulse 0.001 rad every frame he is on it, the hip drop's 0.006, stiffness 0.01, damping 0.97, at 30 frames a second), its collision an AnimatableBody3D that turns with it (feature/kingboo-casino, code `adfef9f`)
+
+**Jaysonn** (from the 239 report's options): "Make the palm leaves dip when landed on."
+
+**The game** (MoveBG/MapObjTree.cpp). A palm's leaves are TMapObjLeaf entries, one per leaf joint (mLeafNum 12 for palmNormal: leaf i on joint 12 - i,
+its collision palmNormalLeaf%02d in the joint's frame, moved with it). touchPlayer: while Mario's ground plane is a leaf, that leaf's angular velocity
+takes mLeafTouchImpulse (0.001 rad) every frame, or mLeafHipDropImpulse (0.006) while he is hip-dropping. controlLeaf, every frame: angle += velocity;
+velocity -= angle x mLeafStiffness (0.01); velocity x= mLeafDamping (0.97); the joint's matrix = its rest x Rx(angle). Standing on a leaf sags it toward
+0.1 rad (5.7 degrees, the tip 0.67 m down on a 585-u leaf) with a 2.1-s swing; a hip drop kicks it 3-4 degrees further.
+
+**The model.** palmnormal.glb is rebuilt (gen_pieces239.py's GlbBuilder) as thirteen nodes under the import's root: Trunk, and Leaf01 .. Leaf12 each at
+the bmd's joint (JNT1: translation (0, 975, 0), rotation Ry(the heading: ha_12 -72.95, ha_11 23.49 ... ha_01 -156.03 degrees)) with the leaf's vertices
+re-expressed in that joint's frame (the leaf runs along its +Z, arching 23-305 u above the joint and 585 u out), so Rx(angle) on the node IS the game's
+dip. Every leaf vertex is wholly on its own joint in the rip, so the leaves are rigid as the game's.
+
+**The scene.** `assets/Sms/Map/PalmNormal.tscn`: the trunk body as 239; the single LeafBody becomes a "Leaves" Node3D at the crown (0, 13.10, 0) m
+carrying `SmsPalmLeaves.cs` and twelve AnimatableBody3D children (Leaf01 .. Leaf12, each turned to its heading, sync_to_physics, his leaf layer 4 /
+mask 0) whose ConcavePolygonShape3D is the leaf's own triangles in the joint's frame -- the collision rides the dip and carries Mario. The script joins
+each body to his "palm_leaf_body" group so Mario.cs's landing hook (ILeafBouncer on the body's parent) reaches Bounce: the leaf he landed on (his floor
+contact among the bodies, else the leaf whose heading faces him) takes the touch impulse, or the hip drop's when his state is a ground pound. Every
+1/30 s the spring steps all twelve leaves; with PushWhileStanding (on) the leaf under his floor contact (his slide collisions after MoveAndSlide) takes
+the touch impulse that step, as touchPlayer does; the body's and the model leaf node's bases are their rest x Rx(angle). Knobs on Leaves:
+TouchImpulse, HipDropImpulse, Stiffness, Damping (the game's palmNormal numbers), FramesPerSecond 30, PushWhileStanding.
+
+**Verified** (the layout drive's leaf test, deleted before the commit; windowed 1280 x 720: secrect_level loaded, Palm0's Leaves.Bounce called 30 times
+= 30 frames of standing, the crown shot from the side six times): Leaf01's body and its mesh node agree to 0.01 degree at every sample; the dip 4.9
+degrees at 0.1 s, 14.1 at 0.5 s (the peak of a 0.03 rad/frame start under 0.01 / 0.97), back through 3.4 at 1.0 s, -8.7 at 1.6 s (the overshoot), 4.5 at
+2.5 s, 1.8 at 5 s -- the game's 2.1-s swing decaying; the twelve bodies in the group, each heading its leaf. dotnet build 0 errors. No shared code
+touched (a new class only), so the arena drives were not re-run. The runner, the logs, the shots and the tasks deleted; the save file untouched.
+
+**Deviations:** none in the mechanism; the game's per-leaf collision quads (joint-space) are replaced by each leaf's own triangles on the same joint.
+
+### 241 -- the SECRET COURSES, part 5: the courses at the GAME'S CLOCKS, with the GAME'S MUSIC, and Mario's stick no longer backwards -- the camera rig no longer inherits the spawner's -90-degree yaw when it goes top-level (SunshineCamera.cs), so the stick turns by the eye's true bearing; the Secret Course theme (MSD_BGM_EXTRA, k_ex.com) plays from the pan's first frame on into the course (new assets/Sms/Sound/SmsStageMusic.cs + Music/MSD_BGM_EXTRA.wav); every map object steps 120 times a second as the game's director performs it -- four times 237-240's pace -- and the pans and skies run at the game's 60 animation frames a second (feature/kingboo-casino, code `bd2bc4a`)
+
+**Jaysonn** (after 240): "marios controls feel backwards on each one. and can you include the music, the blocks are also seemingly slow."
+
+**The controls.** Mario.cs turns the stick by the body's basis and then by `springArmPivot.Rotation.Y`, the pivot's LOCAL yaw under CamController;
+`SunshineCamera.Apply` poses the pivot in WORLD terms. They agree only while CamController itself has no rotation -- and `SunshineCamera._Ready` sets
+`TopLevel = true` before Mario's own `_Ready` has zeroed his root, and Godot's `set_as_top_level` bakes the node's CURRENT global transform into its
+own: in a level whose PlayerSpawner is authored facing +X (both secret courses: the game's start) the rig came out turned -90 degrees for good, the
+pivot's local yaw sat 90 degrees off its global one, and stick-up sent Mario along -Z while the camera looked down +X (the controls test: pivot local
+yaw 0, global -90, CamController rotation (0, -1.5708, 0); 2 s of stick-up moved him (-2.39, 0, -5.12) against a camera forward of (0.87, -0.50, 0)).
+The fix: `_Ready` zeroes the rig's Rotation right after TopLevel (the rig never turns -- Apply places it and poses the pivot in world terms). No knob.
+
+**The music** (System/MSoundMainSide.cpp, `MSMainProc::setMSoundEnterStage`). Every secret course -- stages 46-51, coro_ex0-5; the Hillside Cave Secret is
+47 (coro_ex1), the Secret of Ricco Tower 48 (coro_ex2) -- has demoBgm = stageBgm = MSD_BGM_EXTRA with flags 0: `startStageEntranceDemo` starts it as
+the start camera's pan begins, the pan's end neither stops nor fades it, and `startStageBGM` does not start it again when Mario takes control -- the one
+play carries on into the course. MSD_BGM_EXTRA is k_ex.com in the game's own table (the decomp's enum names sit one lower than the game's ids
+throughout: its MSD_BGM_DELFINO in those cases IS the game's EXTRA -- 156's off-by-one again). Rendered as the other BGMs (`sms_bgm.py`: 3112 notes on
+the game's instruments, tempo 210 x timebase 120): a 6.84-s intro then an 82.29-s loop, two cycles in the file, the loop in the WAV's smpl chunk
+(2851962-5485104 at 32 kHz), 171.4 s; `level225.py` put it on MSD_BGM_BOSS's normalisation (x0.7281 of the raw mix; the peak -4.76 dBFS) and its row
+joins `SmsMarioSoundTable.Sounds` (volume 100 of 127, loop, id 0x80010012), so it plays at MusicDb -4 + the table's -2.08 = -6.08 dB on the Music bus
+like the boss themes. NEW `assets/Sms/Sound/SmsStageMusic.cs` on an AudioStreamPlayer: the Music bus, the slot level (ActorSoundLevel off = the
+node's own volume_db), Play() at _Ready unless SmsActorSound.Music is off (PlayOnLoad). The miss, the game over and the shine get already cut every
+playing Music-bus player (213's StopAllMusic) and the stage reloads after a miss, so the theme starts over with the course. Both level scenes gain
+the Music node (gen_level237.py).
+
+**The clocks** (System/MarDirectorDirect.cpp, `TMarDirector::direct`). The game's frame is 30 a second and direct() runs dt = 600 / 30 = 20 of
+simulation time per frame in 5-ms ticks: FOUR a frame, 120 a second, the movement list (CUE_MOVE) performed on EVERY tick, CUE_CALC_ANIM on the last.
+The CUE_MOVEMENT_GATE bits that would let an object skip ticks are set by no object in the game, so `TLiveActor::perform -> moveObject -> control`
+runs 120 times a second for every map object: TNormalLift adds its rail speed (yaw x 0.01 u) to mPositionDelta and counts its wait (pitch) down once
+per control; TRailBlock / TRollBlock likewise; TMapObjTree steps its leaf springs on every CUE_MOVE. Only the actor hit check is once a frame
+(`checkActorsHit` when mMoveTickCount & 3 == 0, `clearHitNum` otherwise), so the leaf's standing push lands on one tick in four. Animations:
+`MActorAnmEach::setFrameCtrl` sets every bck / btk / brk to SMSGetAnmFrameRate() = 2 frames per 30 fps frame -- 60 a second; the start camera's bck
+advances by that once a frame (`TCameraBck::updateDemo`; its demo frame count is (end + 1) x 2 at the 120 Hz tick). 237-240 took every one of these
+for 30 a second: the movers at a quarter of the game's pace, the leaves' swing four times too slow, each pan twice too long (16 s), the skies at half
+speed. Now: `gen_level237.py` TICKS = 120 for every rail speed, wait and spin it writes, ANM_FPS = 60 for the start camera's keys -- Hillside's lifts
+1.61-6.45 m/s (yaw 100-400) with 0.08-0.83-s waits (were 0.40-1.61 m/s, 0.33-3.3 s), its star lifts 0.64 m/s, its RollStar spins 48 deg/s, Ricco's
+umaibou 24-42 deg/s, the pans 7.97 s; `SmsRailBlock.cs` FramesPerSecond 30 -> TicksPerSecond 120 (the EX cubes' 4-10 u a tick = 6.4-16.1 m/s, the
+R1 blocks' 1-1.4 u = 1.6-2.3 m/s); `SmsPalmLeaves.cs` TicksPerSecond 120 for the spring (an accumulator over the physics step) and TouchEveryTicks 4
+for the standing push -- a stood-on leaf sags to 1.4 degrees with a 0.5-s swing, a hip drop's kick rings out in a second; the two sky shaders'
+frame_rate 30 -> 60.
+
+**Verified** (the layout runner's controls test on the committed scenes and build, windowed 1280 x 720, both courses): after the 7.97-s pan Mario stands
+at the game's start facing +X, the camera 9.2 m behind him looking +X, pivot local yaw -90 = global -90, CamController rotation (0, 0, 0); 2 s of
+stick-up moves him (3.79, 0, 0.25) -- 3.79 m along the camera's forward: CTRL PASS on both. The music playing from the pan's first frames (-6.08 dB,
+bus Music) and still 9.9 s on, the stream 171.4 s, loop mode Forward 2851962-5485104. The movers against the wall clock over 0.62 s: Ricco's
+Umaibou0 29.9 deg/s (30), RailBlock0 1.93 m/s turning 21.6 deg/s; Hillside's RollStar0 47.9 deg/s (48), StarLift0 0.64 m/s, RollCube0 6.3 m/s along
+its path (4 u a tick), the lifts 1.65-1.74 m/s net of their 0.5-s waits (3.22 while moving). The course shots of both rounds as 237-240's. The
+regression drive 68 / 68 (run gj) and the Shine HUD drive 8 / 8 (run ar) on the build with the camera change; dotnet build 0 errors, the clean
+rebuild 0 errors. The runner, the drive, the logs, the shots and the tasks deleted; the save file untouched.
+
+**Deviations:** Godot's physics runs at 60 Hz, so the movers' per-tick steps are integrated as speeds (the same distance a second) rather than 120
+discrete steps; the leaves' spring does step 120 times a second. Mario's landing push on a leaf lands the frame he lands rather than on the next
+hit-check tick. The game lets START / A / B skip the start camera's pan outside Delfino Plaza; his Level.cs plays it through (as before).
+
+### 242 -- a LEVEL SELECT screen in place of a hub: the Player Select screen again, for levels -- his CharacterSelect.tscn's layout node for node with his CharacterPoster as each level's WANTED poster (the level's picture, its arched name, a Shine stamped on at the pick), the Player Select's pick leading to it, and every level's way back running to it (a Shine's exit and the pause menu's Exit Area with no destination of their own; the two courses' Shines outright) (feature/kingboo-casino, code `9b1e3e4`)
+
+**Jaysonn** (after 241): "ok instead for the hub lets just make a level select like the char select screen"; of the first preview (the raw poster art on a
+blank sheet): "no i said make it like the char select scene this looks nothing like it".
+
+**The screen.** `assets/LevelSelect.tscn` is generated (`tools/projectshine/rematch157/select242/gen_select242.py`) from his `assets/CharacterSelect.tscn`:
+the same Background, the same eight Decor pieces at his offsets, rotations and scales (the six that snap-rotate on his SnapRotate.cs with his angles and
+holds, the left sun with his ArtGradient material), the Title strip with "Level Select" where his reads "Player Select", the Portraits HBoxContainer, the
+SelectHand and the FadeOut rect, all by the shared pieces' own uids. `LevelSelect.cs` is CharacterSelect.cs's flow for levels: one of his CharacterPosters
+per `LevelEntry` (the poster's SetEntry takes a CharacterEntry, so the level's picture goes where the head goes, its name art above, its stamp and colour
+with it), the hand centred under the focused poster, ui_accept -> `GameData.LevelSelectScene` = this scene, the stamp painted (PlayStamp + Stamp Hold
+Seconds), the fade to black, the level; ui_cancel -> the fade, then Back Scene (the Player Select). The arrival fades in from what the way here left on the
+screen: `GameData.FadeInFrom` if a screen set it, the Shine demo's (210, 210, 210) after a Shine's exit (ReturnWithShine), else black; `ReturnFromScene`
+puts the hand on the level just left and is then used up (the next level starts plain, not at 119's return spot). `LevelEntry` (new, a Resource:
+DisplayName, ScenePath, Art, NameArt, Portrait, StrokeArt, PaintColor, Unlocked): adding a level is a .tres under `assets/levels/` and a line in the
+Levels array -- four for the demo: Ricco Tower (`Levels/Rico4Secrect/Skybox/Rico4Secret.tscn`), Hillside Cave (`assets/secrect_level.tscn`), King Boo
+(`assets/Level.tscn`), Rematch (`assets/Sms/Rematch/RematchArena.tscn`).
+
+**The way in and back.** CharacterSelect.tscn's `LevelToLoad` = the Level Select (pick the character, then the level). `GameData.LevelSelectScene` (new,
+the run's, not saved) is set on a pick; Mario.cs's `SmsShineGetFinish` takes it as the Shine exit's last fallback before "this level again" (after the
+shine's own ExitScene and the pause menu's ExitAreaScene); SmsPauseMenu's `ExitAreaTarget` (new) is ExitAreaScene when the scene names one, else
+LevelSelectScene -- EXIT AREA shows and goes there (the third item only when there is somewhere to go, as the Plaza's menu). The two courses' ShineSprite2
+get `ExitLevel` = true, `ExitScene` = the Level Select (Hillside's had no exit; Ricco's went to assets/Level.tscn). His other scenes are untouched: they
+reach the Level Select through the fallbacks.
+
+**The art** (`select242/gen_art242.py`, measured off his sheets). His title is the New Super Mario Font (Mario Party 9) from his Windows fonts -- the
+glyphs line up letter for letter -- with the letters stood 15 % taller than the font draws them (his 'e' 0.96 wide to its height, the font's 1.12), a fill
+from red (250, 40, 30) at a letter's top through orange (255, 108, 37) at its middle back to red at its bottom, a darkening toward every edge, a
+near-black outline 3.6 % of the cap height and a soft shadow (5.7 %, 5.4 %) down-right; his sheet keeps air above and below so the title shows at his size
+in the 92-px strip (the capitals' fill 0.535 of the sheet, the baseline 0.751 down) -- "Level Select" is rendered the same way. His MARIO / LUIGI /
+PIANTISSIMO are the same font in caps on an arc (the middle highest, each letter turned to it: 0.22 radians a letter, his MARIO's; at most 2.2, his
+PIANTISSIMO's), 20 % taller than the font, a pastel fill with a glossy bevel lit from the top-left, a black outline a ninth of the letter height running
+letter into letter, a soft shadow -- RICCO TOWER (sky blue), HILLSIDE CAVE (cube orange), KING BOO (casino violet) and REMATCH (arena red) get the same.
+The pictures are square crops of course shots. The stamp a level's poster takes is a Shine Sprite (`StrokeShine.png`, `bake_stroke_order.py`'s encoding for
+his PaintReveal: eight rays round a disc with the two eye holes, painted round from the top) in the Shine's yellow -- a character's poster takes its
+letter.
+
+**Verified** (a windowed GDScript runner driving the screen as a player would, 1280 x 720, four rounds): the screen loads with the hand under the first
+poster and the black clearing; two ui_right steps put the hand under the third (the focused poster swells as his do); ui_accept paints the Shine, fades
+and loads the level -- King Boo's (6.7 s) and the Ricco course (4.3 s) -- with LevelSelectScene set; coming back as a Shine's exit leaves it, the hand sits
+under the level just left and the fade clears from (0.82, 0.82, 0.82); ui_cancel fades and loads the Player Select. Shots of each step beside his Player
+Select: the same brick, posters, hand and decor, his title size and letter shapes (the first sheet showed at 1.4 x his size and in the font's own
+proportions; measured and re-made). Leaving King Boo's level for the Player Select logs two "Handle is not initialized" from Godot's own
+`ScriptManagerBridge.SwapGCHandleForType` (the RefCounted weak / strong handle swap on a wrapper the GC collected during that level's load) while
+CharacterSelect.tscn instantiates; the screen loads and plays; not seen leaving either course. Regression drive 68 / 68 (run gk), the Shine HUD drive
+8 / 8 (run as); dotnet build 0 errors, the clean rebuild 0 errors. The runner, the drive, the logs, the shots and the tasks deleted; the save untouched.
+
+**Knobs** (all default to the screen as built): on LevelSelect -- Levels, Stamp Hold Seconds 0.45, Fade Seconds 0.7, Arrive Fade Seconds 0.4, Arrive From,
+Shine Exit Color, Back Scene, Select Hand Gap 16; on each LevelEntry -- Display Name, Scene Path, Art, Name Art, Portrait (a whole pre-made poster), Stroke
+Art, Paint Color, Unlocked; on a level's pause menu -- Exit Area Scene (its own destination; empty = the Level Select).
+
+**Deviations:** the game has no level select (its hub is Delfino Plaza); this screen stands in for the starting room for the demo, at his word. The
+pictures are provisional course shots -- any Texture2D in an entry's Art slot replaces one.
+
+### 243 -- the EIGHT remaining SECRET COURSES, each laid out as the game lays it out and built from the game's own pieces: The Secret of the Dirty Lake (coro_ex0), The Dune Bud Sand Castle Secret (mam_ex0), The Beach Cannon's Secret (coro_ex4), The Yoshi-Go-Round's Secret (sirena_ex1), The Hotel Lobby's Secret (coro_ex5), The Secret of Casino Delfino (sirena_ex0), The Secret of the Village Underside (monte_ex0), The Shell's Secret (rico_ex1); the Level Select grown to twelve posters (feature/kingboo-casino, code `0ed6e65`)
+
+**Jaysonn** (after 242): "can you go ahead and make the rest of the secret levels by spinning up agents for each one? and then coming back and iterating
+on what the agents do? i think i want every secret level in the demo. so go ahead and spin up agents to implement the remaining platforms and secret
+levels with their sky boxes and everything and then report back to me with all of it done."
+
+**The work.** Eight agents, one course each, from the game's own data pulled to the Mac (the vanilla `scene.bin` / `scene.ral` of each stage, the rip's
+models and skies, the decomp's MoveBG / Map sources) under one brief (`tools/projectshine/rematch157/secret243/BRIEF.md`): the game's layout at 1/74.44,
+Mario at the game's start, the start-camera pan, the game's pieces with their behaviour from the decomp, reuse where 237 mapped a piece already, the
+right sky, the Secret Course theme, a Level Select entry; shared piece types with one owner (the Beach Cannon's agent the wood blocks, signs and pile; the
+Yoshi-Go-Round's the Yoshi blocks and the yellow roll block; the Sand Castle's the sand block; the Hotel Lobby's the ice / watermelon / brick blocks).
+Their trees merged (`merge243.py`), then the iteration on the PC: 26 piece models whose glTF default metallic 1 drew them pitch black under a black sky
+made non-metal (`fix_metal243.py`); the Beach Cannon sky's four textures set to repeat (the shader clamped them, so every layer past UV 1 sampled a
+transparent edge and was cut away); the Yoshi blocks' white-with-spots look (the material's TEV colour now multiplied in); the moving bridge's body;
+the bridge's mesh moved up to be the `Model` child its script looks for (it sat under an extra node, so it loaded with an error and never tinted or
+cycled); the Level Select patched to the twelve courses in the game's course order (`patch_select243.py`) and its row made to slide (`LevelSelect.cs`:
+`RowWindowWidth` 952 = the Player Select's four posters and three gaps, the highlighted poster kept in the middle of that window, the first and last
+posters never leaving its edges, `RowSlideSeconds` 0.18, the seat re-taken when the row resizes -- four posters fill the window exactly, so the Player
+Select's layout is untouched).
+
+**The courses** (`Levels/Secret/<Name>/<Name>.tscn`, every count the game's): DirtyLake -- 10 blue and 7 red rail boards on `scene.ral`, 4 ride clouds,
+2 EX cubes, wood blocks, a normal lift, a roll block, the palm and banana tree, the switch and 8 red coins, 3 Shines, 2 1-ups; SandCastle -- 180 sand
+blocks, 29 lift cubes, 6 nails, 2 wood blocks, the start island; BeachCannon -- 16 wood cubes, 6 L-blocks, 2 triangles, 10 Yoshi blocks, 4 lifts, 3
+crates, 2 launchers, the pile, the arrow boards; YoshiGoRound -- 22 Yoshi blocks on their rails, 3 yellow and 3 blue roll blocks, 31 lift cubes, 14 long
+wood blocks, 11 wood cubes, an ice, a watermelon and a brick block, 3 nails; HotelLobby -- 73 sand blocks, 9 lift cubes, 4 ice, 16 watermelon and 44
+brick blocks, 7 coins, 4 Strollin' Stus and 3 winged ones, wood blocks, a rail block; CasinoSecret -- the course map, 11 EX cubes on their rails, 4 uirou
+lifts, an umaibou; VillageUnderside -- 13 large and 8 long wood blocks, triangles, cubes, an L, the bridge, 9 left-right and 3 up signs, the pile, 4
+launchers, 12 Piantas (11 Chucksters, one burning passer-by), 7 coins; ShellSecret -- 2 piles, 25 nails, 3 umaibou, 3 kamaboko, 3 green and 1 orange
+geta, 2 roll blocks, 2 wood cubes, the hidden red 1-up.
+
+**New pieces** (`assets/Sms/Map/`): `SandBlock.tscn` + `SmsSandBlock.cs` (TSandBlock: waits under Mario, sinks and shrinks, gone, restores);
+`YoshiBlock.tscn` + `SmsYoshiBlock.cs` + `.gdshader` (the rail orbit, hidden ticks, the recycle fade); `WoodBlockCube` / `WoodBlockL` /
+`WoodBlockTriangle` / `WoodBlockBridge.tscn` + `SmsWoodBlock.cs` (the recycling wood blocks: low, high, wait, fade); `WoodBox.tscn` + `SmsWoodBox.cs` (the
+crate a hip drop breaks, the chain within 2.8 m); `IceBlock` / `WatermelonBlock` / `BrickBlock.tscn` + `SmsBreakBlock.cs` (melt by water, break by hip
+drop or head hit); `RideCloud.tscn` + `SmsRideCloud.cs` (the cushion that grows wet and shrinks dry); `Uirou.tscn` + `SmsUirou.cs` (the rail lift that
+reverses at its ends); `Kamaboko.tscn` + `SmsKamaboko.cs`; `GetaGreen` / `GetaOrange.tscn` (on `MovingPlatform.cs`); `RailBlockB` / `RailBlockR` /
+`RollBlockB` / `RollBlockY.tscn`; `Pile.tscn`; `SignRiccoArrow` / `SignArrowUp` / `SignArrowLR.tscn`; `CasinoSecretMap.tscn`; `WaterHitHideObj.tscn` +
+`HiddenRedOneUp.tscn` (on the committed `SmsHiddenCoin.cs`); `SmsDirtyLakeWoodBlock.cs`; `assets/Sms/Npc/SmsChuckster.cs` (on `Pianta.tscn`: the throw,
+the burning one). **Skies** (`assets/Sms/Sky/`): `SkyBeachCannon` (the sunflower hills), `SkyYoshiGoRound` (the sunflowers), `SkyCasinoSecret` (the sunset:
+the clouds' 15000-frame btk, the rays' 4000, the glow's 30-frame brk), `SkyVillageUnderside` (the night: stars, moon, ring, cloud on a 4000-frame
+scroll), each a camera-followed dome with its shader and material `.tres`; the Dirty Lake, Sand Castle and Shell share `SkyHillsideSecret` and the
+Hotel Lobby `SkyRiccoSecret` (the same `sky.bmd` on the disc, byte for byte). Models under `models/Sms/Map/<piece>/` and `models/Sms/Sky/<sky>/`
+(the rip's glbs, textures pinned lossless, `pin243.py`). **Level Select**: `assets/levels/<Name>Entry.tres` x 8, `Font/LevelSelect/art_*` and `name_*`
+x 8 (the names in 242's arched lettering; the pictures provisional course shots cut by `art243.py`), `assets/LevelSelect.tscn` (twelve entries),
+`assets/LevelSelect.cs`.
+
+**Verified** (on the PC): every course loads with no errors and its piece census matches the game's counts (`piececheck243.gd`); eight shot sheets
+(`secretshot243.gd`: the start, four points along the course, the end, overhead, the sky, twice 3 s apart) reviewed after the fixes; the Level Select
+drive (`selectshot243.gd`, run d) 24 / 24: twelve posters, the hand under posters 0, 5, 11 and 3 with each inside the window and the row never leaving
+its edges, the pick loaded the Sand Castle in 4.6 s with `LevelSelectScene` set, the return put the hand on the Sand Castle, the cancel loaded the Player
+Select; dotnet build 0 errors. No shared C# changed besides `LevelSelect.cs`, so the arena drives were not re-run. The runners, drives, logs, shots and
+tasks deleted; Jaysonn's uncommitted files and the save untouched.
+
+**Knobs** (all default to the game's): on every piece its own -- the sand block's Wait Ticks / Fall Scale Per Tick / Minimum Scale / Gone Ticks /
+Restore Scale Per Tick; the Yoshi block's Rail Nodes / Node Speeds / Node Wait Ticks / Node Hidden Ticks / Recycle Fade Ticks / Speed Scale; the wood
+blocks' Low Offset / Move Speed / Visible Wait Ticks / Hidden Wait Ticks / Fade Ticks / Recycles / Tint; the crate's Break Duration / Chain Radius; the
+breakable blocks' Melt Per Water Hit / Auto Melt Threshold / Rule / Break Duration; the cloud's cushion length and speed, water duration and growth; the
+rail pieces' Rail Nodes / Rail Turns / Rail Speeds / Closed Loop / Start Node / Ticks Per Second; the Chuckster's throw speed, angle and outfit; every
+sky material's `speed`, `brightness` and `frame_rate`; the Level Select's Row Window Width and Row Slide Seconds.
+
+**Deviations** (the agents' lists, kept): the 100-coin Shines and the sign boards (NPCBoard) are not placed in any course; no break particles or sounds
+yet on the sand, wood, crate and breakable blocks; the Dirty Lake's EX cubes ignore flag 0x100 and its cloud is an Area3D; the Sand Castle's nail lacks
+the 120-tick cooldown and the 17 u/tick launch; the crate's chain is a 2.8-m radius not the game's four probes; the Yoshi-Go-Round's HasFludd = false has
+no post-clear branch; the Hotel Lobby's winged Stus use the existing enemy scenes; the Casino's seagulls and shimmer are absent and its cloud blend is
+additive; the Village has 11 Chucksters and one non-thrower (the vanilla data's twelfth is the burning passer-by) and its signs use a bounds box; the
+Shell's nail drops take 0.18 s and its hidden 1-up lacks the game's launch; the Village Underside's and Casino's skies were not GPU-compared against the
+game. The poster pictures are provisional course shots (an entry's Art slot replaces one).
+
+### 243b -- the two sunflower skies LIT the game's way: the Beach Cannon's and the Yoshi-Go-Round's sky materials carry lighting in sky.bmd, which 243 skipped, so their sheets showed at full brightness with a double gamma decode (a yellow-green grid, a saturated blue maze); now the stage's object light set lights each vertex as TLightCommon::setLight loads it, and the colour is decoded once (feature/kingboo-casino, code `525b99d`)
+
+**Jaysonn** (after 243): "ok do another pass some skyboxes look wierd and some platofrms are not rotating."
+
+**The skies.** Against the game's screenshots (`secret243/ref/`): the Beach Cannon's sky is (127, 126, 95) in the game where its dome sheet
+`B_EXskyYc` is (246, 248, 184) -- the sheet at 0.51; the Yoshi-Go-Round's is (16, 66, 102) on average where its sheet `B_EXenkeicanb` is (5, 158, 229)
+and the dome's vertex colour 0.82. Both skies' `sky.bmd` materials (the dome, the trees, the hedge, the sunflowers, the clouds) have `colorChan`
+lighting 1, matSrc vertex, ambSrc register, litMask 3, DF_CLAMP -- the only lit skies among the ten secret courses (the other eight are lighting 0).
+243's shaders drew the raw sheets and decoded the colour twice (`source_color` and a `pow 2.2`), which bent the pale yellow to (234, 240, 123) and the
+blue to (0, 70, 165) and made each sheet's fine weave read as a grid. The stage's lights come from `scene.bin`'s AmbAry / LightAry (`lights243.py`: the
+object set's ambient (128, 128, 128), its sun (255, 255, 255) at (200000, 500000, 200000), a sub sun (50, 50, 50) opposite, a shadow (80, 80, 80),
+a specular); `LightUtil.cpp`'s `TLightCommon::setLight` loads GX light 0 with the set's sun (the shadow draw buffer's with the shadow light) and no
+attenuation, and GX light 1 only while an effect light burns -- so the dome sees ambient + max(0, N . L) x the sun, with its inward normals: 0.502 flat
+wherever the sun is behind the surface (the game's khaki, the game's deep blue), brightening in the quadrant opposite the sun's azimuth.
+`SmsSkyBeachCannon.gdshader` and `SmsSkyYoshiGoRound.gdshader` now light per vertex in the model frame before the camera follow (knobs `stage_lit`,
+`ambient_light`, `sun_color`, `sun_position`), sample the sheets raw and decode once (`srgb_to_linear`); `SmsSkyCasinoSecret.gdshader` samples raw too
+(the 237 convention; its tones barely moved -- its top clouds (226, 127, 42) sit against the game's (225, 142, 41), its purple band (124, 42, 96)
+against (117, 80, 116)).
+
+**Verified:** rounds f and g shot (`run_sky243.bat`, `run_sky243g.bat`): the Beach Cannon's horizon sky (123, 124, 92) against the game's (127, 126, 95),
+its tree canopy (79, 77, 32) against (61, 62, 18); the Yoshi-Go-Round's sky (2, 78, 113) against (16, 66, 102); sheets reviewed. No C# changed.
+
+**The platforms.** A rotation census of all eight courses (`rotcheck243.gd`: every MovingPlatform spinner, rail block, Yoshi block, uirou, kamaboko
+and wood block measured over one second) finds every piece the game turns turning at the game's rate: the Shell's umaibou 36 / 72 / 48 deg/s, its
+geta 36-42, its roll blocks 30 / 36; the Yoshi-Go-Round's six rolling boards 24-84; the Casino's umaibou 48; the Dirty Lake's star 72 and its blue
+rail boards tumbling 85-135 deg in the second. Eight of the Casino's eleven glass cubes travel without turning because the game's rails give them
+no turn: `TRailBlock::control` turns a block over each segment by the angles of the node it is heading for (banked on arrival), and every node of
+`exlift00`, `01`, `03`-`08` carries (0, 0, 0), so in the game they slide too; the three whose nodes carry 180s (`exlift02` yaw, `09` pitch, `10`
+pitch + roll) make a half turn every segment here as there. The Dirty Lake's seven red boards showed no turn in the census second only because it
+fell in a flat stretch of their rails (60-degree pitches on the 100-u segments, none on the 400-u ones: a full turn per traverse, flat wherever
+Mario stands). Which platform Jaysonn saw standing still is asked in the report; if whole pieces sat still, the editor's Build is the first thing
+to check (243's new C# scripts -- the uirou, the kamaboko, the Yoshi blocks -- load only after it).
+
+### 243c -- the Casino's field cubes ROLL, Jaysonn's call over the game's data: the eight EXRollCubes whose rails carry no turn now roll like dice as they travel (a quarter turn per side length, flat at every node), a `RollWithTravel` knob on `SmsRailBlock` (off = the game) set on those eight in `CasinoSecret.tscn` (feature/kingboo-casino, code `0f5a976`)
+
+**Jaysonn** (after 243b's census found eight of the Casino's eleven cubes sliding): "The Casino cubes should still roll, make them"
+
+**The game.** `TRailBlock::control` turns a rail block over each segment by the angles of the node it heads for, banked on arrival; `exrollcube` has no
+`.bck`, so the rail is its only turn, and `sirena_ex0`'s `exlift00`, `01`, `03`-`08` give it none (every node (0, 0, 0)). The census measured those
+eight at 0.0 deg over 1.5-4.0 m; MarioWiki's course text has the first two cubes push Mario off and the field's push or squish him, with only the
+final "large, rotating cube" turning. So in the game they slide. **A logged deviation**, then: `SmsRailBlock.RollWithTravel` (off by default) rolls
+the block about the level axis across its path, the top forward, `RollSideUnits` (800, the cube's side at scale 1) per quarter turn -- the field's
+800-u segments are one side and the start's 1600-u crossings two, so every cube lands flat at every node; a dead-end reversal rolls it back; the roll
+sits outside the rail's own turn (`Roll(f) * RotRPH(turn * f) * accumulated`) and is banked with it. `CasinoSecret.tscn`: `RollWithTravel = true`
+on `RollCube00`, `01`, `03`-`08` (eight instance overrides; nothing else changed). `02`, `09`, `10` keep the game's 180-degree turns.
+
+**Verified:** the Casino census (run b): all eleven turn -- the eight at 33.8 deg over 4.03 m (a quarter turn per 10.75-m side, exactly), 25.1 over
+3.00 m; 02 / 09 / 10 unchanged; "rail blocks 11 (sliding 0)". Course shots (run h, two rounds 9 s apart) show the start's two cubes and the field's
+mid-roll. The all-course census (run c) after it: the other courses' rail blocks as in 243b (the knob is off everywhere but the Casino). Build 0 errors.
+
+### 244 -- the rail block AUTHORED like Jaysonn's `MovingPlatform`, for his custom levels: the same three inspector buttons, a metres-per-second speed knob, the rail drawn in the editor, grouped knobs, and a drop-in `RailCube.tscn` (feature/kingboo-casino, code `8bb9a21`)
+
+**Jaysonn:** "i did have a rail system implemented to spin the platforms. did you use that?" -- his `MovingPlatform.cs` drives every spinner and lift
+(the umaibou, the stars, the geta, the Yoshi-Go-Round's rolling boards, Hillside's lifts); `SmsRailBlock.cs` (237) drives the rail blocks and cubes
+(Ricco's 3, Hillside's 4, the Casino's 11, the Dirty Lake's 2 cubes + 17 boards, the Hotel Lobby's 1), because the game's rail block turns by a set
+angle per segment spread along the travel about the world axes with a speed per node, which his constant spin and his 80%-trigger `WaypointRotations`
+do not express. His condition: "as long as the moving platforms are easy to make in other levels when i start doing custom its fine".
+
+**What changed** (`assets/Sms/SmsRailBlock.cs`): his workflow on the rail block -- "Set Origin Here" (the block's spot becomes node 0 and the whole
+rail moves with it; makes the rail if there is none), "Add Node At Current Location" (the dragged spot becomes the next node, in game units in the
+parent's frame, a zero turn and the default speed padded in, the block snapped back to its start node), "Remove Last Node"; `MoveSpeedMetresPerSecond`
+(0 = the rail's own per-node speeds, the game's; above 0 = one speed for every segment); the rail drawn in the editor (`_Process` under
+`Engine.IsEditorHint` only, `SetProcess(false)` at run time): a yellow line along the segments, an orange cross at each node, the start node green, an
+UNOWNED `RailPreview` child the editor never saves, freed with the node; knobs in groups "Authoring", "Rail (the game's units)", "Pace", "Roll".
+New `assets/Sms/Map/RailCube.tscn`: his `rotating_block.tscn` with the rail script and `RollWithTravel` on -- drop it in, drag, click. No placed rail
+block runs differently (the knob defaults are the 243c values).
+
+**Verified:** `authortest244.gd` (run b) PASS -- the buttons' functions called as the inspector calls them: origin at 10 m -> node (0, 744.4, 0); a
+10.747-m drag + Add Node -> (800.0, 744.4, 0) with the block back home; padding to 3 / removal to 2; the editor line 14 vertices, unowned; the authored
+rail run at 2 m/s for 2 s: 3.97 m, 33.2 deg of die-roll. The rotation census of the eight courses (run d) as in 243c. Build 0 errors. Note: a running
+`AnimatableBody3D` with `sync_to_physics` reverts a transform set outside the physics step (the editor skips that guard), so the test drags with sync off.
+
+### 245 -- the breakable blocks, the crates and the sign boards get their REAL textures: 243 shipped 8x8 placeholder PNGs for eight models (the rip exported the .bmd's dummy; the game's textures live in the .bmt beside it), so the Hotel Lobby's bricks and watermelons, the Beach Cannon's crates and both courses' arrow signs drew white with a grey speckle (feature/kingboo-casino, code `bdec8d4`)
+
+**Jaysonn:** "ok the breakable blocks are a white mess you can see them in your own ref photots can you please fix it?"
+
+**The cause.** `brickblock.bmd`, `watermelonblock.bmd`, `kibako.bmd`, `arrowboardup/lr.bmd` and the two break models carry only an 8x8 dummy in their
+own texture block (`B_dummy`, `J_kibako_dammy`, `K_name_dummy`); the game applies the material table `<model>.bmt` beside each, which holds the real
+sheets (`B_rengaBLOCK` 128x64, `B_suikaBLOCK` 128x128, `J_kibako` 128x256, `K_yajirushiBoard` 64x32). The rip exports the .bmd's texture, so the
+agents shipped 95-byte stubs. **The fix:** the eight PNGs (`models/Sms/Map/{brickblock,brickblockbreak,watermelonblock,watermelonblockbreak,kibako
+(+ kibako_crash),arrowboardup,arrowboardlr}`) replaced by the .bmt textures (pulled with `bmd_tex153.py` from the disc files in `secret243/van/`),
+same file names, so no scene or glb changed; the glbs' wrap modes already match the .bmt's (brick / watermelon repeat, crate / board clamp). The
+IceBlock had its real `B_IceBlock` already.
+
+**Verified:** run k sheets of the Hotel Lobby, the Beach Cannon and the Village Underside: brown bricks with the game's mortar, green-striped
+watermelons, wooden crates with the label, pink sign boards (the sign's ARROW graphic is in neither file -- for the 246 review). Import clean. No C#.
+
+### 246 -- the secret-course REVIEW: ten agents, one per course, checked every placed piece against the disc data, the decomp and the models' material files; the one real wrong-way bug (the rail block's half turns) fixed, plus nine smaller fixes they shipped (feature/kingboo-casino, code `9a7b57c`)
+
+**Jaysonn:** "some blocks are still spinning the wrong way. have agents go clean up the levels and double check the work"
+
+**Method.** The committed tree pulled from the PC (`secret243/cur246/`); `secret243/BRIEF246.md` with the verified conventions (the `.tscn`
+`Transform3D` stores the basis ROWS; a placement is `Rz(roll) Ry(yaw) Rx(pitch)` with the standard right-handed matrices, `MsMtxSetXYZRPH`; TRollBlock
+spins about its local +Z by +speed, `MsMtxSetRotZ`; TRailBlock turns by the arriving node's angles about the world axes; TNormalLift's yaw field = speed,
+pitch = wait; 245's `.bmt` texture lesson). Every agent wrote a `check246.py` (scene vs scene.bin at 1e-3) and a `REPORT246.md`
+(`secret243/<stage>/`, Hillside `coro_ex1_hillside/`, Ricco `coro_ex2_ricco/`). **All ten checkers pass with 0 placement failures**: every position,
+rotation, scale, spin axis and sense, rail start node, first direction and speed is the game's; each report lists every mover's world-space sense.
+
+**The wrong-way bug.** `MsAngleDiff` keeps a half turn as +180 (its range is (-180, 180]); Godot's `Mathf.Wrap(180, -180, 180)` gives -180, so
+`SmsRailBlock` turned every 180-degree rail segment the other way: the Casino's exlift02 (yaw; the cube Mario rides forward at the start), exlift09
+(pitch; the one before the uirou) and exlift10 (pitch + roll; the big cube to the Shine) -- the cubes a player stands on. `ShortWay()` fixes it; the
+sense check (`signcheck246.gd`, run b): 02 about world +Y, 09 about +X, 10 about a positive X/Z blend. No other course has a 180 in its rails.
+
+**The other fixes merged** (the agents' `fix246/` trees): the Dirty Lake's triangle boards fade to BLACK on recycle (`TWoodBlock::calcRecycle` scales the TEV colour; the material is opaque) instead of going
+see-through; the Yoshi-Go-Round's lift honours its rail's `0x100` stop and flashes while recycling (`SmsYoshiBlock`); the Beach Cannon's wood blocks
+make TNormalLift's 1-u/tick first outbound step (`SmsWoodBlock`) and `WoodBlockTriangle`, `WoodBlockL`, `WoodBox`, `Pile`, `SignRiccoArrow` take the
+game's `.col` geometry for collision (the triangle's empty half was standable); the Shell's kamaboko make TNormalLift's initial 50-u descent and return
+to the right height (`SmsKamaboko`); the Hotel Lobby's ice block keeps melting through its tail and draws saturated and opaque like the game's I8
+material (`SmsBreakBlock`, `IceBlock.tscn`, new `SmsIceBlock.gdshader`); the Village takes `monte_ex0`'s cyan object-light set (ambient (0, 50, 50),
+sun (50, 170, 200), a grey sub light) in place of a generic warm light, its six tinted wood blocks get their tint (`Tint` was a misspelling of
+`TintColor`), its LR sign the game's hit cylinder; Ricco's red-coin Shine spawn the game's (1, 1, 0.75) scale.
+
+**Left for Jaysonn (not applied):** FLUDD -- the game's secret courses have none, the port's have it (`Level.HasFludd` defaults true; only the
+Yoshi-Go-Round sets it false; his placed `FluddItem` in Ricco has no scene.bin object); his `Nail.cs` (2 hits, a 1.5-m tween) against the game's
+TNail (3 hits of 50 u, instant, a 120-tick lockout). Also reported, not done: the arrow SIGNS' arrow graphic (in neither arrowboard file -- the Beach
+Cannon report's finding), the Ricco arrow's second (environment) TEV stage, the ride cloud's two-register lighting, the umaibou's 52-triangle `.col`,
+and the Casino map's ORANGE: `map.bmd` lights the wood by the stage's warm set (ambient (100, 80, 50), white sun) and multiplies by (1 + the (255, 63, 15)
+register); a plain tint drew it red and a gain pale yellow (run n), so the committed material stays until a lit-material pass like 243b's skies.
+
+**Verified:** build 0 errors; rotation census run e as 243c; sheets run m (Casino, Village, Hotel Lobby, Beach Cannon, Shell).
+
+### 247 -- Jaysonn's second playtest of the secret courses: the Shell's Secret gets its COURSE MAP, the Beach Cannon's wood blocks stand still and fade to black, the Yoshi blocks' egg pattern, the Casino's rolling cubes turn the other way (feature/kingboo-casino, code `3c7b49c`)
+
+**Jaysonn:** "ok again the cubes in hotel secrect is not rotating the right way. in the sunset style one. and yoshi style blocks still look curriuptyed.
+shell secrect also is missing tons of platofrms with vertex colors missing. beach cannon secrect dissapeaering platforms are mving? they should be still
+and the effect should be black. please make these correct"
+
+**The Shell map.** 243 shipped the Shell's Secret with its placed pieces only; the course's platforms, frames, pegs, glass walls and arrow panel are
+the stage's `map/map/map.bmd`. New `assets/Sms/Map/ShellSecretMap.tscn` + `models/Sms/Map/ShellSecret/map.glb` (+ 4 PNGs), built by
+`secret243/gen_shellmap247.py` the way the Casino's map was: the rip's glb cleaned to one unskinned mesh, materials, textures and vertex colours kept,
+metallic 0, the two glass materials translucent as `map.bmd` blends them ((62, 22, 85) at 76/255; a faint sheen), the disc's `map.col` (466 triangles)
+as the collision; instanced as `CourseMap` in `ShellSecret.tscn`.
+
+**The wood blocks** (`SmsWoodBlock.cs`). `TNormalLift::control` runs the hidden countdown, then the wait, then the recycle, and steps along the rail
+only when none of those is pending; every Beach Cannon wood block's rail node carries both the wait flag (0x800) and the recycle flag (0x1000), and
+arriving there (at load, and after every reset) re-arms both -- so the game never walks the block to its rail's other node. The cycle is now: wait
+(pitch ticks) -> fade to BLACK over 180 ticks (`TWoodBlock::calcRecycle` scales the TEV register; the material is opaque) -> hidden (roll ticks) ->
+back at full tint. 243-246 walked them down 200 u and back before each fade and faded the alpha. `WalkTheRail` (off) keeps the old walk as a knob.
+
+**The Yoshi blocks** (`SmsYoshiBlock.gdshader`): sampled CLAMPED (`yoshiblock.bmd`: wrapS 0, wrapT 0). The mesh's UVs run -1.414..1 / -1.664..1 (its
+VTX1 block): the spot polygons are sent below v = 0 (the sheet's top row, inside the spot) and the white polygons left of u = 0 (the left column), with
+the soft edge from the 0..1 quadrant; `repeat_enable` tiled the quarter-spot over them and cut it into crescents.
+
+**The Casino's roll** (`SmsRailBlock.cs`): `RollTopForward` knob, default off -- the top of the block moves AGAINST its travel, as the game's own ride
+cube exlift09 turns on its outbound leg (its +180 pitch over a -Z run carries Mario backwards); on = 243c's die roll.
+
+**Verified:** build 0 errors; the map imported; sheets of the Shell, the Beach Cannon and the Casino (run p, two rounds 9 s apart); `check247.gd`
+(run a): the Casino's 8 rolling cubes all TOP AGAINST TRAVEL (16.9 deg per 2.02 m) with the three ride cubes' axes as 246 left them; the Beach
+Cannon's 24 wood blocks moved 0.000 m over 14 s, 23 faded to black (darkest sample 0.00-0.02, alpha 1) and went hidden, the one without a rail static;
+the eight-course rotation census (run f) unchanged from 246.
+
+### 248 -- the nails work as the game's: three instant 50-u drops, a 1-s lockout, the hidden item thrown out of the top, the impact sound; the four courses' nails follow the disc's rewards (feature/kingboo-casino, code `7093902`)
+
+**Jaysonn:** "Make the nails work like the game's" (246 had reported his `Nail.cs`: two pounds of 1.5 m with a 0.18-s tween, the item 1.5 m up with its own bounce).
+
+**The game's nail** (`TMapObjNail::receiveMessage`, MapObjEx.cpp; `kugi.bmd`): on HIT_MESSAGE_HIP_DROP, if the state timer is not running and fewer than
+three hits: `mPosition.y -= 50`, the map collision rebuilt where it stands, MSD_SE_OBJ_KUGI_IMPACT, `mStateTimer = 120`, the hit counted; on the third
+hit the hidden object (the scene data's event: 100 a coin, 2000 a 1-Up, -1 none) is thrown with `throwObjToFront(obj, 200, mAppearSpeed, mAppearYSpeed)`:
+it appears 200 u over the nail's (sunk) position = 50 u over its start, with velocity (facing x appear speed, appear y speed) -- `loadHideObjInfo` gives
+appear speed 0 and appear y speed 17 u/tick for all 38 secret-course nails, a coin's life 1200 ticks.
+
+**`assets/Nail.cs`** keeps Jaysonn's class, scene layout and knob names; the defaults are the game's: RequiredHits 3, HitDropDistance 50/74.44 m,
+DropDuration 0 (instant; above 0 the old tween), ItemSpawnYOffset 50/74.44 m over the REST position, LockoutTicks 120 at TicksPerSecond 120,
+ItemAppearYSpeedUnitsPerTick 17, ItemAppearSpeedUnitsPerTick 0, ItemLifeTicks 1200, UseGameItemThrow (SmsDropTable.Launch: a coin flies with the game's
+item physics and life, a 1-Up body hops BodyItemPopMetresPerSecond 6; off = the item's own LaunchAsDrop), ImpactSound. The hit is a Mario in his
+ground-pound fall or landing inside the hit zone over the head, tested every movement tick (the game tests when his hip drop lands on the nail's
+collision); the super hip drop counts too. `HitCount()` / `HasSpawned()` for drives.
+
+**The sound:** `assets/Sms/Sound/Enemy/MSD_SE_OBJ_KUGI_IMPACT.wav` baked from the game's data (`sms_audio.py bake`, 0.94 s); `SmsActorSound.ActorOf["Nail"]`
+added so `Attach` hands the nail a sound node (211's lesson: an unknown type got null).
+
+**The courses** (`secret243/patch_nails248.py`, every nail matched to its scene.bin nail by position): Hillside's Nail1 and the Yoshi-Go-Round's Nail0
+now throw the 1-Up their event says (they gave coins); the Sand Castle's and the Shell's nails lose their per-instance restatements of the defaults (the
+Shell's item height was 200 u over the REST position, 2.15 m too high); the Shell's ten event -1 nails are empty, its two 1-Ups explicit.
+
+**Verified:** build 0 errors; `nailtest248.gd` (run b, the Shell's Secret, windowed) through the real path -- a jump, then L in the air over the head:
+Nail00 (coin), Nail01 (empty), Nail19 (1-Up) each drop 0.672 m at once per landing, sink 2.015 m after three, ignore a fourth; the impact sound plays at
+the nail; the coin / 1-Up appears 0.67 m over the rest position and rises, the empty nail throws nothing; the 120-tick lockout on Nail02's receive path.
+
+### 249 -- Jaysonn's two drawn characters join the Level Select's bottom row as painted-icon decor: flipping on his SnapRotate like the other doodles, their antenna bulbs blinking (feature/kingboo-casino, code `218a573`)
+
+**Jaysonn:** "ok lets add them to the level select page. near the bottom like the other icons" -- after the 248/248b figure work: his pasted drawing of the two
+characters, first rendered glossy (rejected: "they need to be in the style of the icons of the level select, so like the fish, sunflower and shell"), then
+painted in the menu doodles' wet-brush style by an agent and iterated here (tuning 7: the icons' smooth swelling line, flat paint, the drawing's proportions;
+tuning 8: arms and legs as tubes, eyes re-measured off the drawing; tuning 9: the first set's eyes back, the bow rebuilt as the drawing's two standing loops
+with a knot and gather lines). `tools/projectshine/rematch157/figure248b/paint248.py` renders the set; each image has a lights-off twin.
+
+**The textures** (`Font/LevelSelect/decor_big_on/off.png` 532x492, `decor_small_on/off.png` 384x355): the tuning-9 renders cropped to the union of each
+figure's lit and lights-off painted bounds plus 3 % -- one crop per figure, so the blink never shifts it -- at native pixels (the painted big one is 462 px tall
+for an ~86-px rect; his Pianta icon is 512 px for a 71-px one), transparent pixels zeroed.
+
+**The scene** (`assets/LevelSelect.tscn`, under `Decor` after the Pianta): `FigureBig` (94x87 at 536,554, rotation 0.08 rad; SnapRotate -15 deg / 0.5 s: it
+rests leaning toward the small one and flips away) and `FigureSmall` (71x66 at 642,581, rotation -0.1 rad; SnapRotate +15 / 0.5 s), the painted figures
+~86 and ~62 px tall (the drawing's 0.72 ratio; the big one the Sunflower's size), feet on one line at the screen's bottom edge, in the GreenBlob-Sunflower
+gap -- the only bottom-row spot that holds the pair at the icons' size (the painted doodles span x 531..706). `FigureBlink`, an AnimationPlayer with
+autoplay `blink`: a 1.5-s looping Animation whose two discrete value tracks (`FigureBig:texture`, `FigureSmall:texture`) key the lit twin at 0 and the
+lights-off twin at 1.0 s, plus a RESET to the lit twins -- so the bulbs are lit 1.0 s, dark 0.5 s, the pair in step. Knobs: the AnimationPlayer's
+`speed_scale` (the cadence) and the keys themselves in the editor's animation panel; the two SnapRotates as on every doodle. The P1 hand sits over the
+centred poster, i.e. over the big figure for posters 2-9; it ends 6 px above the figure's box (the glove ~20 px above the bulbs' rays).
+
+**Verified:** headless import (the four `.import` written, no errors); `selectshot249.gd` (run b, windowed 1280x720): both figures present with the right
+textures and his SnapRotate; FigureBlink playing `blink` (1.5 s, loops); both inside the screen under the poster row, between the GreenBlob and the
+Sunflower, feet within 2 px; 3.3 s sampled -- both twins shown, the two in step on every frame, lit 1.04 s / dark 0.50 s, 15-deg flips every 0.5 s; the hand
+at poster 2 ends above both figures; twelve posters; cancel loads the Player Select. Shots lit / dark / with the hand. No C# changed (no Build needed).
+
+### 250 -- Jaysonn's third playtest of the secret courses: the Dirty Lake's course map, the inside-out collision of his end platform / rail block / star platform made two-sided (the Village's "platform you fall into and cant leave"), the Secret Course theme without its Yoshi track (feature/kingboo-casino, code `5eda59a`)
+
+**Jaysonn:** "levels like dirty lake are missing platforms and the village underside has a platform you fall into and cant leave. please fix all
+the stages this is crazy how many details are missing. also the music is playing the yoshi version i think we just want the normal secrect level music."
+
+**The Dirty Lake's map** (`assets/Sms/Map/DirtyLakeMap.tscn`, `models/Sms/Map/DirtyLake/`; `secret250/gen_dirtylakemap250.py`, the Shell's 247
+recipe): coro_ex0's `map/map/map.bmd` is 95 KB -- the stage's white bolted block platforms (`_blo` unlit vertex colour, `_neji` the bolts, `_o17`
+lit) -- and its `map.col` has 152 triangles (the platforms up to y 15300 u and the fall surfaces); the 243 agent built the course from its placed
+pieces only, as the Shell's had. The rip's glb cleaned to one unskinned mesh, metallic 0; the col as a two-sided ConcavePolygonShape3D at 1/74.44;
+`DirtyLake.tscn` gains the CourseMap after its Sky. Checked: the other six courses' `map.bmd` are the 1824-byte sand plane (map.col 192 bytes),
+so this was the last course without its map. The `.import` the open editor wrote for the glb carried 11.7 MB of `importer_defaults`
+`_subresources` (Mario's animation settings); replaced by the lean form the headless imports write.
+
+**The collision** -- an audit of all ten courses, headless (`secret250/trapscan250.gd`: shape sweeps and probe bodies, which disagreed with Mario on
+kinematic movers; then `mariodrop250.gd` with MARIO HIMSELF: for every CollisionShape3D on his mask, the faces' world signed volume, a 1-m drop at
+the shape's top, a jump out). Five scenes had INSIDE-OUT faces (negative signed volume) with `backface_collision` off: one-sided faces whose fronts
+face inward let a body in and then hold it. Made two-sided with `backface_collision = true` (the geometry untouched; a closed shape is then solid
+from every side): his `Font/HudElements/ending_platofrom.tscn` (the end platform of the Village, Hotel Lobby, Beach Cannon and his Ricco and
+Hillside; 364 triangles, 13.43 m wide x 8.06 m tall at his 2.662 scale = the game's normalvariant3.col extents exactly; its top faces were right,
+its walls inverted -- in the Village the pedestal's wall stands on WoodBlockLong05's top (84.6), so Mario walking into it sank in and stayed), his
+`Levels/Rico4Secrect/Skybox/railvariant1.tscn` (all 320 triangles inverted; the Hotel Lobby's GearRailBlock, the Shell's RollBlock0, his Ricco rail
+blocks -- Mario fell into their tumbled faces, TRAPPED in the audit) and his `StarPlatform.tscn` (the Dirty Lake's RollStar, his Hillside stars).
+Left alone: his banana tree's leaf sheets (BananaLeafBounce.cs builds them one-sided; open surfaces, Mario landed on them in every drop).
+
+The audit's other fall-throughs were its own artefact, understood before anything was changed: a drop sampled on the LOWER block of a stack starts
+its ray inside the upper block (a ray does not report the shape it starts in), so Mario was set inside the upper block, pushed out through its
+bottom and left embedded; a riding Mario then snaps back from every later teleport, so a whole tower read TRAPPED (`check250.gd` frame by frame:
+NormalBlock13, the Yoshi-Go-Round tower's top, lands at -0.01 m; NormalBlock12 under it reads -1.82 from frame 0). The umaibou and the Casino's
+rolling cubes read the same way across their turning arms and faces; whether Mario rides a turning body cleanly is not something this audit can
+tell from a teleport, and he has not reported it.
+
+**The music** (`sound154/sms_bgm.py`: `Bgm.render(yoshi_drums=False)` leaves out every track that is child 15 of its parent; `--yoshi-drums`
+keeps it): `MSound::setParameterSeqSync` case 0 sets `mMute` on the track that is its parent's child 15 when the sequence syncs, and
+`MSBgm::setStageBgmYoshiPercussion` (Yoshi.cpp, mount / dismount) un-mutes and re-mutes it for BGMs whose switch has MSBgmSwBit_YoshiPercussion
+-- the Yoshi percussion part. k_ex.com's track 15: 537 notes on program 120 (241 rendered them in -- the "Yoshi version"); t_boss.com's: 6 notes
+on program 103; t_chuboss.com and the jingles have none. `MSD_BGM_EXTRA.wav` re-rendered (171.4 s, the same 6.84-s intro and 82.29-s loop,
+loop 2851962-5485104; level225 x0.7281 of the raw mix as before, so the remaining tracks keep their level; peak -5.09 dBFS) and
+`MSD_BGM_BOSS.wav` (98.9 s, loop 133806-3165384, x0.7281; the drums-kept render is byte-identical to the shipped file, so those six notes are
+the only change).
+
+**Verified:** `check250.gd` (windowed) -- CourseMap/StaticBody3D with the disc's 152 two-sided triangles and the mesh; Mario stands on the map's
+three highest platforms (205.53); the Village end platform's wall pushes a straddling Mario back out (z -89.8 -> -89.52 against the wall at -90.0)
+and he stands on its top (91.16); the Yoshi-Go-Round tower's top block lands him clean. `mariodrop250.gd` run c over the five courses that
+carry the fixed scenes: no one-sided inside-out shape left but the banana leaves. No C# changed (no Build needed).
+
+**Not in this pass:** the Shell's climbable PoleNormal (no pole mechanic in the project), the 100-coin Shines, the Casino's seagulls and shimmer,
+the invisible NPC boards -- all as the 243 reports listed them. Jaysonn moved the Level Select's GreenBlob, Sunflower and the two 249 figures in
+the editor while this pass ran; that edit is his, uncommitted in his tree.
+
+### 251 / 251b -- the Level Select shows two courses for now (Ricco Tower, Hillside Cave); the Player Select and the Level Select play Jaysonn's menu song, one play carried across the two screens; the Level Select's hand clicks with the yes / no cursor sound and A plays the talk window's band (feature/kingboo-casino, code `3bef906` + `f0e1912`)
+
+**Jaysonn:** "ok there are still a bunch of broken things in all the levels we will fix them later. for now can we just have the level selct have rico, and
+bianco hill screct? and also for char select and level i have a song in the ref folder to use Level&CharSelectMusic.mp3" -- then: "next i want the sound of
+when you pick yes or no for dialog option box as the sound it makes picking the levels. and when you press A it plays the sound of a text box opening."
+
+**The list** (`assets/LevelSelect.tscn`): `Levels = [RiccoTowerEntry, HillsideCaveEntry]`; the ten other entries are off the scene's list but their
+`.tres` files stay under `assets/levels/` (an entry back on the list brings a course back). The scene is his working-tree file, so this commit also
+carries the decor moves he made in the editor tonight (GreenBlob, Sunflower, FigureBig, FigureSmall) and the editor's normalisation of it.
+
+**The song** (`assets/Sms/Sound/Music/LevelCharSelectMusic.mp3`, his `Ref/Level&CharSelectMusic.mp3` renamed without the `&`; 73.2 s): new
+`assets/Sms/Sound/SmsMenuMusic.cs` on a Music node in both select scenes. One piece for both screens, so it does not restart on the way from the Player
+Select to the Level Select: the first menu to ready hands the song to a KEEPER of the same class under `/root/SmsMenuMusic` (CarryAcrossMenus; the next
+menu with the same song leaves it playing); the keeper watches the current scene each frame and, when none of its children is an SmsMenuMusic -- a level,
+the title -- fades out over FadeOutSeconds (0.35) and frees itself; StopAllMusic cuts it like any music player; a return to the Level Select starts it
+over. Loop (+ LoopOffset) on the mp3 stream as the rematch does; StreamDb -5.2 on top of SmsActorSound.MusicDb on the Music bus (the song is mastered
+loud: RMS -12.4 dBFS, peaks at 0, against the boss theme's render at -17.6; -5.2 puts it level with the themes); SmsActorSound.Music off = silent.
+
+**The sounds** (251b, `assets/Sms/Sound/System/`, baked from the disc's sequence data with `sms_audio.py bake`): `MSD_SE_SY_E3_MENU_CURSOR.wav` (0x481E,
+0.19 s: the talk balloon's yes / no highlight moving, also the card save's hand) on the hand's move to ANOTHER level, and `MSD_SE_SY_TALK_OBI.wav` (0x4827,
+0.76 s: a talk window's band rolling open) on A as the pick begins. `LevelSelect.cs`: MoveSoundPath / ConfirmSoundPath (Sfx/Move, Sfx/Confirm), both on
+the Sfx bus at the sound table's level (SoundsAtGameLevel: 127 -> 0 dB, 60 -> -6.5 dB); nothing on the first highlight at load. Two alternatives shipped
+for the knobs with table rows: `MSD_SE_SY_SELECT_COMMON.wav` (the yes / no PICK) and `MSD_SE_SY_TALK_MODE_IN.wav` (talk mode begins). The Player Select
+has no sounds yet (not asked). A first wiring as [Export] AudioStreamPlayer fields set by NodePath came up null at run time; the project's NodePath +
+GetNodeOrNull convention is used.
+
+**Verified:** build 0 errors (the marker constants read in the DLL as UTF-16 through PowerShell -- an ASCII findstr misses a C# string constant);
+`menushot251.gd` (windowed): the keeper plays on the Music bus at -9.2 dB, looping; the pick loads the Level Select with the SAME keeper still playing
+(2.20 s -> 4.96 s: no restart); two posters, the hand on Ricco Tower, a right step to Hillside Cave; the pick loads `assets/secrect_level.tscn`, the keeper
+is gone 1.5 s in and the course's own MSD_BGM_EXTRA plays. `soundshot251b.gd` run b: the two players on the Sfx bus at 0 / -6.51 dB, nothing on the first
+highlight, a right step plays Move, a left step again, a step at the row's start moves nothing and plays nothing, A plays Confirm, the pick loads Ricco.
+
+**251c** (code `ff07c28`) -- Jaysonn: "no not that sound for the pick it should be the sound the text box makes when it appears not the text showing on the
+screen. make sense?, Give the Player Select the same two sounds". The pick sound on both screens is now `MSD_SE_SY_TALK_MODE_IN` (0x4804: the sound
+`MSound::talkModeIn` plays the moment a talk begins -- the box coming up); TALK_OBI was the balloon's bands rolling out line by line, i.e. the text showing.
+The Player Select gets the Level Select's wiring (`CharacterSelect.cs`: MoveSoundPath / ConfirmSoundPath / SoundsAtGameLevel; the Sfx node in its scene)
+-- the yes / no cursor click on the hand's move between characters, the talk box on A. `MSD_SE_SY_2D_IN.wav` (the save card's window coming in) joins
+System/ and the table as the other "a box appears" sound for the knob. Verified on both screens by `soundshot251c.gd`: the players on the Sfx bus at
+0 / -2.08 dB (127 / 100 of 127), nothing on the first highlight, each step clicks, A plays the box as the pick begins, both picks load.
+
+### 252 -- King Boo and King Boo's Rematch back on the Level Select; the rematch's intro can no longer be skipped, a miss still goes straight into the fight (feature/kingboo-casino, code `2e6d088`)
+
+**Jaysonn:** "next put the king boo and rematch back on the level select then make it so you cant skip the intro cutscene on the king boo fight. but keep it
+where if you die you just go right into the fight".
+
+`assets/LevelSelect.tscn`: Levels = [Ricco Tower, Hillside Cave, King Boo, King Boo's Rematch] (the entries' `.tres` files had stayed; two lines back).
+
+`assets/Sms/Rematch/SmsRematchIntro.cs`: `SkipAllowed` defaults to OFF -- A no longer skips the two-line card nor cuts the 174 look-about cutscene short;
+the intro plays through. The miss path is as it was: after a death `GameData.CameFromMiss` sends `Start()` straight to the fall (no card) and gates the
+cutscene off -- Mario falls in and King Boo comes. The knob is per scene; RematchArena.tscn does not set it (neither the committed file nor his uncommitted
+copy), so the default applies without touching his scene. Which intro he meant: the casino fight's own intro (the disc ride) never had a skip, and only the
+rematch's had both a skip and the straight-in-after-a-miss rule he describes. The mid-fight split cutscenes keep their A skip (SplitSkipAllowed; not asked).
+
+**Verified:** build 0 errors; `introshot252.gd` (windowed): four posters in that order, the hand reaches the Rematch in three steps; the arena loaded plain --
+A 1 s into the card leaves it up, the card ends by itself 5.2 s later, the cutscene begins, A during it changes nothing, it runs to its end in 8.5 s
+unskipped; the arena reloaded with CameFromMiss -- no card, falling at 1 s, the fight on at 7 s with no cutscene state passed.
+
+### 253 -- the GameCube controller adapter read directly over USB (the Mayflash in Wii U / Switch mode, Nintendo's own): a Godot joypad per port with the triggers' analog pulls AND their clicks (feature/kingboo-casino, code `d134da2`)
+
+**Jaysonn:** "ok we need to touch up on the controller. i wanna be able to use mayflash so my gamecube controller work on my godot game. rivals of aether 2
+does this. i want it on mine so we have proper trigger work".
+
+**Why directly.** In Wii U / Switch mode the adapter (USB 057E:0337) is no Windows gamepad at all -- Dolphin and Rivals of Aether 2 read it over USB
+through the WinUSB driver (the Zadig step), which is where the real analog triggers and the 125-Hz reports come from; the Mayflash's PC mode is a plain
+HID pad with flattened triggers, and his Delfinovin route (the adapter turned into an Xbox pad) loses the click.
+
+**`assets/Sms/Input/SmsGcAdapter.cs`** (autoload `SmsGcAdapter`, `project.godot` [autoload] after GameData; Windows P/Invoke -- setupapi, winusb,
+advapi32; idle elsewhere): finds the present 057E:0337 by its driver's own interface GUIDs (the `DeviceInterfaceGUIDs` a WinUSB install writes; libusb's
+way) and the hub's generic USB interface, opens it (CreateFile, WinUsb_Initialize), sends the 0x13 start command and reads the 37-byte reports on a
+thread (0x21, then a port: status 0x10 wired / 0x20 WaveBird, A B X Y and the D-pad, Start Z and the R / L CLICKS, both sticks, the two analog triggers
+0..255). The physics tick turns changes into joypad events on device 20 + port through `Input.ParseInputEvent` (+ FlushBufferedEvents, so the same
+tick's actions read them): A B X Y -> 0-3, Start -> 6, Z -> 10 (`button_z`), the L click -> 9 (`button_l`), the R click -> 17 (paddle 2; a
+`button_rclick` action added when the map has none -- `Mario.SmsRClick`, the stand-and-aim spray), the D-pad -> 11-14, the main stick -> axes 0 / 1,
+the C stick -> 2 / 3, the analog pulls -> axes 4 / 5 (`button_l` / `button_r` strengths: Mario's `_fluddR` is the game's mAnalogR). Sticks calibrated
+at the controller's first report (the console's power-on origin; `Recalibrate()`), StickRange 100 raw = full, StickDeadzone 6; triggers from their rest,
+TriggerFull 170 raw = 1.0. A port that goes releases what it held; the adapter lost is rescanned every 2 s; `Rumble(port, on)`. When the adapter is
+there but will not open, the log says why once: no WinUSB driver (Zadig), or another program holding it.
+
+**His PC tonight:** the Mayflash is plugged in in Wii U mode (WUP-028, serial 15/07/2014) with the WinUSB driver already on it (libwdi's "GameCube
+Controller Adapter"), but Delfinovin and Dolphin were running and WinUSB gives the adapter to one program at a time, so the game's open got ACCESS_DENIED
+and said so. The live read awaits Delfinovin closed; the report -> input chain is verified with injected reports.
+
+**Verified:** build 0 errors; `gcdrive253.gd` run b (headless, reports injected as the USB thread stores them): the autoload, `button_rclick` as joypad
+17; a rest report sets the origin; A X Z and the R click press the actions, the R pull (180 raw over rest) = `button_r` 1.0, a half pull 0.375 (the
+action's 0.2 deadzone) with no click, the main stick +80 raw = Lstick (0.8, 0), the C stick +60 up = Rstick (0, -0.6), the L click + pull = `button_l`
+1.0, the D-pad on device 20; a rest report releases all; a 'no controller' report drops the port; a short report is refused.
+
+### 254 -- FLUDD's water drawn the game's way: textured view-aligned quads with the frame refracted through them, the water tint and the glints, and the flat wet disc where a drop lands (feature/kingboo-casino, code `dfe1bea`)
+
+**Jaysonn:** "can you go and add the textures for fludd now for the water. so it doesnt look like blue spheres?"
+
+**The game's draw (ModelWaterManager.cpp).** calcDrawVtx (770) builds every flying drop as a quad in VIEW space: a diamond whose front and back corners
+lie along the on-screen velocity -- vtx0 = pos + n + vel x mExtension x 4.0 (unk5D18), vtx2 = pos - n - vel x ..., n = the unit on-screen velocity
+x 1.414 x size / 2 -- and whose side corners sit across it, UVs (0,0) (1,0) (1,1) (0,1) (DLUtil.cpp's TDLTexQuad), so the texture's disc is drawn out
+into a streak along the flight. drawRefracAndSpec (1806) then draws that quad three times: the screen (TScreenTexture, the frame at 320 x 224)
+through an indirect warp -- waterref.bti's texel - 128 times 0.07 (unk5D1C) texels, S from its alpha, T from its intensity -- at alpha 255 (unk5D65)
+x waterMask.bti; the water colour gModelWaterManagerWaterColor[0] = (0x3C, 0x46, 0x78) at 0x14 x the mask; and the glint, (0x8e, 0x8e, 0x9e) +
+waterSpec.bti x (0xbc, 0xcc, 0xdc) at alpha waterSpec, ADDED. A landed drop is drawWaterVolume (1029): water_shadow_yuka.bmd (a ball of radius 11.76)
+scaled by size x mMagnify x the life left into destination alpha where it meets the ground (128, then the screen's alpha x 80 / 255), the water
+colour through it -- a flat disc at 0.157; and move() 677-690 MERGES landed drops: one within 2.5 x (size + size) of an earlier one hands it its size
+and life and dies, so there is one disc a spot.
+
+**`assets/Sms/Fx/tex/waterref.png`, `watermask.png`, `waterspec.png`** (+ pinned `.import`): the three `/mario/timg` textures out of chr0.szs
+(IA8 / I8 / I8, 32 x 32). **`assets/Sms/Fx/water_drop.gdshader`** (new): the vertex shader is calcDrawVtx on the MultiMesh instance (translation = the
+drop, INSTANCE_CUSTOM = velocity x mExtension and size, or -1 for a puddle, which then takes the instance basis as its plane and extent); the fragment
+composes the three passes as the game's premultiplied source and coverage in display space (the screen taken to sRGB as this project's GX shaders do)
+and hands Godot the linear source with the coverage as alpha; a puddle is the tint at puddle_alpha through the mask's hardened edge. Z test on, no
+write, no cull, no fog. **`assets/Sms/SmsWaterDrops.cs`**: the sphere mesh and its StandardMaterial3D are gone -- a 4-vertex quad with custom data,
+the shader with the three textures and the game's numbers as public knobs (WaterColor, SpecBase, SpecGain, RefractScale, RefractAlpha, Tail,
+PuddleAlpha, PuddleRadius 11.76, PuddleWallHalfWidth 8.5 / Up 7.29 / Down 14.1 from water_shadow_kabe.bmd, PuddleLift 2, MergeReach 2.5,
+ExtraCullMargin 8); _Process draws the puddles first (one a cluster, the merge applied to the drawing only -- the drops still sit and clean as
+before -- on the kept landing normal, 2 units off the surface) and then every flying drop as the quad. The old Magnify x 2 draw scale is gone: a
+drop's drawn disc is its size, as the game's.
+
+**Verified:** build 0 errors; `waterdrive254.gd` run f (windowed; a bare stage with a checkered floor, a wall and a 2.15 m post; the spray nozzle's
+emit at the floor then the wall) 17/17 -- the shader, the three 32 x 32 textures and the custom data on the MultiMesh, the game's water_color / tail /
+ind_scale, one puddle for one landing spot (7 visible instances = 1 puddle + 6 flying of 38 drops), the stream changing the pixels along its arc from the
+side and from behind, the landing spot bluer and the floor 4.7 m away unchanged, the wall hit one patch, all gone 2.5 s after the spray; runs c / d in
+the Hillside Cave course from its PlayerSpawner. Before / after shots in tools/projectshine/rematch157/water254/.
+
+**Left for later (DONE in 263):** the landed drops' 256-tick life, the slide, the simulated merge, and the silhouette pass -- which is the WATER drawn in
+Mario's through-the-map silhouette (TSilhouette), not Mario seen through the water as this note had it.
+
+### 255 -- a controller on the Player Select and the Level Select: A picks, B goes back, the stick and the D-pad move the hand (feature/kingboo-casino, code `732f8d6`)
+
+**Jaysonn:** "the controller doesnt work for the char and select menu can you fix it? A should select whatever the cursor is on and the control stick
+should move it left and right".
+
+**Why it did not.** Both screens confirmed on Godot's `ui_accept` and went back on `ui_cancel`, and the project's map has `ui_accept` = Enter / Kp Enter /
+Space and `ui_cancel` = Escape -- no pad button at all (the game's own `button_a` / `button_b` are joypad 0 / 1). The stick reached the hand only through
+Godot's focus navigation (`ui_left` / `ui_right` carry axis 0 and the D-pad), which needs a focused poster and steps on every motion event over its
+deadzone. The first headless drive showed it: the stick moved the hand, A did nothing.
+
+**`assets/CharacterSelect.cs`, `assets/LevelSelect.cs`** (PadControls, on): `_Input` takes the left stick's axis 0 from any device (Godot's joypads, the
+GameCube adapter's 20+) before the GUI sees it -- past StickThreshold (0.5) the hand moves one poster (`MoveHighlight`: the poster takes the focus,
+`Highlight` follows with the sound, the hand and the Level Select's row slide) and not again until the stick is back inside StickRelease (0.3); the event is
+marked handled so the focus navigation never steps as well (a held stick moved twice in the first cut). `_UnhandledInput`: `button_a` confirms beside
+`ui_accept`; on the Level Select `button_b` goes back beside `ui_cancel`; `ui_left` / `ui_right` (the D-pad) move the hand when no poster had the focus.
+
+**Where the work happens now.** Jaysonn pushed the branch (his `d169f04` "Commit outstanding work" on top of 254's log commit) and put Godot 4.7.2 mono on
+the Mac; the repo is cloned at `~/Repos/ProjectShine` there, with the .NET 8 SDK in `~/.dotnet` and a full headless import done. This pass was built,
+driven and committed on the Mac and PUSHED from it -- the PC is no longer in the loop. Two local-only things in that clone, never committed: a
+`[filesystem] import/blender/enabled=false` line in project.godot (no Blender on the Mac; the headless import stops at the repo's two .blend files
+without it) and the editor's 4.7.2 re-stamps of the `.import` files and Mario's `.res` clips. His `d169f04` also swept the PC's 255 drive leftovers
+(`menudrive255*.gd / .log / .out / .err`) into the repo; this log commit removes them.
+
+**Verified** (Mac, Godot 4.7.2 mono headless): build 0 errors (markers in the DLL); `menudrive255.gd` (joypad events on device 0) 17/17 -- the stick
+moves the hand on both screens with and without a focused poster, a HELD stick moves once and a second push after the centre moves again, A on the
+Player Select brings up the Level Select, B there goes back and A again comes forward, the D-pad with no focus puts the hand on a poster.
+
+### 256 -- the Hillside Cave Secret's two star platforms before the goal turn as they circle: the game's SPLINE rail lift (feature/kingboo-casino, code `4cd0868`)
+
+**Jaysonn:** "the star platforms at the end of hillside secrect need to rotate and they are not".
+
+**What the game does.** normalvariant0 0 / 1 are TNormalLift objects on the rails `S_block00` / `S_block01`: closed four-node diamonds 100 u across, every
+node yaw 40 (the speed, 0.4 u a tick). `TGraphWeb` gives every rail whose name starts with `S_` a `TSplineRail` (graph.cpp 145) -- `TSplinePath`'s natural
+cubic spline on a chord-length parametrization, closed (last node, every node, the first, the second; t wrapped between the first node's t and its
+repeat). On a spline the lift does not walk node to node: the tracer advances t by speed x (t ahead - t behind) / chord (`calcSplineSpeed`, `traceSpline`),
+the position is the spline at t and `mRotation = MsGetRotFromZaxis(spline(t + 0.01) - spline(t))` (MapObjRailBlock.cpp 75) -- it faces along the curve, so
+a star on a closed loop turns once a lap while it circles (a lap = 4 x 141.42 u at 0.4 u a tick = 11.8 s, about 30 deg/s). 237-238 had put the two on
+MovingPlatform's straight waypoint loop with no rotation: the 15-m star slid round a 1.3-m square and never turned, which read as nothing at all.
+
+**`assets/Sms/SmsSplineLift.cs`** (new): the port -- TSplinePath (makeTable / calcSpline as written), TSplineRail (wrapT; getPosAndRot with the 0.01
+look-ahead; MsGetRotFromZaxis: yaw = atan2(x, z), pitch = -asin(y)), the tracer on the spline (the wrap cases of calcSplineSpeed / traceSpline;
+getShortestNextIndex: the one not come from, else the nearer, the lower index on a tie), TNormalLift::control's speed re-read at each node (1.0 u a tick
+before the first node, the game's unk144), Rz Ry Rx for the facing, the authored scale kept out of it, 120 ticks a second, an AnimatableBody3D with
+SyncToPhysics so Mario rides it. One difference, deliberate: the game's tracer starts at t = 0, which wraps onto the LAST node's stretch (its lift jumps
+there on its first tick); here t starts at the node the lift stands on. Knobs: RailNodes, RailSpeeds, ClosedLoop, StartNode, FirstSpeed, UnitsPerMetre,
+FaceAlongRail (off = the placed rotation kept), LookAheadT, TicksPerSecond, SpeedScale, Active. **`assets/secrect_level.tscn`**: StarLift0 / StarLift1 on
+the new script with the disc's four nodes each (the script set on the instance, as the RollCubes carry SmsRailBlock). The mid-course RollStars (48 deg/s in
+place) are untouched.
+
+**The Mac clone, two things learned:** a headless `--import` under 4.7.2 REWRITES Mario's animation `.res` files under `models/` (they are the glb
+import's saved-to-file animations), and the rewritten clips' tracks no longer resolve (`Node/Skeleton3D:...`): Mario's AnimationMixer then logs some 75
+warnings a frame and a 15-s drive writes a 2.8-GB log. `git checkout -- models/` after any import puts the committed ones back; they must never be
+committed from here. And a `--script` drive must wait for `current_scene` by name before touching it (the course takes more than a few physics frames to
+load on this machine); a GDScript error before `quit()` leaves the tree running until the bound.
+
+**Verified** (Mac, Godot 4.7.2 mono): build 0 errors; `starcheck256.gd` (headless, 15 s sampled) 13/13 -- each lift sweeps 494 deg in 15 s (32.9 deg/s),
+circles its rail's centre at 1.27..1.35 m, stays level, runs at 0.4 u a tick after its first node, the two turn opposite ways as their mirrored rails
+run; before the fix the same probe read 0.0 deg of yaw over 2 s. Windowed frames 3 s apart show the stars turning.
+
+### 257 -- A on a ledge is the game's quick hop: ma_hgjmp in place, no launch (feature/kingboo-casino, code `0c85db6`)
+
+**Jaysonn:** "we need to fix marios get up animations from the ledge when pressing A he should do a quick hop. right now its not like that he gets flung
+onto the platform".
+
+**The game.** hanging() on A -> HANG_JUMPING (MarioSpecial.cpp 457; on its own when a floor is within 100 u under the hang, 582), with the exert voice.
+hangJumping() (629) is waitProcess() -- no movement, no velocity -- plus ANIM_HGJMP, and WAIT on the clip's last frame; B drops him (LAND_SAFE_DOWN). It is
+ASCEND's shape (ma_hgup), which the port already did right: the clip carries the body up over the edge. The port's A path instead moved him out to the
+wall face and LAUNCHED him (17.8 m/s up, 8 m/s forward: a 3-m arc) into an airborne state that came down through the generic landing.
+
+**`assets/Mario.cs`:** SmsLedgeVault sets ledgeHopUp pinned (voice, no position change, no velocity); new TickLedgeHop = TickLedgeClimb's shape for
+ma_hgjmp (its length read from the clip, 0.50 s; ma_hgup is 1.10 s): the platform follow, B -> the passive drop, XZ eased from the hang to the stand spot,
+Y pinned, idle + ma_wait at the end. Both ledge branches tick the hop as they tick the climb; the old TickLedgeHang's A path goes through the vault too;
+the two launch constants are gone.
+
+**Verified** (Mac, headless, the Hillside course, Mario himself -- the game's own climb-down puts him in the hang): 12/12 -- ma_hgjmp plays for 0.50 s,
+he never rises over the hang height and his velocity never goes up, he ends idle on the top 0.48 m in from the hang at the ledge's height; B during the
+hop lets go into LAND_SAFE_DOWN.
+
+### 258 -- Mario's alternate colours on the Player Select: X / Y cycle Red, Yellow, Blue, Green, Black on his poster; he spawns wearing the pick (feature/kingboo-casino, code `1f0ce9d`)
+
+**Jaysonn:** "a cool feature i wanna include is the color options mario can wear. i have the texture files done to make him look like alt colors from
+super smash bros melee but in the char select screen i wanna be able to pick them by pressing X or y to cycle thru them".
+
+**The textures.** His four recoloured body atlases were in `Font/` as "untitled_ma_mdl1_0 - Copy*.png" (the "(4)" copy is byte-for-byte the default and
+stays): Melee's yellow (Wario's colours), blue (blue cap and shirt, red overalls), green (with brown overalls) and black (slate overalls). Moved and
+named `models/Mario/Colors/mario_yellow.png`, `mario_blue.png`, `mario_green.png`, `mario_black.png` (uids kept, the `.import` rewritten with the
+default atlas's own settings). Only the body atlas ma_mdl1_0 changes; the eyes and the gloves are other atlases.
+
+**The code.** `assets/CharacterColor.cs` (new): a colour -- DisplayName, BodyTexture (null = the default look), BodyTextureMatch, Swatch.
+`CharacterEntry.Colors`: the list (empty = no choice; Luigi, Piantissimo, Yoshi have none). `assets/characters/MarioEntry.tres`: the five.
+`CharacterPoster`: a colour strip built in code under the head when the entry has colours -- swatch dots (the current one bigger, rimmed) and the
+name, "Y ◂ Red ▸ X" on the highlighted poster; knobs for its box and sizes. `CharacterSelect`: X / Y (keyboard E / Q) cycle the highlighted poster's
+colour with the hand's click; A writes it to `GameData.SelectedColor`; back on the screen, the played character's poster starts on it.
+`GameData.SelectedColor` / `SelectedColorEntry` (session-only, like the character). `Mario.ApplyBodyTexture` (ApplyProfile's swap, factored) runs in
+_Ready after the profile and before the eyes and the body overlay cache the materials, so blinks and the damage fog see the coloured body.
+
+**Verified** (Mac, headless + windowed): 21/21 on the select (five colours, the strip, X / Y and their wraps, Luigi ignoring X, the click, A carrying
+Yellow to GameData, B back keeping it) and in a level Mario's Mesh_0 on the picked atlas on all 8 body surfaces, none on the default, the 2 eye
+surfaces untouched; frames of the strip and of Mario in each colour in the Ricco course. A lesson from the Mac loop: a `git checkout -- models/`
+(the fix for the import's clobbered animation files) also reverts unstaged edits under `models/` -- stage first.
+
+### 258b -- the mugshot follows the colour: Mario's cap and emblem re-hued in four new head shots the poster swaps in (feature/kingboo-casino, code `c8e245c`)
+
+**Jaysonn:** "could you modify marios mugshot to be the different colors? it would just need to change the hat color".
+
+`Font/CharacterSelect/MarioHead_yellow.png`, `_blue`, `_green`, `_black` from `MarioHead.png` by
+`tools/projectshine/rematch157/colors258/recolor_head258.py`: the cap's pixels (hue within 9 degrees of red, saturation 0.72 up, above the mouth, the
+outlines left; feathered edges) re-hued to each alternate's cap colour read from his atlases themselves (the median where the default atlas is cap red),
+the shading kept; skin, hair, eyes, mustache untouched; the M goes with the cap as on the atlases. `CharacterColor.HeadArt` (null = the entry's);
+`CharacterPoster` puts the colour's head on as the strip refreshes; `MarioEntry.tres` names the four. Verified 7/7 (the head art round the five colours
+and back, Luigi's unchanged) with the poster frames.
+
+### 258c -- the colour name under the dots is off (feature/kingboo-casino, code `83df6ca`)
+
+**Jaysonn:** "we dont need the text at the bottom sayin what color they are". `CharacterPoster.ColorShowName` (off): the swatch dots alone, centred in
+the strip's box under the head; the "Y / X" hint went with the name. Verified with the head-shot drive (7/7) and the poster frames.
+
+### 259 -- the menu song is gone before a level's music starts (feature/kingboo-casino, code `116c161`)
+
+**Jaysonn:** "when transitioning to the level the music from the select screen sometimes overlaps. i think this is a loading issue?"
+
+**Why.** 251's keeper noticed the menus were gone only in its own _Process, on the first frame of the new scene, then faded over 0.35 s -- but the level's
+SmsStageMusic had started in its _Ready, so both played for the fade; and the keeper ran at full volume through the load stall before that (the audio
+thread mixes on while the main thread loads). The overlap was the fade, longer on a slow load.
+
+**The fix.** `SmsMenuMusic.LeaveMenus(from, seconds)`: the Level Select's Confirm fades the song out over its own 0.7-s fade to black, so it is silent before
+the level loads; `CutUnderLevels` (on): a level that comes up with the song still audible cuts it rather than fading over it. The Player Select's M-gate path
+fades the same way; the way to the Level Select still carries the song. Verified frame by frame: fade from 1.32 s after A, under -40 dB at 1.75 s, the
+keeper gone at the scene change (2.64 s) when the stage music starts; no frame with both audible.
+
+### 260 -- no model import writes Mario's animation clips any more (feature/kingboo-casino, code `6bb19a6`)
+
+**Jaysonn:** "i keep getting a bunch of these:" -- `AnimationMixer (at: Mario.tscn): 'ma_yo_walk', couldn't resolve track: 'nodes_0/Skeleton3D:M_foot_R'`
+(and jnt_hand_R, jnt_hand_L, M_hand1_R, M_hand1_L ... a line per bone per clip, on opening the project in 4.7.2).
+
+**Why.** Mario's 200 clips are `models/ma_*.res`, retargeted to Player.tscn's `Armature/Skeleton3D` and referenced by its AnimationPlayer. They were once
+generated by a glb import with "save to file" on, and that import's settings had become the project's scene-import DEFAULT (`[importer_defaults]` in
+project.godot: 11.4 MB, 200 entries "save ma_<clip> to res://models/ma_<clip>.res"), so all 183 glb / gltf / fbx / blend `.import` files carried the same
+200 save entries (11 MB each). Eleven model files hold all 200 clips (the ma_mdl1 exports of Mario, Luigi, Koopa, SM64, ResortMario, Yoshi and the NewMario /
+NewestMario / Godot variants): whichever re-imported last -- a clone, a Godot upgrade, a cache wipe -- overwrote all 200 .res with ITS skeleton path
+(`nodes_0/Skeleton3D`, `Node/Skeleton3D`), Mario's mixer found no `nodes_0` under him and warned for all 11,379 tracks, and his clips were frozen until
+the files were restored from git.
+
+**The fix.** The `"animations"` block is gone from `_subresources` in all 183 `.import` files (`tools/projectshine/rematch157/anim260/strip_anim_defaults260.py`;
+it skips any block that is not exactly the plain default) and the `[importer_defaults]` section is gone from project.godot (its only key; the file is 10 KB).
+Imported models keep their clips inside their own scenes, as Godot imports them by default; `models/*.res` are untouched (the committed clips are the
+Armature-pathed ones). Verified: a forced re-import of all 182 model scenes writes no .res / .tres anywhere; Mario in the Hillside Cave Secret, headless --
+all 204 clips / 11,379 tracks resolve to `Armature/Skeleton3D` and its bones, zero "couldn't resolve track", ma_run1 moves the warned-about bones through
+the AnimationPlayer and through the tree's state machine (`anim260/animdrive260.gd`, 10/10). No C# changed.
+
+**On the PC.** The editor rewrites `.import` files on every re-import, so `git pull` may refuse while they are locally modified: `git status`, and if nothing
+of his own is in it, `git restore .` then `git pull` -- the restore also puts the clobbered `models/ma_*.res` back to the committed clips (the pull alone
+cannot: 260 does not change them). The next editor open re-imports the models once, writes no clip files, and the warnings are gone.
+
+**Mac notes.** Godot ignores a parameter-only change to a `.import` file (its md5 is cached, but `_test_for_reimport` only re-imports for a changed source, a
+missing destination or a changed importer version), so the forced re-import deleted `.godot/imported/*.{glb,gltf,fbx}-*.md5`. The editor ignores
+`override.cfg`, and with the Blender importer active a headless re-import batch holding the two `.blend` files is ABORTED WHOLE when the Blender-path query
+fails -- the local `[filesystem] import/blender/enabled=false` line must be IN project.godot (`select255/local_blend_off.py`, never committed:
+`anim260/project_godot260.py` rebuilds the commit-ready file from HEAD). The headless 4.7.2 editor also drops `[editor_plugins]` (godot_ai does not load
+headless) when it saves project.godot -- another reason to rebuild it rather than commit what the editor leaves.
+
+### 261 -- a death plane under every secret course, at the game's height (feature/kingboo-casino, code `efe661b`)
+
+**Jaysonn:** "ok add death planes the the secrect levels".
+
+**The game's.** A `BG_TYPE_DEATH_PLANE` (0x800) polygon in each stage's map.col; `TMario::thinkSituation` (MarioMove.cpp 1886) finds it under him with its
+height over his feet the tick he drops through -- MARIO_FLAG_GAME_OVER, HP 0, MARIO_STATUS_FALL_DEAD (`fallDead()` = `jumpProcess(0)`: he falls on, no
+control), the cry MSD_SE_MV10B_CRY_JUMP_01 unless the long fall's ANIM_THROWN already cried, CAMERA_FLAG_HELL_DEAD_DEMO, DEMO_FLAG_HELL_DEAD (the miss's
+2-s iris); `decideNextStageOfMiss` (MarDirectorDirect.cpp 205): an EX map restarts itself from its start. All ported in 212 / 213 (`SmsDeathPlane.cs`,
+`Mario.SmsFallDead`, `SmsMissTick`, Level's no-intro miss re-entry); the courses simply had no plane.
+
+**Where.** y 0 in all ten. The two courses whose vanilla collision is to hand prove it: coro_ex1 (Hillside Cave Secret) and coro_ex2 (Secret of Ricco
+Tower) `map.col` hold nothing but the death plane at y 0 (x -15000..35000 / -15000..45000, z +-15000 u) and a catch floor at -16000; their pieces are
+map objects 1700-3400 u over it (`tools/projectshine/rematch157/death261/col_death261.py`: header {vertexNum, vertexOff, groupNum, groupOff}, 0x18-byte
+groups {bgType, triNum, flags, pad, 4 offsets}, s16 x3 indices). Jaysonn's other eight courses sit on the same unit grid, lowest pieces 16-88 m over
+y 0, nothing under it: the same plane (their map.col were not to hand -- the disc is on the PC, offline tonight -- the node is his to move).
+
+**The scenes** (`add_death_planes261.py`): a `DeathPlane` node (SmsDeathPlane, MarioPath ../PlayerSpawner/Mario, a note) at the end of each file with a
+red see-through Preview sheet (the game's rectangle for the two known courses, the course's bounds + 60 m for the others), hidden in play by the node.
+`SmsDeathPlane.cs`: a course's Mario is the PlayerSpawner's, made in the spawner's own _Ready, so a plane that readies first looks once more once the
+scene is up (deferred) before giving up.
+
+**Verified** (headless, `deathdrive261.gd`, 87/87): Hillside with no intro (GameData.CameFromMiss, the miss's own re-entry) -- Mario runs on W; carried
+40 m off the start island he falls 2.07 s, the plane fires the frame his feet cross y 0 (feet -0.26), FALL_DEAD + GAME_OVER, the cry the long fall's
+(ma_thrown on: no second cry, as the game), 18.6 m more of fall in 0.6 s with W doing nothing, the miss takes a life (4 -> 3), the course reloads from
+its start (0.8 m from the first spawn, lives 3, fresh flags, the re-entry flag consumed); a second 12-m fall there: the fresh plane fires, this death
+cries itself (FallCry playing, no ma_thrown), another reload (lives 2). The other nine courses load with the plane at y 0, Mario found, the sheet hidden.
+Fall note: the port's Mario gravity is the shipped mGravity 1.0 u/tick^2 = 48.4 m/s^2 (the self-tests' model since the jump passes), so 52 m to the
+plane is 2.07 s, 12 m is 0.73 s.
+
+### 262 -- the game over goes where the game's goes: the "Continue / Return to Title Screen" window; the floor death's camera demo was 216's, verified (feature/kingboo-casino, code `6d2b283`)
+
+**Jaysonn:** "Game over goes nowhere. GameOverScene is empty on Mario, so losing the last life reloads the same course with the lives reset. For a demo
+that should probably drop back to the Player Select. Small pass. and fix the normal (floor) death's camera demo: the game holds the eye and closes the
+FOV on Mario over 343 ticks; a floor death keeps the play camera."
+
+**The game** (MarDirectorDirect.cpp 417-441, 383-407; CardSave.cpp 361, 1245). The Miss state with no life left plays the game-over jingle under the
+game-over wipe; the screen out and the jingle done, `startWipe(WIPE_FADE_IN, 0.3)` and STATE_CARD_SAVE with PURPOSE_GAME_OVER: the card save's `'mask'`
+(juice_mask.bti, black, alpha 255: the screen stays black) and the `'w_6'` window (411 x 112 at (95, 188)) with savemessage.bmg 31 "Continue" and 32
+"Return to Title Screen" (`'sm7b'` / `'sm8b'`, the hands `'sc6a'` / `'sc7a'`); up / down move the hand, A picks (0x481C). Continue -> PROGRESS_UNK1 ->
+getNextState 0: `TFlagManager::restore()` (the progress back to the last save), MSF_UNK30001, the Plaza (the intro stage with no shine); Return to Title
+Screen -> PROGRESS_UNK19 -> 1: APP_STATE_DONE, the title.
+
+**The port.** `assets/Sms/Console/SmsCardSave.cs`: `Purpose.GameOver` (7); the fourth window `'w_6'` at the blo's own places (the hands at x 21, the
+323-wide texts at 72, rows 27 / 63 -- `OptionList` takes them), bmg 31 / 32; `Progress.GameOverSel` = waitForSelectOver (0 Done, 1 Quit); the mask, a
+black ColorRect over the whole viewport under the windows (GMSP01_NX widens the game's 600 x 480 pane for 16:9), shown for this purpose alone and kept up
+through Finish till the stage moves; `CenterContents` centres a 323 box as the 250 ones; readouts `GameOverOptionsShown`, `MaskShown`. `assets/Mario.cs`:
+`SmsMissTick`'s no-life branch: `FadeIn(0.3)` and the card save instead of a reload; `SmsGameOverFinish(next)`: 1 -> the card save's `TitleScene`
+(`assets/CharacterSelect.tscn`, the Player Select); 0 -> `GameData.RestoreFromSave()` then `GameOverContinueScene` (new; empty = the Level Select this
+course was picked on, `GameData.LevelSelectScene`, else the title); the miss's quiet holds through the window as the game's does till the next stage's
+initSound (the card save's sounds are the system's, never muted). `GameOverScene` stays as an OVERRIDE (set = straight there, no window). `GameData.
+RestoreFromSave`: the shine / blue coin sets reloaded from the file (none = empty). Not ported: startDisappearStar / Coin (the HUD's counters leaving:
+under the solid mask).
+
+**The camera: already done.** The normal dead demo was ported in 216 (`SunshineCamera.CtrlNormalDeadDemo`: 16 ticks after MARIO_FLAG_GAME_OVER the eye is
+held and the fov closes at a steady pace toward clamp(10500 / eye-to-lookat, 5, 80) deg over 343 ticks, the look-at on his body + 35 u). 212's entry
+had called it not ported and the line was never corrected (fixed in place now). No code change; the drive below proves it.
+
+**Verified** (`death261/gameoverdrive262.gd`, headless 33/33 and windowed with the shot `gameover262.png`): the Hillside Cave Secret with 0 lives, Mario
+killed ON THE FLOOR through the enemies' entry (`TakeDamage` x 8, 2.5 s apart, knocked inward) -- a floor death, not the plane's; 0.25 s after the flag
+the NORMAL dead demo is on (not the hell one), the eye held to the unit for the next second, the fov 45.19 -> 32.64 deg toward 14.8 (708 u to the
+look-at), the timer 296 -> 174, the live Camera3D wearing it, the pace the game's chase (expected 32.68); the miss takes the last life (0 -> -1); 7.3 s
+on the card save opens with the mask up, "Continue | Return to Title Screen", the tree paused, the course still up under it; Down + A -> the Player
+Select, the tree running, Lives -1. Run 2: A on Continue -> the Level Select, the progress the save's, no miss flag left. The 261 drive still 87/87.
+
+### 262b -- Mario's battle stance re-posed on the sprite sheets: a right-foot lunge, the far fist up, the near arm down (feature/kingboo-casino, code `e38bbf8`)
+
+**Jaysonn:** "can we polish up the pose a bit i think it still looks a bit off".
+
+**The reference, read properly this time.** His three sprite sheets from 176 (now kept under `tools/projectshine/rematch157/anim176/ref/`), blown up
+cell by cell (`sheet_zoom.gd`, `sheet_measure.gd`): the stance is a LUNGE -- the right foot far forward with the knee bent hard and the shin upright,
+the left leg stretched back nearly straight, the hips low (84 % of his standing height; 2.8 x his standing width front to back in the 3/4 view), the
+torso leaning well forward and turned so the right shoulder leads, the RIGHT fist up beside the face at nose height, the LEFT arm hanging low and back
+by the hip, the head up on the enemy. 176 had drawn a bladed boxing guard: the LEFT foot forward, both fists at the chin, the chest turned the other
+way -- so from the stand-off camera (Mario seen from his left) the near fist was up where the sprite has the near arm down and the far fist up.
+
+**The pose** (`anim176/stance262.py` generates both `.pose.json`; the baker makes the `.tres`): named numbers -- body yaw 18 and chest yaw 18 (the right
+shoulder forward), lean 31, the head back 32 and up 40 onto the enemy, the lead thigh 65 deg forward with the shin upright (knee 21), the rear thigh 67
+back nearly straight, the centre down 9.8. The centre drop, the rear thigh and the lead knee are SOLVED so both ankles sit at the idle's 9.0 (the rig:
+the idle thigh hangs 26 forward and the knee is bent 44, so a knee of -36 leaves 8 deg; the legs are 20 + 19.5 units); the arms are fitted by grid to
+targets about the head (the fist 20 to his right of its centre, 10 under, 20 ahead -- beside the face, clear of it from the front; the first fits sat
+it on his cheek) and the left hip (the hand by it, behind). The loop's bounce: up 2 and back along the rear leg's line, both feet re-planted (0.3 u),
+the lead fist pumping, the rear arm swinging. The drop-in: the idle, the fists up as the RIGHT foot steps (off the floor; the rear knee solved so that
+foot stays down), the stance. Names, lengths, the intro's knobs and the 176b hold unchanged; the hand table still closes the fists.
+
+**Verified**: `stanceshot262.gd` (windowed, 176's clips beside these from the stand-off side, the right-front three-quarter and the front, plus the
+bounce frame: `anim176/shots262/`) and `introstance262.gd` (headless 8/8: the rematch intro plays the look-about at 8.1 s, the drop-in at 10.1 s, the
+loop from 10.6 s; the fight starts with him holding it, a stick push ends the hold, the tree comes back). No C#: no Build needed.
+
+### 262c -- the battle stance's hands: the lead fist's knuckles to the enemy, the rear arm wound straight back (feature/kingboo-casino, code `1a99031`)
+
+**Jaysonn:** "yeah his fist should be turned and his back hand should be more fighting pose. i gave you ref images from before do you have them still?"
+(yes: `anim176/ref/`, the three sheets of 176).
+
+**The sheets at 8x** (the side row's frames 6-8): the lead fist in front of the face with its KNUCKLES toward the enemy, thumb up; the rear arm straight
+BACK from the shoulder, near horizontal, the fist behind the body at the shoulder line -- a wound-up punch. 262b had read the 3/4 row's low glove as a
+hand hanging by the hip, and the lead glove came out knuckles-up with the fingers curled over the top.
+
+**The pose** (`anim176/stance262.py`): `FIST_TWIST_R` -90 -- the lead hand turned 90 deg about its own forearm (the elbow-to-hand line of the posed body,
+decomposed into the script's body-axis turns: `euler_pairs` / `twist_pairs`); three turns shot side by side (`twistshot262.gd`, -90 / +90 / 0) and -90 is
+the sprite's. `REAR_TARGET` (6, -2, -24) about the left shoulder joint: the rear fist straight back at shoulder height, a little out; the fit (swing 30,
+out 20, yaw 30, the elbow eased 10) lands 26 u behind the shoulder, the elbow held behind it (`ELBOW_BACK` 12). Two earlier readings -- a fist cocked
+by the ribs, a fist at the hip -- were fitted, shot and dropped. The legs, the lean, the head and the lead arm's place are 262b's.
+
+**Verified**: `stancering262.gd` (windowed, FLUDD hidden, 12 views: `anim176/shots262c/`) -- the knuckles toward the camera from the front, the rear arm out
+behind him in the side, back and high views; `introstance262.gd` (headless 8/8): the intro's look-about at 8.1 s, the drop-in at 10.1 s, the loop from
+10.6 s, the hold, the stick ending it. No C#.
+
+### 262d -- the stance's hands, second round: the lead fist turned the other way (a guard), the rear arm bent and chambered (feature/kingboo-casino, code `1803737`)
+
+**Jaysonn:** "back arm should be bent and his front fist is turned the wrong way his fingers should be fased inward to his face making his front fist look
+more battle ready".
+
+**The lead fist** (`FIST_TWIST_R` 90; 262c had -90). Settled by looking, not by the rig's maths: a 12-step sweep of the twist (-150..180 by 30) baked as
+variant clips and shot from his left-front (the side of the fist that faces his face) and from the front (`twistsweep262.gd`; the sheet in
+`anim176/shots262d/`). At 90 the curled fingers face his face, the knuckles the enemy, the thumb is up -- the guard. (`fist_probe262.py`, a palm-axis
+model read off the idle hand, disagreed with the renders by a quarter turn: a lesson -- read a hand's facing off a render, not off the bone's axes.)
+
+**The rear arm** (`REAR_TARGET` (5, -6, 8) about the left shoulder joint, `REAR_BEND` 90..125, `ELBOW_BACK` 12): the fist at the chest's side a little
+AHEAD of the shoulder (the chest leans 31 forward, so a fist "on the shoulder's line" sat behind the body in 262c), the elbow bent (the fit: swing 35,
+in -40, the elbow bent 105) and held well behind the shoulder: a chambered rear fist, the elbow out behind him. Legs, lean, head and the lead arm's
+place unchanged from 262b.
+
+**Verified**: `stancering262.gd` (windowed, FLUDD hidden, 12 views: `anim176/shots262d/`) -- both fists up from the front, the lead one's back of the hand
+to the camera with the thumb on top, the rear fist at his left side at chest height; the rear elbow back and the fist by the ribs from the stand-off
+side; `introstance262.gd` headless 8/8. No C#.
+
+### 263 -- FLUDD's landed drops live the game's way, and Mario's silhouette through the map with his water in it (feature/kingboo-casino, code `5a36261`)
+
+**Jaysonn:** "fix these: Small leftovers, low priority: FLUDD's landed drops live a fixed 40 ticks and don't slide (the game: up to 256, sliding on slippery
+floors), and the see-Mario-through-the-water silhouette isn't drawn."
+
+**The landed drops** (`assets/Sms/SmsWaterDrops.cs`; `TModelWaterManager::move`, ModelWaterManager.cpp 420-724; `gWaterManagerPlaneInfo` 355 = { 0.93, -3, 2 |
+0.7, -1, 1 }). A drop that meets a floor splashes and survives as a puddle with unk5D88[0] = 0.5 (0.35 under the L camera; a wall 0.5) -- else it is spent;
+its life is capped at 256 (unk5D68) and runs down by the plane's vanish speed (1 plain, 2 wet), the disc shrinking with it; case 2, the slide: the horizontal
+speed x the plane's friction (0.7 / 0.93) + the plane normal's horizontal part (downhill), capped at a drop size a tick, the floor under the new place taking it
+back (a ray spanning half a drop size about the last contact) -- no floor = it slid off the edge and flies again; case 3, a wall drop runs down the wall (-1 /
+-3 units a tick) and dies at the floor; the merge (unk5D60 & 0x40) simulated in index order (the earlier takes the later's size and life, the later dies) instead
+of drawn. A wet plane is a collider in the group `sms_wet_ground` (`SlipGroup`). Knobs for every number; readouts `TakeStats`, `Landed(k)`, `PuddleCount`.
+Not ported: the DRY_UP sound, the splashes. A first slide check had the floor ray too short for a tilted plane (the lifted particle's own offset ate it:
+the puddle "slid off" at the top of a 25-degree ramp) -- the ray now spans half a drop size about the last contact.
+
+**The silhouette.** 254's note was backwards: the game draws the WATER in Mario's silhouette pass, not Mario through the water. `TSilhouette`
+(MarioUtil/DrawUtil.cpp): when the camera's view of Mario is blocked (MARIO_FLAG_OCCLUDED) his model is drawn again in the stage's silhouette colour ((0, 0x27,
+0x77) by default) where the map is in front of him (Z GEQUAL), the alpha chasing 128 at 0.01 of the gap a game frame while hidden and 0 once seen; the water
+joins (`drawSilhouette`, 952: waterJumping.bti blobs for the flying drops, the puddle volumes) at 80 x the alpha. The port had no silhouette at all. Now:
+`assets/Sms/Fx/silhouette.gdshader` (flat colour, depth_test_inverted: only behind what is nearer) rides every mesh under his skeleton as a material_overlay
+while the alpha is above zero (`Mario.SmsSilhouetteTick`, in _Process at the game's rate scaled to the frame rate; `SunshineCamera.MarioOccluded` -- its
+ray from the eye to his waist -- stands in for the framebuffer peek); `assets/Sms/Fx/water_silhouette.gdshader` + `tex/waterjumping.png` draw the drops'
+MultiMesh again in that colour at 80 / 255 x the alpha's fraction (`SmsWaterDrops.SetSilhouette`). Knobs: `SmsSilhouette`, `SmsSilhouetteColor`,
+`SmsSilhouetteOccludedAlpha`, `SmsSilhouetteApproachRate`. The game's per-triangle layering (no Z write) is kept: his far side over his near side reads a shade
+darker, as it does on the GameCube.
+
+**Verified** (`water263/waterdrive263.gd`, windowed 28/28): a bare stage -- 80 drops on a flat floor: 51 % die in the splash, puddles at 150 ticks, gone by 300,
+0.044 -> 0.001 m/tick in 10 ticks; the wet patch: gone by 160, 0.048 -> 0.023; the 25-degree ramp: a steady 0.019 m/tick downhill (the game's 1.4 units =
+0.42 / 0.3) from x 14.3 to the foot at 15.96, then off it; the wall: 2.38 m down to the floor and dead there; a stream on one spot: 235 landings, 119 merges,
+one puddle at most. Hillside with a wall between the camera and Mario: occluded, the alpha 37.5 of 128 after a second and 110 after five, the overlay on
+12 of 12 meshes, the spray's silhouette pass on; the wall gone: 110 -> 59 in two seconds, off, the overlays gone. Shots in `water263/shots/`.
+
+### 264 -- King Boo's fight in its own scene (KingBooFight.tscn), and a Test poster for the test level (feature/kingboo-casino, code `214de34`)
+
+**Jaysonn:** "make one more level called test. which holds the level we have been testing everyhitng in and make sure the king boo fight (normal) lives in
+its own scene".
+
+**The fight scene** -- `assets/Sms/Enemy/BossTelesa/KingBooFight.tscn` (new): a level scene rooted on `Level.cs` (StageName "Casino Delfino", ScenarioName
+"King Boo Down Below", ShowGoText off: the room has no GO!), `KingBooArena.tscn` (the casino room: the slot, the three roulettes, King Boo, the wall; 153 and
+on) instanced at the origin, a `PlayerSpawner` at (3.80, 12.20, 1.43) -- the old test-level spawn (3.80, 49.34, 182.16) minus the arena's old offset
+(0, 37.14, 180.73), so the boss's FallDemo intro (the ride down on the disc, then the slot) still fires from the same place over the room -- the test
+level's sky, tonemap and sun, and an `SmsDeathPlane` at y -30 as a safety net (the game's delfinoBoss map.col has no death plane; its wall runs 1500 units
+under the table). The Level Select's King Boo poster (`assets/levels/KingBooEntry.tres`) now loads this scene instead of Level.tscn.
+
+**The test level** -- `assets/Level.tscn`: the KingBooArena instance (and its ext_resource) is gone; Mario's spawn is back on the Plaza at (0, 5.46, 20.64),
+where it stood before the fight moved in (153). Nothing else in it changed: the Cataquacks, the fruit, the crates, the 1-up tower, the secret-course doors
+are as they were. It is the fifth poster, "Test" -- `assets/levels/TestEntry.tres` (ScenePath res://assets/Level.tscn, the Shine stroke, a yellow paint),
+listed last in `assets/LevelSelect.tscn`: Ricco Tower, Hillside Cave, King Boo, Rematch, Test.
+
+**The art** -- `Font/LevelSelect/name_test.png` ("TEST" along the arc in a pastel yellow, 242's lettering: `kingboo264/gen_art264.py` on
+`select242/gen_art242.py`) and `art_test.png` (a 512 square of the drive's Plaza shot: Mario among the Cataquacks, the 1-up tower, the pineapple, the crate;
+the HUD hidden for the photo), with their .import files. No C# changed.
+
+**Verified** (`kingboo264/kingboo264.gd`, windowed 27/27): the Level Select shows five posters, Test fifth and King Boo third, the hand starting under the
+first (read off the poster's modulate: `CharacterPoster` keeps its highlight private, and its 1.06 scale is reset by the HBoxContainer's first layout
+pass -- a tiny pre-existing thing: the first poster is not scaled up until the hand moves) and four stick pushes putting it under Test; A on Test loads
+res://assets/Level.tscn with Mario on the Plaza (y 2.9) and no BossTelesa, Roulette00 or KingBooArena anywhere in it; KingBooFight.tscn loads with Mario at
+PlayerSpawner/Mario, BossTelesa, the wall and three roulettes, FLUDD on, the death plane active; the intro runs 1 -> 2 -> 0 (659 + 180 ticks), Mario
+camera-locked through the ride, y 24.8 -> -1.8, the fight camera the room's DEFINITE_D2 kind (18), King Boo appearing 3.3 s after, no death; back on the
+Level Select the hand is under King Boo and A loads the fight's own scene, the way back `GameData.LevelSelectScene`. Shots in `kingboo264/shots/`.
+
+### 265 -- the GameCube adapter on the Mac (and Linux): read through libusb, as Dolphin does; the R click's stand-in back for every other pad (feature/kingboo-casino, code `c6e8459`)
+
+**The ask:** "did we do the proper stuff for the controller adaptor to run on mac?" -- no: 253's reader was Windows-only (WinUSB + setupapi P/Invokes;
+on a Mac the autoload logged "not Windows: the adapter reader is idle"), and in Wii U / Switch mode the adapter is a vendor-specific USB device, not
+a HID pad, so macOS and Godot's joypad layer see no controller at all. "can you make it work on mac?"
+
+**The reader** (`assets/Sms/Input/SmsGcAdapter.cs`): a second USB layer under the same code (`Backend`: WinUsb / LibUsb -- the report parsing, the
+calibration and the joypad events untouched and shared). On macOS and Linux the adapter (057E:0337) is opened through **libusb-1.0** the way
+Dolphin's GCAdapter does: libusb_open, auto-detach (Linux; a no-op on macOS), claim interface 0, the 0x13 start command on the OUT endpoint, the
+37-byte reports read on the thread with libusb_interrupt_transfer (250-ms timeouts so the loop sees `_run`), rumble through the same `Write`.
+macOS attaches no driver of its own to the adapter, so there is no Zadig step: plug in, play. The library is found by a `DllImport` resolver (the
+runtime's own search knows nothing of Homebrew's `/opt/homebrew/lib` or the project): `$SMS_LIBUSB`, next to the game's executable and
+`../Frameworks` (an exported .app), the project's `addons/libusb/macos/libusb-1.0.0.dylib`, Homebrew's, then the system search; none = one warning
+(`LibUsbHint`) and idle; an adapter seen but refused = `MacInUseHint` (another program holds it) / `LinuxHint` (Dolphin's udev rule). Readouts
+`BackendName`, `LibUsbLoaded`, `Discovery` ("libusb: N USB devices, M adapter(s)"); the rescan runs on every system now. **A 253 fix found by the
+drive:** a port that went away kept its last report's button bits as "sent", so a controller plugged back in with a button held never registered it;
+the port now counts as all released (as `ReleaseAll` had sent).
+
+**The R click** (`assets/Mario.cs`, `SmsRClick`): 253's `button_rclick` action is added to the map on every system by the autoload, and its mere
+presence switched off the game's stand-in (the trigger pulled past `RClickPull`, 0.98) -- so on a Mac, or with an Xbox pad or the Mayflash in PC
+mode anywhere, the R click (the stand-and-aim spray, the squat) never came. Now: the action when it is down, else the pull stand-in while no adapter
+reader is open (`SmsGcAdapter.Open`); with the adapter open nothing changes from 253. Readout `SmsRClickNow`.
+
+**The library** (`addons/libusb/`, new): `macos/libusb-1.0.0.dylib` -- libusb 1.0.30, Homebrew's arm64 build, install name `@rpath/...`, re-signed
+ad hoc (Apple silicon; Homebrew ships no Intel bottle any more); `macos/COPYING` (LGPL 2.1: loaded at run time, the game's own licence untouched);
+`README.md` (the search order, Linux's udev rule, the export step -- Godot copies no .dylib into the .app: put it in `Contents/MacOS/` after the
+export; without it the reader idles and the Mayflash still works in PC mode as an ordinary pad). Homebrew itself could not install here (its
+sandbox is refused inside this session), so the bottle was fetched and the dylib taken from it.
+
+**Verified** (`gc265/gcdrive265.gd`, headless on the Mac, 36/36): the autoload loads the project's dylib through the resolver, enumerates the bus
+(1 device, 0 adapters), reports "no adapter (057E:0337) present", nothing open, a 2-s rescan the same with no exception; the no-libusb path (the
+dylib hidden) warns once with LibUsbHint and idles; 253's injected-report chain unchanged (A X Z + the R click, the pull, the sticks, a half pull, the
+D-pad + L click, a release, a controller gone, a short report refused); in the test level with no adapter open, button_r at 1.0 is the R click
+(SmsRClickNow), 0.5 is not, an injected click bit alone is, released is not. **Not yet tried with an adapter on the Mac** (none here): the one thing
+left to see -- plug it in (Wii U / Switch mode), the log should say "open: USB 057E:0337 through libusb (...)".
+
+### 266 -- the demo's round: Player Select -> Level Select -> a level -> Player Select -> Level Select ...; the game boots on the Player Select (feature/kingboo-casino, code `34c49dc`)
+
+**Jaysonn:** "it should be char -> level -> play level -> char -> level select and so on for the demo" -- and the demo runs from the repo on someone
+else's Windows laptop. Until now the game booted straight into the test level (run/main_scene), every finished level went back to the Level Select
+(the courses' Shines had the Level Select baked into ExitScene; the Exit Area and the game over's Continue fell back to GameData.LevelSelectScene), the
+Rematch's Shine gave control back in the arena (a dead end), and the Player Select was reached only through the pause menu's title option.
+
+**The boot** (`project.godot`): run/main_scene = `assets/CharacterSelect.tscn`. Only that line (the local `[filesystem]` blender line stays out of the
+commit: staged from HEAD's content by `flow266/patch_scenes266.py`).
+
+**The way back** -- one knob on the Level Select, `AfterLevelScene` (`assets/LevelSelect.cs`; default the Player Select, empty = back to the Level
+Select): where a level picked there goes when it is DONE. The pick writes it to `GameData.AfterLevelScene`; `GameData.LevelWayBack` is that, else
+`LevelSelectScene`, else "" (a level run on its own reloads itself, the Plaza's decideNextStage, as before). The three readers follow it: the
+Shine's exit with no destination of its own and the game over's Continue (`assets/Mario.cs`), EXIT AREA (`assets/Sms/Console/SmsPauseMenu.cs`).
+Each sets `FadeInFrom` (the demo's white, the fader's or the card's black) so the select screen it lands on fades in from what was on the screen --
+the Player Select only knew the episode select's white. `assets/CharacterSelect.cs`: arriving as a level's way back it spends `ReturnWithShine`
+(the Shine's white was its own fade in), so the Level Select reached through its fade to black fades in from black; `ReturnFromScene` is left for
+the Level Select's hand -- the poster of the level just left, through the Player Select in between.
+
+**The courses** -- the eleven level scenes' Shines (assets/Level.tscn, assets/secrect_level.tscn, Levels/Rico4Secrect/Skybox/Rico4Secret.tscn,
+Levels/Secret/*.tscn x 8) lose their baked `ExitScene` line (`ExitLevel` stays on): the destination is the Level Select's knob, one place to change.
+`assets/Sms/Rematch/RematchArena.tscn`: KingBoo.`ShineExitLevel` on -- the Rematch's Shine ends the level (the save card, the stage moves) instead
+of handing control back in the arena. **King Boo's normal fight keeps its Rematch chain** (KingBooArena.tscn BossTelesa.Rematch on, 157's design):
+King Boo -> the table shatters -> the Rematch -> its Shine -> the Player Select; turn `Rematch` off on BossTelesa for the game's Shine there.
+Left as the game has it: lives carry over a Shine's exit (TFlagManager); a game over resets them. Say so if each new player should start fresh.
+
+**Verified** (`flow266/flowdrive266.gd`, windowed 34/34): the main scene is the Player Select, A on it loads the Level Select; the knob reads the
+Player Select; stick right + A picks Hillside Cave, GameData.LevelSelectScene = the Level Select, AfterLevelScene / LevelWayBack = the Player
+Select, the pause menu's ExitAreaTarget = the Player Select, the course's Shine ExitLevel on with no ExitScene; Mario put on the Shine: the get demo
+runs (6.98 s, "moveStage -> res://assets/CharacterSelect.tscn"), the Player Select arrives fading in from the demo's white, ReturnFromScene =
+Hillside, ReturnWithShine and FadeInFrom spent; A -> the Level Select with the hand under Hillside Cave; Lives 0, Hillside again, killed on the
+floor through TakeDamage (8 hits), the card's "Continue | Return to Title Screen", A on Continue -> the Player Select, Lives -1, FadeInFrom spent;
+by inspection RematchArena's KingBoo.ShineExitLevel on, KingBooArena's BossTelesa.Rematch on, the eleven courses' Shines ExitLevel on with no
+ExitScene line. Shots in `flow266/shots/`.

@@ -1,0 +1,18 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="PackedScene" path="res://models/Sms/Sky/VillageUnderside/sky_village_underside.glb" id="1_glb"]
+[ext_resource type="Material" path="res://assets/Sms/Sky/VillageUndersideSky_VRshp.tres" id="2_mat"]
+[ext_resource type="Material" path="res://assets/Sms/Sky/VillageUndersideSky_moon.tres" id="3_mat"]
+[ext_resource type="Material" path="res://assets/Sms/Sky/VillageUndersideSky_ring.tres" id="4_mat"]
+[ext_resource type="Material" path="res://assets/Sms/Sky/VillageUndersideSky_Enk.tres" id="5_mat"]
+
+[node name="SkyVillageUnderside" instance=ExtResource("1_glb")]
+transform = Transform3D(0.0134336378, 0, 0, 0, 0.0134336378, 0, 0, 0, 0.0134336378, 0, 0, 0)
+
+[node name="SkyMesh" parent="." index="0"]
+cast_shadow = 0
+custom_aabb = AABB(-500000, -500000, -500000, 1000000, 1000000, 1000000)
+surface_material_override/0 = ExtResource("2_mat")
+surface_material_override/1 = ExtResource("3_mat")
+surface_material_override/2 = ExtResource("4_mat")
+surface_material_override/3 = ExtResource("5_mat")

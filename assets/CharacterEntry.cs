@@ -39,4 +39,8 @@ public partial class CharacterEntry : Resource
     [Export] public Color PaintColor = new(0.933f, 0.016f, 0f, 1f);
 
     [Export] public bool Unlocked = true;
+
+    /// <summary>258: the alternate colours this character can wear (CharacterColor resources; the first is the default look). Empty = no colour
+    /// choice on the Player Select. X / Y cycle them on the highlighted poster; the pick rides GameData.SelectedColor to the spawn.</summary>
+    [Export] public Godot.Collections.Array<CharacterColor> Colors = new();
 }

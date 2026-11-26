@@ -1754,3 +1754,371 @@ STILL OPEN, carried forward: `feature/enemy-pinna2` (entry #14, SMS 147 and 148)
 both still pushed and still waiting on Jaysonn's playtest, untouched since 2026-11-03 and now 183 commits behind the trunk.
 `feature/select-stages` holds the only copy of #11's text. Three merged branches are safe to delete besides: `feature/enemy-sirena`,
 `feature/kingboo-rematch` and, once PR #16 is closed, `feature/sounds`.
+
+### #19 -- PR #17 OPENED 2026-11-25 (https://github.com/JasonAbsolute/ProjectShine/pull/17, feature/kingboo-casino -> main, at Jaysonn's word: "push everything and make a pr"); pushed by Jaysonn 2026-11-23 (d169f04), Kiro's own pushes since -- queued 2026-11-17 03:41 PST (Kiro) (SMS 230 + 231 + 232 + 232b + 233 + 233b + 233c + 233d + 234 + 235 + 236 + 237 + 238 + 239 + 240 + 241 + 242 + 243 + 243b + 243c + 244 + 245 + 246 + 247 + 248 + 249 + 250 + 251 + 251b + 251c + 252 + 253 + 254 + 255 + 256 + 257 + 258 + 258b + 258c + 259 + 260 + 261 + 262 + 262b + 262c + 262d + 263 + 264 + 265 + 266), updated 2026-11-25 11:32 PST -- was 2026-11-25 07:45 PST -- was 2026-11-25 00:29 PST -- was 2026-11-24 17:20 PST -- was 2026-11-24 15:41 PST -- was 2026-11-24 14:53 PST -- was 2026-11-24 13:45 PST -- was 2026-11-24 04:05 PST -- was 2026-11-24 03:19 PST -- was 2026-11-24 02:35 PST -- was 2026-11-23 23:21 PST -- was 2026-11-23 23:15 PST -- was 2026-11-23 23:07 PST -- was 2026-11-23 22:47 PST -- was 2026-11-23 17:24 PST -- was 2026-11-23 17:09 PST -- was 2026-11-23 16:09 PST -- was 2026-11-23 04:40 PST (the push hand-off and the demo-export notes) -- was 2026-11-23 04:16 PST -- was 2026-11-23 03:04 PST -- was 2026-11-23 02:32 PST -- was 2026-11-23 02:15 PST -- was 2026-11-23 01:59 PST -- was 2026-11-23 01:08 PST -- was 2026-11-22 23:50 PST -- was 2026-11-22 03:47 PST -- was 2026-11-22 02:45 PST -- was 2026-11-22 01:33 PST -- was 2026-11-22 00:14 PST -- was 2026-11-21 23:29 PST -- was 2026-11-21 21:33 PST -- was 2026-11-21 21:01 PST -- was 2026-11-21 17:22 PST -- was 2026-11-21 04:02 PST -- was 2026-11-20 04:19 PST -- was 2026-11-20 01:42 PST -- was 2026-11-20 01:16 PST -- was 2026-11-20 00:41 PST -- was 2026-11-19 03:15 PST -- was 2026-11-19 01:35 PST -- was 2026-11-19 00:10 PST -- was 2026-11-18 23:26 PST -- was 2026-11-18 22:56 PST -- was 2026-11-18 22:29 PST -- was 2026-11-17 18:25 PST
+Push the fourteenth feature branch: `feature/kingboo-casino`, branched from `main` `d7887ae` (the trunk after PR #15, the rematch and the sounds, and its
+"#17 and #18 done" commit). The CASINO fight's touch-ups after Jaysonn's playtest of the trunk. SMS 230: every actor sound fades by the GAME's OWN RULE for
+it (MSHandle's category distances and the sound's curve bits: a placed Shine's hum is heard within 16 m and gone at 48 m -- it hummed across the whole level
+at half volume -- King Boo's DOWN and his vanishes play flat anywhere), and the casino fight's sounds checked against the game's: all wired but the hover hum
+(a DSP oscillator voice the baker cannot render) and the slot machine's landing thump (the game checks a frame its clip never reaches; 231 moves it) --
+assets/Sms/Sound/SmsActorSound.cs. SMS 231: the slot machine comes up BOLTED to King Boo (SlotSnapsAtAppear: the hosei zeroed as the appear begins; the
+game left it on an exponential tail after each spit, seconds behind him), his body goes WITH the death's burst (HideBodyAtBurst: the sixth-size body of
+the down clip's last frame no longer sits through the wait to the Shine), the fanfare's CONFETTI rebuilt from ms_btls_fubuki.jpa (125 squares of 0.8 m
+raining over the table for 6 s, spinning, white / yellow / red, no shadows; ConfettiHeightUnits 1000 starts it at the frame's top over his crown -- the
+game's 1707 is out of frame) and the slot's landing thump at a frame the appear clip has (SlotLandFrame 56; the game's 78 never came) --
+assets/Sms/Enemy/SmsBossTelesa.cs, assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn. SMS 232: the slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING
+BUBBLES (TBubble, the game's dead code: its shipped slot never lands Mixed, and its own kill cylinder would have popped them where they were born): they sink
+to the table, spread, rise to 4.7 m and grow to 5.5 m across, hurt and pop on touch, pop into a LARGE WATER BOTTLE when hosed, and after 8 s split into three
+children each that walk at Mario (the pool 30) -- assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs, OsenBubble.tscn, OsenBubble.gdshader (new), the model and its
+three textures under models/Eniemes/BossTelesa/bubble/ (new), SmsBossTelesa.cs (SlotForce Mixed, BubbleScene, the spit; the kill cylinder lets bubbles
+through), BossTelesa/SmsTelesaSlot.cs (a forced Mixed holds each drum to its own face), assets/Sms/Items/SmsWaterBottle.cs (LifeTicksOverride). SMS 233:
+the fanfare's CONFETTI at the jpa's own 60 Hz and look (231 read a jpa frame as 1/30 s and drew flat billboards: pixel blocks) -- 125 alpha-tested 0.5-m
+squares fluttering along their fall (align_y + rotate_y), 12 m/s easing to 2.8, the colour cycling grey / yellow / red by age, 3 s, from 1125 u over the
+table (BtlsFubuki.tscn regenerated by tools/projectshine/rematch157/gen_fubuki233.py; SmsBossTelesa.cs ConfettiHeightUnits 1125) -- and the REMATCH's
+ENTRANCE: King Boo came up for the fight by the casino appear clip's 17-m leap under the game camera, out of the floor and off the frame's top in two frames
+(a pop); 233 made it a slow EMERGENCE through the stone under the cutscene's own camera, and 233b (Jaysonn: "it's not supposed to be a cutscene, he should
+just use the animation of him coming from under in the intro") put the defaults BACK -- the intro's own leap after the tell, under the game camera, 174 /
+182's flow -- keeping both as knobs, off (SpawnRiseLeap on assets/Sms/Rematch/SmsKingBooRematch.cs; RiseInCutscene on assets/Sms/Rematch/SmsRematchIntro.cs);
+233c (Jaysonn: "no he just appears, he's not like coming from the ground naturally" -- the leap takes him from under the floor to out of the game camera's
+frame in 4 frames) CARRIES his body up through the stone on a smooth curve over the appear clip's 1.6 s while the clip plays its pose, the burst and the
+stars as he breaks the surface, no overshoot, no camera hold (SpawnRise = Clip Carried on KingBooRematch; Clip Leap = 182's, Emergence = 233's); 233d (Jaysonn: "ok no just undo what i said about him coming up") takes the ENTRANCE work OUT -- both rematch scripts back
+to 232b's byte for byte: the fight's rise is 182's leap after the tell under the game camera, as before 233; the confetti stays. SMS 234: the FRUIT --
+every fruit scene's material MATTE (roughness 1, specular 0: the game's materials are a vertex-lit toon ramp with no specular; the port's 0.5 / 0.5 drew
+a plastic highlight band), the ROLL at the game's rate (SmsRollLikeTheGame on assets/Fruit.cs: |vxz| / (the game's body radius x Size) x 2 a tick, as
+calcCurrentMtx -- the port's smaller collision spheres spun them 1.3-2.2x faster, a durian 12 turns a second: a blur that read as no spin), and the red
+pepper rolling like the rest (the "SMS quirk: it never spins" lock was not in the game) -- assets/Fruit.cs, fruit_banana / fruit_coconut / fruit_durian /
+fruit_pineapple / fruit_red_pepper / fruitpapaya.tscn. SMS 235: the casino table's BREAK without the glass -- the shards carry the discs' own material
+(MatchMaterial: metallic 1 / specular 0.5 / roughness 1, the unshaded surface, the gold's 7 x 7 tiling, the linear filter; 157's shader drew a pale glossy
+non-metal the moment it swapped in), the cracks dark seams with no glow (CrackGlow 0, CrackDarken 0.6), the fade a dissolve in the opaque pass --
+assets/Sms/Rematch/SmsFloorShatter.cs, FloorShatter.gdshader. SMS 236: the pause menu's selection sparks round the WHOLE circle (the shader's angle
+step had stayed at the dumped rate 14 while the emitter fired the circle's division 10: a 103-degree gap; the step is the burst's own count now) --
+assets/Sms/Console/PauseSparks.tscn, PauseSparks.gdshader, SmsPauseMenu.cs. SMS 237 / 238: the two SECRET COURSES for the demo laid out as the game lays
+them out and under the game's own skies -- the Secret of Ricco Tower (Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) and the Hillside Cave Secret
+(assets/secrect_level.tscn): every piece at the disc's scene.bin position / rotation / scale with his piece scenes scaled to the game's model sizes, the
+lifts and stairs on their scene.ral rails (his MovingPlatform), the umaibou and stars spinning at the game's rates, the rail blocks and EX cubes on the
+new assets/Sms/SmsRailBlock.cs (the game's TRailBlock), the intro pans the game's startcamera.bck, the skies the game's sky.bmd domes riding with the
+camera with their btk / brk in shaders (assets/Sms/Sky/*, models/Sms/Sky/*). SMS 239: Hillside's lift cubes orange like the game's (normal_block.tscn's mesh
+is the game's NormalBlock glb with its vertex colours, models/Sms/Map/normalblock/) and its palms the game's palmNormal (assets/Sms/Map/PalmNormal.tscn,
+models/Sms/Map/palmnormal/: the trunk, the stand-on quad and the leaves as collision, his PalmTreeGrab climb zone). SMS 240: the palm's leaves DIP when
+Mario lands or stands on them the game's way (TMapObjTree's spring on each leaf's crown joint; assets/Sms/Map/SmsPalmLeaves.cs, PalmNormal.tscn, the
+glb rebuilt with a node per leaf). SMS 241: Mario's stick no longer backwards in a level whose spawner is turned (the camera rig no longer
+inherits the spawner's yaw when it goes top-level; assets/SunshineCamera.cs), the Secret Course theme in both courses from the pan's first frame
+(assets/Sms/Sound/SmsStageMusic.cs, Music/MSD_BGM_EXTRA.wav, the table row), and the courses at the game's clocks -- every mover four times
+237-240's pace (the director's 120 movement ticks a second), the pans and skies at 60 animation frames a second (gen_level237.py's scenes,
+SmsRailBlock.cs, SmsPalmLeaves.cs, the two sky shaders). SMS 242: a LEVEL SELECT screen in place of a hub -- the Player Select screen again, for
+levels (his CharacterSelect.tscn's layout node for node, his CharacterPoster as each level's WANTED poster with the level's picture, its arched name
+and a Shine stamped on at the pick; new assets/LevelSelect.tscn, LevelSelect.cs, LevelEntry.cs, assets/levels/*.tres, Font/LevelSelect/*); the Player
+Select's pick leads to it (CharacterSelect.tscn LevelToLoad), and a level's way back is this screen -- a Shine's exit and the pause menu's Exit Area
+with no destination of their own return to it (GameData.LevelSelectScene; assets/GameData.cs, Mario.cs, Sms/Console/SmsPauseMenu.cs), the two
+courses' Shines name it outright (assets/secrect_level.tscn, Levels/Rico4Secrect/Skybox/Rico4Secret.tscn). SMS 243: the EIGHT remaining SECRET
+COURSES, each laid out as the game lays it out and built from the game's own pieces -- the Dirty Lake, the Sand Castle, the Beach Cannon, the
+Yoshi-Go-Round, the Hotel Lobby, Casino Delfino, the Village Underside and the Shell (Levels/Secret/<Name>/<Name>.tscn; the new pieces under
+assets/Sms/Map/ with their scripts, the Chuckster under assets/Sms/Npc/, four new skies under assets/Sms/Sky/, the models under models/Sms/Map/
+and models/Sms/Sky/), and the Level Select grown to twelve posters in the game's course order with a sliding row (assets/LevelSelect.tscn,
+LevelSelect.cs, assets/levels/*Entry.tres, Font/LevelSelect/art_* and name_*). SMS 243b: the Beach Cannon's and the Yoshi-Go-Round's skies lit the
+game's way (their sky.bmd materials carry lighting; the stage's object light set per vertex, the colour decoded once; assets/Sms/Sky/SmsSkyBeachCannon.gdshader,
+SmsSkyYoshiGoRound.gdshader, SmsSkyCasinoSecret.gdshader). SMS 243c: the Casino's eight no-turn cubes roll like dice as they travel (Jaysonn's call over the
+game's sliding; SmsRailBlock.RollWithTravel, off = the game; assets/Sms/SmsRailBlock.cs, Levels/Secret/CasinoSecret/CasinoSecret.tscn). SMS 244: the rail block authored like MovingPlatform (the three inspector buttons,
+MoveSpeedMetresPerSecond, the rail drawn in the editor; assets/Sms/SmsRailBlock.cs) and the drop-in assets/Sms/Map/RailCube.tscn. SMS 245: the real textures
+for the brick, watermelon, crate and arrow-board models (eight PNGs under models/Sms/Map/, from the disc's .bmt files). SMS 246: the review's fixes -- the
+rail block's half turns the game's way (SmsRailBlock ShortWay), the ice block, the kamaboko descent, the wood blocks' first step and .col
+collisions, the Village's lights and tints, Ricco's Shine spawn scale (assets/Sms/SmsRailBlock.cs, assets/Sms/Map/*, Levels/Secret/VillageUnderside, Levels/Rico4Secrect).
+SMS 247: the Shell's course map (new assets/Sms/Map/ShellSecretMap.tscn, models/Sms/Map/ShellSecret/), the Beach Cannon's wood blocks still + fading to black
+(SmsWoodBlock.cs), the Yoshi blocks' egg pattern (SmsYoshiBlock.gdshader clamped), the Casino's roll sense (SmsRailBlock RollTopForward).
+SMS 248: the nails work as the game's (assets/Nail.cs: three instant 50-u drops, the 1-s lockout, the item thrown out of the top, the impact sound
+assets/Sms/Sound/Enemy/MSD_SE_OBJ_KUGI_IMPACT.wav + SmsActorSound's table); the four courses' nails follow the disc's rewards.
+SMS 249: Jaysonn's two drawn characters as Level Select bottom-row decor (assets/LevelSelect.tscn: FigureBig, FigureSmall on his SnapRotate, FigureBlink
+swapping their textures for the lights-off twins; Font/LevelSelect/decor_{big,small}_{on,off}.png from figure248b/paint248.py).
+SMS 250: the Dirty Lake's course map (assets/Sms/Map/DirtyLakeMap.tscn, models/Sms/Map/DirtyLake/), his ending_platofrom / railvariant1 / StarPlatform
+collision made two-sided (backface_collision), MSD_BGM_EXTRA.wav and MSD_BGM_BOSS.wav re-rendered without the game-muted Yoshi track.
+SMS 251 / 251b: the Level Select lists Ricco Tower and Hillside Cave only; the menu song (assets/Sms/Sound/Music/LevelCharSelectMusic.mp3, SmsMenuMusic.cs on
+both select scenes, carried across them); on BOTH selects the hand's click (System/MSD_SE_SY_E3_MENU_CURSOR) and A = a talk box coming up (System/MSD_SE_SY_TALK_MODE_IN; 251c).
+SMS 252: the Level Select lists Ricco Tower, Hillside Cave, King Boo, King Boo's Rematch; the rematch's intro (card + cutscene) cannot be skipped with A any more
+(SmsRematchIntro.SkipAllowed off), a miss still goes straight into the fight.
+SMS 253: the GameCube adapter (Mayflash in Wii U mode / Nintendo's, 057E:0337) read over USB by the new SmsGcAdapter autoload (assets/Sms/Input/) -- a joypad per port
+with the analog triggers and their clicks (button_rclick).
+SMS 254: FLUDD's water drawn the game's way -- textured view-aligned quads (new Fx/water_drop.gdshader + the three /mario/timg water textures) with the frame
+refracted through them, the water tint and the glints, a flat wet disc where a drop lands; no more blue spheres.
+SMS 255: a controller on the Player Select and the Level Select -- A picks what the hand is on, B goes back from the Level Select, the left stick and the D-pad
+move the hand one poster a push (assets/CharacterSelect.cs, assets/LevelSelect.cs).
+SMS 256: the Hillside Cave Secret's two star platforms before the goal turn as they circle -- the game's spline rail lift (new assets/Sms/SmsSplineLift.cs; the two
+lifts in assets/secrect_level.tscn on it).
+SMS 257: A on a ledge is the game's quick hop (ma_hgjmp in place, no launch; B during it lets go) -- assets/Mario.cs.
+SMS 258: Mario's alternate colours (Red, Yellow, Blue, Green, Black) cycled with X / Y on his Player Select poster and worn in the game (new assets/CharacterColor.cs,
+CharacterEntry / CharacterPoster / CharacterSelect / GameData / Mario.cs, MarioEntry.tres, the four atlases moved to models/Mario/Colors/); 258b: his mugshot's cap
+and emblem in each colour (Font/CharacterSelect/MarioHead_<colour>.png, CharacterColor.HeadArt); 258c: the colour's name under the dots off (dots only).
+SMS 259: the menu song fades out with the Level Select's screen fade and cuts under a level, so it never overlaps a level's music (SmsMenuMusic.cs, LevelSelect.cs,
+CharacterSelect.cs).
+SMS 260: no model import writes Mario's clips over models/ma_*.res any more -- the 200-clip "save to file" scene-import default is gone from project.godot and
+from all 183 model .import files (the cause of the editor's "couldn't resolve track" flood; no code).
+SMS 261: a death plane under every secret course at the game's y 0 (the fall death, the iris, TOO BAD!, a life, the course again) -- the ten course scenes,
+assets/Sms/SmsDeathPlane.cs.
+SMS 262: the game over's "Continue / Return to Title Screen" window on the black screen after the jingle (Return = the Player Select; Continue = the save
+restored + the Level Select) -- SmsCardSave.cs, Mario.cs, GameData.cs; the floor death's camera zoom was 216's (verified, log corrected); 262b: the rematch's battle stance re-posed on the sprite sheets (a right-foot lunge, the
+far fist up, the near arm down -- assets/Mario/Anims/ma_battle_stance*.pose.json + .tres); 262c: its hands -- the lead fist's knuckles to the enemy, the rear
+arm wound straight back; 262d: the fist turned the other way (a guard: the fingers to his face) and the rear arm bent, chambered at the chest's side
+(the same four files).
+SMS 263: FLUDD's landed drops live the game's way (256 ticks, the slide, the merge, the splash's chance to stay) and Mario's SILHOUETTE through the map with his
+water in it (new Fx/silhouette.gdshader, Fx/water_silhouette.gdshader, Fx/tex/waterjumping.png; Mario.cs, SmsWaterDrops.cs, SunshineCamera.cs).
+SMS 264: King Boo's fight in its OWN scene (new assets/Sms/Enemy/BossTelesa/KingBooFight.tscn; KingBooEntry.tres points at it; the arena is out of Level.tscn and
+Mario's spawn back on the Plaza) and a fifth poster, TEST, for the test level (new assets/levels/TestEntry.tres, Font/LevelSelect/art_test.png + name_test.png;
+LevelSelect.tscn). No C#.
+SMS 265: the GameCube ADAPTER ON THE MAC (and Linux) -- read through libusb as Dolphin does (SmsGcAdapter.cs: a second USB layer, the dylib shipped in
+addons/libusb/macos/ with its LGPL text and a README); the R click's pull stand-in back for every pad that is not the adapter (Mario.cs SmsRClick). C#.
+SMS 266: the DEMO'S ROUND -- the game boots on the Player Select (project.godot run/main_scene); a finished level (its Shine, EXIT AREA, the game over's
+Continue) goes to the Player Select (the Level Select's new AfterLevelScene knob; GameData.LevelWayBack); the eleven courses' Shines lose their baked
+ExitScene; the Rematch's Shine ends the level (RematchArena.tscn). C#. NOT yet playtested by Jaysonn: push the branch so
+it is on GitHub. PR #17 is open (2026-11-25); any further pass on this branch lands in it. Squash-merge as PR #15 was; after the merge this
+entry is done.
+- Branch `feature/kingboo-casino` -- code tip `34c49dc` ("SMS 266: the demo's ROUND -- Player Select -> Level Select -> a level -> Player Select -> Level Select ...; the game boots on the Player Select"; project.godot, assets/LevelSelect.cs, assets/GameData.cs, assets/Mario.cs, assets/CharacterSelect.cs, assets/Sms/Console/SmsPauseMenu.cs, assets/Sms/Rematch/RematchArena.tscn, the eleven course .tscn)
+  on 265's log commit (`88410b3`) on the 265 commit (`c6e8459`, "SMS 265: the GameCube adapter on the MAC (and Linux) -- read through libusb ..."; SmsGcAdapter.cs, Mario.cs, addons/libusb/*)
+  on 264's log commit (`da3ad96`) on the 264 commit (`214de34`, "SMS 264: King Boo's fight in its OWN scene (KingBooFight.tscn) and a TEST poster for the test level"; KingBooFight.tscn, TestEntry.tres, KingBooEntry.tres, LevelSelect.tscn, Level.tscn, art_test.png, name_test.png)
+  on 263's log commit (`308ceac`) on the 263 commit (`5a36261`, "SMS 263: FLUDD's landed drops live the game's way ... and Mario's SILHOUETTE through the map ..."; SmsWaterDrops.cs, Mario.cs, SunshineCamera.cs, the two Fx shaders, tex/waterjumping.png)
+  on 262d's log commit (`4255700`) on the 262d commit (`1803737`, "SMS 262d: the battle stance's hands, second round ..."; the stance's four files)
+  on 262c's log commit (`59ae41e`) on the 262c commit (`1a99031`, "SMS 262c: the battle stance's HANDS ..."; the same four files)
+  on 262b's log commit (`e788aed`) on the 262b commit (`e38bbf8`, "SMS 262b: Mario's BATTLE STANCE re-posed on Jaysonn's sprite sheets ..."; assets/Mario/Anims/ma_battle_stance.pose.json, ma_battle_stance.tres, ma_battle_stance_in.pose.json, ma_battle_stance_in.tres, README.md)
+  on 262's log commit (`a6a16ae`) on the 262 commit (`6d2b283`, "SMS 262: the GAME OVER goes where the game's goes ..."; assets/Sms/Console/SmsCardSave.cs, assets/Mario.cs, assets/GameData.cs)
+  on 261's log commit (`3b883e0`) on the 261 commit (`efe661b`, "SMS 261: a DEATH PLANE under every secret course, at the game's height ..."; assets/Sms/SmsDeathPlane.cs, assets/secrect_level.tscn, Levels/Rico4Secrect/Skybox/Rico4Secret.tscn, Levels/Secret/*/*.tscn)
+  on 260's log commit (`19aa53f`) on the 260 commit (`6bb19a6`, "SMS 260: no model import writes Mario's animation clips any more ..."; project.godot, 183 model .import files under models/, Levels/, Skyboxes/, assets/)
+  on 259's log commit (`5ec7f04`) on the 259 commit (`116c161`, "SMS 259: the menu song no longer overlaps a level's music ..."; assets/Sms/Sound/SmsMenuMusic.cs, assets/LevelSelect.cs, assets/CharacterSelect.cs)
+  on 258c's log commit (`1ee1169`) on the 258c commit (`83df6ca`, "SMS 258c: the colour's NAME under the dots is off ..."; assets/CharacterPoster.cs)
+  on 258b's log commit (`0e1bd06`) on the 258b commit (`c8e245c`, "SMS 258b: Mario's Player Select MUGSHOT changes with the colour ..."; Font/CharacterSelect/MarioHead_*.png, assets/CharacterColor.cs, CharacterPoster.cs, MarioEntry.tres)
+  on 258's log commit (`5d8b7de`) on the 258 commit (`1f0ce9d`, "SMS 258: Mario's ALTERNATE COLOURS on the Player Select ..."; assets/CharacterColor.cs, CharacterEntry.cs, CharacterPoster.cs, CharacterSelect.cs, GameData.cs, Mario.cs, assets/characters/MarioEntry.tres, models/Mario/Colors/)
+  on 257's log commit (`4856ae3`) on the 257 commit (`0c85db6`, "SMS 257: A on a ledge is the game's QUICK HOP ..."; assets/Mario.cs)
+  on 256's log commit (`2091de0`) on the 256 commit (`4cd0868`, "SMS 256: the Hillside Cave Secret's two star platforms before the goal TURN as they circle ..."; assets/Sms/SmsSplineLift.cs, assets/secrect_level.tscn)
+  on 255's log commit (`5f473b5`) on the 255 commit (`732f8d6`, "SMS 255: a controller works on the Player Select and the Level Select ..."; assets/CharacterSelect.cs, assets/LevelSelect.cs)
+  on Jaysonn's `d169f04` ("Commit outstanding work on feature/kingboo-casino": his Level.tscn, the arena scenes, the .tres re-saves, the addons churn, KINGBOO_REMATCH_gdoc.txt, the PC's 255 drive leftovers)
+  on 254's queue commit (`064af84`) on 254's log commit (`c689e41`) on the 254 commit (`dfe1bea`, "SMS 254: FLUDD's water drawn the GAME's way instead of as blue spheres ..."; assets/Sms/SmsWaterDrops.cs, assets/Sms/Fx/water_drop.gdshader, assets/Sms/Fx/tex/water*.png)
+  on 253's log commit (`4d222ee`) on the 253 commit (`d134da2`, "SMS 253: the GameCube controller adapter ... read DIRECTLY over USB ..."; assets/Sms/Input/SmsGcAdapter.cs, project.godot)
+  on 252's log commit (`d36978f`) on the 252 commit (`2e6d088`, "SMS 252: King Boo and King Boo's Rematch back on the Level Select ..."; assets/LevelSelect.tscn, assets/Sms/Rematch/SmsRematchIntro.cs)
+  on 251c's log commit (`26ae531`) on the 251c commit (`ff07c28`, "SMS 251c: the selects' pick sound is the one a talk box makes as it COMES UP ..."; assets/CharacterSelect.cs, assets/CharacterSelect.tscn,
+  assets/LevelSelect.cs, assets/LevelSelect.tscn, assets/Sms/Sound/SmsMarioSoundTable.cs, assets/Sms/Sound/System/MSD_SE_SY_2D_IN.wav) on 251's log commit (`5955c03`) on the 251b commit (`f0e1912`, "SMS 251b: the Level Select's two sounds ..."; assets/LevelSelect.cs, assets/LevelSelect.tscn,
+  assets/Sms/Sound/SmsMarioSoundTable.cs, assets/Sms/Sound/System/) on the 251 commit (`3bef906`, "SMS 251: the Level Select shows two courses for now ..."; assets/LevelSelect.tscn,
+  assets/CharacterSelect.tscn, assets/Sms/Sound/SmsMenuMusic.cs, assets/Sms/Sound/Music/LevelCharSelectMusic.mp3) on 250's log commit (`5cc0968`) on the 250 commit (`5eda59a`, "SMS 250: Jaysonn's third playtest of the secret courses ..."; Levels/Secret/DirtyLake/DirtyLake.tscn,
+  assets/Sms/Map/DirtyLakeMap.tscn, models/Sms/Map/DirtyLake/, Font/HudElements/ending_platofrom.tscn, Levels/Rico4Secrect/Skybox/railvariant1.tscn, StarPlatform.tscn,
+  assets/Sms/Sound/Music/MSD_BGM_EXTRA.wav, MSD_BGM_BOSS.wav) on 249's log commit (`8c9973a`) on the 249 commit (`218a573`, "SMS 249: Jaysonn's two drawn characters join the Level Select's bottom row ..."; assets/LevelSelect.tscn,
+  Font/LevelSelect/decor_big_on.png, decor_big_off.png, decor_small_on.png, decor_small_off.png + .import) on 248's log commit (`cedced5`) on the 248 commit (`7093902`, "SMS 248: the nails work as the game's ..."; assets/Nail.cs, assets/Sms/Sound/SmsActorSound.cs, assets/Sms/Sound/Enemy/MSD_SE_OBJ_KUGI_IMPACT.wav,
+  assets/secrect_level.tscn, Levels/Secret/{SandCastle,ShellSecret,YoshiGoRound}/*.tscn) on 247's log commit (`30f9a2d`) on the 247 commit (`3c7b49c`, "SMS 247: Jaysonn's second playtest of the secret courses ..."; Levels/Secret/ShellSecret/ShellSecret.tscn, assets/Sms/Map/ShellSecretMap.tscn,
+  models/Sms/Map/ShellSecret/, assets/Sms/SmsRailBlock.cs, assets/Sms/Map/SmsWoodBlock.cs, SmsYoshiBlock.gdshader) on 246's log commit (`6b7895c`) on the 246 commit (`9a7b57c`, "SMS 246: the secret-course REVIEW ..."; assets/Sms/SmsRailBlock.cs, 13 files under assets/Sms/Map/, Levels/Secret/VillageUnderside/VillageUnderside.tscn,
+  Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) on 245's log commit (`bf56070`) on the 245 commit (`bdec8d4`, "SMS 245: the breakable blocks, the crates and the sign boards get their REAL textures ..."; eight PNGs under models/Sms/Map/)
+  on 244's log commit (`03aa58c`) on the 244 commit (`8bb9a21`, "SMS 244: the rail block AUTHORED like Jaysonn's MovingPlatform ..."; assets/Sms/SmsRailBlock.cs, new assets/Sms/Map/RailCube.tscn)
+  on 243c's log commit (`9a0a7a9`) on the 243c commit (`0f5a976`, "SMS 243c: the Casino's field cubes ROLL ..."; assets/Sms/SmsRailBlock.cs, Levels/Secret/CasinoSecret/CasinoSecret.tscn)
+  on 243b's log commit (`d29b632`) on the 243b commit (`525b99d`, "SMS 243b: the two sunflower skies LIT the game's way ..."; assets/Sms/Sky/SmsSkyBeachCannon.gdshader,
+  SmsSkyYoshiGoRound.gdshader, SmsSkyCasinoSecret.gdshader) on 243's log commit (`7a41d27`) on the 243 commit (`0ed6e65`, "SMS 243: the EIGHT remaining SECRET COURSES, each laid out as the game lays it out and built from the game's own pieces ...";
+  Levels/Secret/*, assets/Sms/Map/*, assets/Sms/Npc/SmsChuckster.cs, assets/Sms/Sky/*, models/Sms/Map/*, models/Sms/Sky/*, assets/levels/*Entry.tres,
+  Font/LevelSelect/*, assets/LevelSelect.tscn, assets/LevelSelect.cs) on 242's log commit (`f44ea8e`) on the 242 commit (`9b1e3e4`, "SMS 242: a LEVEL SELECT screen in place of a hub -- the Player Select screen again, for levels ...";
+  assets/LevelSelect.tscn, LevelSelect.cs, LevelEntry.cs, assets/levels/RiccoTowerEntry.tres, HillsideCaveEntry.tres, KingBooEntry.tres, RematchEntry.tres,
+  Font/LevelSelect/*, assets/GameData.cs, assets/Mario.cs, assets/Sms/Console/SmsPauseMenu.cs, assets/CharacterSelect.tscn, assets/secrect_level.tscn,
+  Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) on 241's log commit (`50d0a5f`) on the 241 commit (`bd2bc4a`, "SMS 241: the secret courses at the GAME'S CLOCKS, with the GAME'S MUSIC, and Mario's stick no longer
+  backwards ..."; assets/SunshineCamera.cs, assets/Sms/Sound/SmsStageMusic.cs, Music/MSD_BGM_EXTRA.wav, SmsMarioSoundTable.cs, assets/Sms/SmsRailBlock.cs,
+  assets/Sms/Map/SmsPalmLeaves.cs, assets/Sms/Sky/SmsSkyRiccoSecret.gdshader, SmsSkyHillsideSecret.gdshader, assets/secrect_level.tscn,
+  Levels/Rico4Secrect/Skybox/Rico4Secret.tscn) on 240's log commit (`15b5721`) on the 240 commit (`adfef9f`, "SMS 240: the palm's leaves DIP when Mario lands or stands on them, the game's way ...";
+  assets/Sms/Map/SmsPalmLeaves.cs, PalmNormal.tscn, models/Sms/Map/palmnormal/palmnormal.glb) on 239's log commit (`4936ea6`) on the 239 commit (`077f0bc`,
+  "SMS 239: the Hillside Cave Secret's lift cubes ORANGE like the game's and its palms the game's own
+  palmNormal ..."; normal_block.tscn, assets/secrect_level.tscn, assets/Sms/Map/PalmNormal.tscn, models/Sms/Map/normalblock/*, models/Sms/Map/palmnormal/*)
+  on 237 + 238's log commit (`7ade9a8`) on the 238 commit (`cde8cf0`, "SMS 238: the Hillside Cave Secret (secrect_level.tscn) laid out as the game lays it out and under
+  the game's own sky ..."; assets/secrect_level.tscn, assets/Sms/Sky/SmsSkyHillsideSecret.gdshader, SkyHillsideSecret.tscn, HillsideSecretSky_*.tres,
+  models/Sms/Sky/HillsideSecret/*) on the 237 commit (`cfd6c07`, "SMS 237: the Secret of Ricco Tower (Rico4Secret.tscn) laid out as the game lays it out
+  and under the game's own sky ..."; Levels/Rico4Secrect/Skybox/Rico4Secret.tscn, assets/Sms/SmsRailBlock.cs, assets/Sms/Sky/SmsSkyRiccoSecret.gdshader,
+  SkyRiccoSecret.tscn, RiccoSecretSky_VRsph.tres, models/Sms/Sky/RiccoSecret/*) on 235 + 236's log commit (`d47f4f4`) on the 236 commit (`afeee08`,
+  "SMS 236: the pause menu's selection sparks round the WHOLE circle ..."; assets/Sms/Console/
+  PauseSparks.tscn, PauseSparks.gdshader, SmsPauseMenu.cs) on the 235 commit (`cbd5bfd`, "SMS 235: the casino table's BREAK without the glass ...";
+  assets/Sms/Rematch/SmsFloorShatter.cs, FloorShatter.gdshader) on 234's log commit (`0c2761d`) on the 234 commit (`25f9b25`, "SMS 234: the FRUIT -- matte
+  like the game's ..., the ROLL at the game's rate ..., and the red pepper rolling like the rest ..."; assets/Fruit.cs, fruit_banana.tscn, fruit_coconut.tscn,
+  fruit_durian.tscn, fruit_pineapple.tscn, fruit_red_pepper.tscn, fruitpapaya.tscn) on 233d's log commit (`0b9bc81`) on the 233d commit (`a54f214`, "SMS 233d: the rematch's ENTRANCE work UNDONE at Jaysonn's word --
+  SmsKingBooRematch.cs and SmsRematchIntro.cs back to 232b's (8ef659c) ..."; assets/Sms/Rematch/SmsKingBooRematch.cs, SmsRematchIntro.cs) on 233c's log commit (`7bbb891`) on the
+  233c commit (`3a7f4eb`, "SMS 233c: King Boo COMES UP THROUGH THE STONE for the fight -- the intro's appear clip plays its pose while his body is CARRIED
+  up out of the floor on a smooth curve ..."; assets/Sms/Rematch/SmsKingBooRematch.cs) on 233b's log commit (`6cf8f0b`) on the 233b
+  commit (`5d412b1`, "SMS 233b: the rematch's entrance back to the intro's OWN rise under the GAME camera ..."; assets/Sms/Rematch/SmsKingBooRematch.cs,
+  SmsRematchIntro.cs) on 233's log commit (`3b8d7ff`) on the 233 commit (`561521a`, "SMS 233: the casino fanfare's
+  CONFETTI at the jpa's own 60 Hz and look ..., and the rematch's ENTRANCE: King Boo comes up for the fight in a slow EMERGENCE under the cutscene's own
+  camera ..."; assets/Sms/Enemy/BossTelesa/BtlsFubuki.tscn, assets/Sms/Enemy/SmsBossTelesa.cs, assets/Sms/Rematch/SmsKingBooRematch.cs,
+  assets/Sms/Rematch/SmsRematchIntro.cs) on 232b's log commit (`8ef659c`) on
+  the 232b commit (`8851d26`, "SMS 232b: the hot-spring bubble's Refraction OFF by default -- the game's own picture ... is a pale blue bubble";
+  SmsOsenBubble.cs, OsenBubble.gdshader, OsenBubble.tscn) on 232's log commit (`cdaf77f`) on the 232 commit (`1331ba7`, "SMS 232: the casino
+  slot's MIXED result ported -- King Boo spits TWELVE HOT-SPRING BUBBLES ..."; assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs, OsenBubble.tscn,
+  OsenBubble.gdshader, models/Eniemes/BossTelesa/bubble/*, assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/SmsTelesaSlot.cs, assets/Sms/Items/SmsWaterBottle.cs)
+  on the 231 commit (`572614e`, "SMS 231: the CASINO FIGHT touched up -- the slot machine
+  comes up BOLTED to King Boo ..., his body goes WITH the death's burst ..., the fanfare's CONFETTI is the game's ..., and the slot machine's landing thump
+  finally fires"; assets/Sms/Enemy/SmsBossTelesa.cs, BossTelesa/BtlsFubuki.tscn) on the 230 commit (`65e5d5c`, "SMS 230: the CASINO FIGHT's sounds checked,
+  and every actor sound FADES BY THE GAME'S OWN RULE for it ..."; assets/Sms/Sound/SmsActorSound.cs) and 231's log commit (`51ecd1e`) on `main` `d7887ae`;
+  the branch tip is this file's own commit on top of them; 98 commits since `main`. No new files in 266. New files (265): addons/libusb/README.md, addons/libusb/macos/libusb-1.0.0.dylib, addons/libusb/macos/COPYING. New files (264): assets/Sms/Enemy/BossTelesa/KingBooFight.tscn, assets/levels/TestEntry.tres, Font/LevelSelect/art_test.png + name_test.png (+ .import). New files (263): assets/Sms/Fx/silhouette.gdshader (+ .uid), assets/Sms/Fx/water_silhouette.gdshader (+ .uid), assets/Sms/Fx/tex/waterjumping.png (+ .import). No new files in 262d, 262c, 262b, 262, 261, 260, 259 or 258c. New files (258b): Font/CharacterSelect/MarioHead_yellow.png, MarioHead_blue.png, MarioHead_green.png, MarioHead_black.png (+ .import). New files (258): assets/CharacterColor.cs (+ .uid); models/Mario/Colors/mario_yellow.png, mario_blue.png, mario_green.png, mario_black.png (+ .import; MOVED from Font/"untitled_ma_mdl1_0 - Copy*.png"). No new files in 257. New file (256): assets/Sms/SmsSplineLift.cs (+ .uid). No new files in 255 (his d169f04 brought the PC's menudrive255* leftovers in; 255's log commit removes them). New files (254): assets/Sms/Fx/water_drop.gdshader (+ .uid), assets/Sms/Fx/tex/waterref.png, watermask.png, waterspec.png (+ .import). New file (253): assets/Sms/Input/SmsGcAdapter.cs. New file (251c): assets/Sms/Sound/System/MSD_SE_SY_2D_IN.wav (+ .import). New files (251 / 251b): assets/Sms/Sound/SmsMenuMusic.cs, assets/Sms/Sound/Music/LevelCharSelectMusic.mp3, assets/Sms/Sound/System/ (four WAVs + .import). New files (250): assets/Sms/Map/DirtyLakeMap.tscn, models/Sms/Map/DirtyLake/ (map.glb, map_0.png, map_1.png + .import). New files (249): Font/LevelSelect/decor_big_on.png, decor_big_off.png, decor_small_on.png, decor_small_off.png (+ .import). New file (248): assets/Sms/Sound/Enemy/MSD_SE_OBJ_KUGI_IMPACT.wav (+ .import). New files (247): assets/Sms/Map/ShellSecretMap.tscn, models/Sms/Map/ShellSecret/{map.glb, map_0..3.png}, assets/Sms/Map/SmsIceBlock.gdshader.uid. New file (246): assets/Sms/Map/SmsIceBlock.gdshader. No new files in 245 (eight PNGs replaced). New file (244): assets/Sms/Map/RailCube.tscn. No new files in 243b or 243c. New files (243): Levels/Secret/{DirtyLake,SandCastle,BeachCannon,
+  YoshiGoRound,HotelLobby,CasinoSecret,VillageUnderside,ShellSecret}/*.tscn; assets/Sms/Map/ -- SandBlock, YoshiBlock, WoodBlockCube, WoodBlockL,
+  WoodBlockTriangle, WoodBlockBridge, WoodBox, IceBlock, WatermelonBlock, BrickBlock, RideCloud, Uirou, Kamaboko, GetaGreen, GetaOrange, RailBlockB,
+  RailBlockR, RollBlockB, RollBlockY, Pile, SignRiccoArrow, SignArrowUp, SignArrowLR, CasinoSecretMap, WaterHitHideObj, HiddenRedOneUp (.tscn) and
+  SmsSandBlock, SmsYoshiBlock (+ .gdshader), SmsWoodBlock, SmsWoodBox, SmsBreakBlock, SmsRideCloud, SmsUirou, SmsKamaboko, SmsDirtyLakeWoodBlock (.cs + .uid);
+  assets/Sms/Npc/SmsChuckster.cs (+ .uid); assets/Sms/Sky/ -- SkyBeachCannon, SkyYoshiGoRound, SkyCasinoSecret, SkyVillageUnderside (.tscn + Sms*.gdshader
+  + .uid + the material .tres); models/Sms/Map/<piece>/ x 25 and models/Sms/Sky/{BeachCannon,CasinoSecret,VillageUnderside,YoshiGoRound}/ (glb + png + .import);
+  assets/levels/<Name>Entry.tres x 8; Font/LevelSelect/art_<name>.png and name_<name>.png x 8 (+ .import). New files (242): assets/LevelSelect.tscn, assets/LevelSelect.cs
+  (+ .uid), assets/LevelEntry.cs (+ .uid), assets/levels/RiccoTowerEntry.tres, HillsideCaveEntry.tres, KingBooEntry.tres, RematchEntry.tres,
+  Font/LevelSelect/LevelSelectText.png, name_ricco_tower.png, name_hillside_cave.png, name_king_boo.png, name_rematch.png, art_ricco_tower.png,
+  art_hillside_cave.png, art_king_boo.png, art_rematch.png, StrokeShine.png (+ their .import). New files (241): assets/Sms/Sound/SmsStageMusic.cs (+ .uid),
+  assets/Sms/Sound/Music/MSD_BGM_EXTRA.wav (+ .import). New files (240): assets/Sms/Map/SmsPalmLeaves.cs (+ .uid). New files (239): assets/Sms/Map/PalmNormal.tscn,
+  models/Sms/Map/normalblock/normalblock.glb + normalblock.png, models/Sms/Map/palmnormal/palmnormal.glb + palmnormal.png (+ their .import). No new files in 233 / 233b / 233c / 233d / 234 / 235 / 236.
+  New files (237 / 238): assets/Sms/SmsRailBlock.cs (+ .uid); assets/Sms/Sky/SmsSkyRiccoSecret.gdshader and SmsSkyHillsideSecret.gdshader (+ .uid),
+  SkyRiccoSecret.tscn, SkyHillsideSecret.tscn, RiccoSecretSky_VRsph.tres, the nine HillsideSecretSky_*.tres; models/Sms/Sky/RiccoSecret/
+  sky_ricco_secret.glb, P_casino_glow2mm.png, B_crasicmario.png and models/Sms/Sky/HillsideSecret/sky_hillside_secret.glb, B_sters.png, B_sunsetgrade.png,
+  B_exsky_Rail.png, B_exsky_Train.png, B_exsky_Silen.png, B_exsky_Aplane.png (+ their .import). New files (232): SmsOsenBubble.cs (+ .uid), OsenBubble.tscn,
+  OsenBubble.gdshader (+ .uid), models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb, N_btelesa_bubble.png, N_btelesa_bubble_ind.png,
+  N_btelesa_bubble_spe.png (+ their .import). The range carries none of Jaysonn's live edits (assets/Level.tscn, KingBooArena.tscn, RematchArena.tscn,
+  SmsHiddenCoin.cs, the .tres and .import churn).
+- DEMO LAPTOP (Windows), from the repo -- Thanksgiving 2026-11-26: (1) install Godot 4.7.2 .NET (the "mono" build, godotengine.org/download/windows)
+  and the .NET 8 SDK (dotnet.microsoft.com); (2) git clone https://github.com/JasonAbsolute/ProjectShine.git, then `git checkout feature/kingboo-casino`;
+  (3) open project.godot in Godot (the first import takes a few minutes), press the editor's BUILD (top right), then F5 -- the game starts on the Player
+  Select; (4) the Mayflash GameCube adapter: switch "Wii U" / "Switch" + the WinUSB driver through Zadig (253's one-time step: Options > List All
+  Devices, WUP-028 / 057E:0337, WinUSB, Install) for the analog triggers and the L / R clicks -- or switch "PC" and it is a plain pad with no driver
+  (the R click then = a full trigger pull). An Xbox pad works as is. (5) The round: pick a character (A), pick a level (A), play; the Shine, the pause
+  menu's EXIT AREA or a game over bring the next player to the Player Select.
+- To try 266: press the editor's Build first (C# changed). F5 boots on the Player Select. Pick a character, pick Hillside Cave, grab its Shine: the
+  demo's white fades into the PLAYER SELECT (not the Level Select); A again and the Level Select's hand sits under Hillside Cave. EXIT AREA from the
+  pause menu and a game over's Continue go to the Player Select too. King Boo's poster still chains into the Rematch; the Rematch's Shine now ends
+  the level. Knob: LevelSelect.tscn -> AfterLevelScene (empty = back to the Level Select, the old way).
+- To try 265: press the editor's Build first (C# changed). On the MAC: switch the Mayflash to "Wii U" / "Switch", plug it in, run the game -- the log says
+  "[SMS gc adapter] open: USB 057E:0337 through libusb (...)" and the GameCube pad works with its analog triggers and the L / R clicks, no driver, no
+  Zadig. On Windows nothing changes (WinUSB as in 253). With an Xbox pad, or the Mayflash in PC mode, the R click now comes from a full pull of the
+  trigger again (the stand-and-aim spray; it had been dead since 253 on anything but the adapter). An exported Mac .app needs the dylib copied into
+  Contents/MacOS/ (addons/libusb/README.md).
+- To try 264: no Build needed (scenes, a resource, two pictures). The Level Select has a fifth poster, TEST: it is the old test level with everything in it,
+  Mario on the Plaza where he used to start. The KING BOO poster now loads the fight's own scene (KingBooFight.tscn): the drop onto the disc, the slot, the
+  fight, as before -- the arena is no longer inside the test level. Open assets/Sms/Enemy/BossTelesa/KingBooFight.tscn to edit the fight room's level.
+- To try 263: press the editor's Build first (C# changed). Spray the ground: the puddles now sit about two seconds and shrink away (they used to vanish in a
+  third of a second), about half the drops that land are spent in their splash, a stream on one spot keeps one puddle, and on a slope the puddles creep
+  downhill and fall off the edge; a wall's drops run down it. Walk behind a pillar or a wall so the camera loses you: your blue silhouette fades in through
+  it over a few seconds (the game's TSilhouette), the spray with it; step out and it fades away. Knobs on Mario under "SMS (263)".
+- To try 262b / 262c: no Build needed (two clips). Play the King Boo Rematch: on the cut to the stand-off Mario drops into the new stance -- the right foot
+  forward in a lunge, leaning in, the far fist up beside his face as a guard (the fingers to his face, the knuckles at King Boo, the thumb up), the near
+  arm bent with the fist chambered at his side and the elbow back -- and holds it into the fight until you touch the stick.
+- To try 262: press the editor's Build first (C# changed): in a course lose every life (the HUD's lives at 0, then one more death). After TOO BAD! and
+  the game-over jingle the screen is black with the game's window: Continue / Return to Title Screen; the stick moves the hand, A picks. Return to Title
+  Screen = the Player Select; Continue = the Level Select with the progress as last saved. Dying on the floor: the camera stops where it is and zooms in
+  on him until the wipe (216's; it was always there).
+- To try 261: press the editor's Build first (SmsDeathPlane.cs changed), open any secret course and walk off a platform: a long fall, the cry, the camera
+  stays and watches, the iris closes, TOO BAD!, a life down, the course again from its start with no intro. In the editor the plane is the red see-through
+  sheet at y 0 under each course (the DeathPlane node; drag it to move the plane, Active off to turn it off).
+- To try 260: no Build needed (project.godot and .import files only). In the ProjectShine folder: `git status`; if nothing of yours is in it, `git restore .`
+  then `git pull` (the editor rewrites .import files on every re-import, so the pull may refuse without the restore; the restore also puts the 200 clobbered
+  models/ma_*.res back). Open the project: the models re-import once, no clip files are written, and the Output has no "couldn't resolve track" lines.
+- To try 259: press the editor's Build first (C# changed): pick a level -- the menu song fades out as the screen goes black and the level's music starts alone.
+- To try 258 / 258b: press the editor's Build first (C# changed): on the Player Select with the hand on Mario press X or Y -- his cap and the dots step through
+  Red, Yellow, Blue, Green, Black (E / Q on the keyboard); pick a level and he is in that colour. To give another character colours: CharacterColor entries in its
+  CharacterEntry's Colors (a body atlas each). To re-place the strip: Color Strip Rect on CharacterPoster.tscn's root.
+- To try 257: press the editor's Build first (C# changed): hang from any ledge and press A -- a quick half-second hop up onto it, in place; B mid-hop drops you.
+- To try 256: press the editor's Build first (C# changed): in the Hillside Cave Secret the two star platforms before the goal turn steadily (one turn every 12 s) while
+  they circle; ride one. Knobs on each (StarLift0 / StarLift1): Rail Speeds (0.4 u a tick), Face Along Rail, Speed Scale.
+- To try 255: press the editor's Build first (C# changed): on the Player Select and the Level Select the stick (or the D-pad) walks the hand one poster a push, A
+  picks, B on the Level Select goes back. Knobs on each screen's root: Pad Controls, Stick Threshold (0.5), Stick Release (0.3).
+- To try 254: press the editor's Build first (C# changed): spray anything -- the water is a glassy stream with the game's tint and glints, and a wide faint wet disc where it lands.
+- To try 253: press the editor's Build first (C# changed); the adapter's switch on Wii U, its WinUSB driver on (it is), Delfinovin / Dolphin CLOSED -- the game takes the
+  adapter within 2 s (the log: "[SMS gc adapter] open: ..."); a controller in port 1 is joypad 20: the R pull is the spray's pressure, the click the planted spray.
+- To try 252: press the editor's Build first (C# changed): the Level Select lists Ricco Tower, Hillside Cave, King Boo and King Boo's Rematch; in the Rematch the card and the
+  look-about cutscene play through whatever you press; die and you fall straight back into the fight as before.
+- To try 251 / 251b: press the editor's Build first (C# changed): the Player Select plays the menu song, it carries into the Level Select, which lists Ricco Tower and
+  Hillside Cave; on both screens the hand clicks between the posters and A plays a talk box coming up as the pick begins; a level's own music takes over as it loads.
+- To try 250: no Build needed (scenes, a model, two sounds): the Dirty Lake has its white bolted block platforms; the Village's end platform, the Hotel Lobby's
+  rail block and the Dirty Lake's star no longer let Mario in; the secret courses play the Secret Course theme without its Yoshi drums.
+- To try 249: no Build needed (a scene and four textures): run the project, Player Select -> Level Select -- the two characters stand between the green blob
+  and the sunflower, rocking with the other doodles, their bulbs blinking. Cadence: Decor/FigureBlink's Speed Scale; the keys in the animation panel.
+- To try 248: press the editor's Build first (C# changed), ground-pound a nail in any secret course: it sinks a third at once with the game's clank, three pounds
+  sink it flush and pop its coin or 1-Up straight up (the Shell's empty nails give nothing, as in the game).
+- To try 247: press the editor's Build first (C# changed), open the Shell's Secret (the course's platforms are there), the Beach Cannon's Secret (the wood
+  blocks stand still and go black before they vanish; the Yoshi blocks are white with coloured spots) and the Casino (the cubes roll the other way).
+- To try 246: press the editor's Build first (C# changed), open the Secret of Casino Delfino -- the cube that carries Mario forward at the start, and the two later
+  ones, now flip the game's way. The Village is lit cyan like the game's night.
+- To try 245: open the Hotel Lobby's Secret -- brown bricks and green watermelons; the Beach Cannon's crates are wood. No Build needed (textures only).
+- To try 244: press the editor's Build first (SmsRailBlock.cs changed), drop assets/Sms/Map/RailCube.tscn into a level, drag it to each stop and click
+  "Add Node At Current Location" in the inspector; the rail shows as a yellow line; set Move Speed Metres Per Second.
+- To try 243c: press the editor's Build first (SmsRailBlock.cs changed), open the Secret of Casino Delfino -- the two cubes at the start and the
+  field's six roll as they travel; the knob is RollWithTravel on each cube.
+- To try 243b: open the Beach Cannon's Secret and the Yoshi-Go-Round's Secret -- the sky is the game's khaki and its deep blue, no grid. No Build
+  needed (shaders only).
+- To try 243: press the editor's Build first (the C# changed), run the project, pick a character: the Level Select now shows twelve WANTED posters in
+  the game's course order (Hillside Cave, Dirty Lake, Ricco Tower, Sand Castle, Beach Cannon, Yoshi-Go-Round, Hotel Lobby, Casino Secret, Shell Secret,
+  Village Underside, King Boo, Rematch); the row slides as the hand moves. Each new course opens with the game's start-camera pan and the Secret Course
+  theme; its Shine and the pause menu's EXIT AREA come back here.
+- To try 242: run the project (the Player Select) and pick a character: the Level Select comes up -- the same screen with four WANTED posters, Ricco
+  Tower, Hillside Cave, King Boo, Rematch; left / right moves the hand, A stamps a Shine on the poster and loads the level, B goes back to the Player
+  Select. In a level, a Shine's exit or the pause menu's EXIT AREA brings you back here with the hand on the level you left. Press the editor's Build
+  first: the C# changed. To add a level: a LevelEntry .tres under assets/levels/ (Scene Path, Art, Name Art) and a line in the LevelSelect node's
+  Levels; to change a poster's picture: the entry's Art.
+- To try 241: play either course (press the editor's Build first: the C# changed). The Secret Course theme starts with the pan and runs on; after
+  the pan (8 s now) push the stick up and Mario goes away from the camera; the lifts, the tumbling blocks, the rolling cubes and the spinning bars
+  move at the game's pace (four times what they did). Knobs: the Music node on each level (Play On Load, Actor Sound Level; SmsActorSound.Music /
+  MusicDb as for the boss themes); Ticks Per Second on a rail block (120) and on a palm's Leaves (120, Touch Every Ticks 4); frame_rate on the sky
+  materials (60).
+- To try 240: in assets/secrect_level.tscn climb a palm (push into the trunk) and drop onto a leaf, or ground-pound one: the leaf sags under you and
+  swings back over a couple of seconds, carrying you with it; stand still on it and it settles a little lower. Knobs on the palm's Leaves node
+  (Touch Impulse, Hip Drop Impulse, Stiffness, Damping, Push While Standing) default to the game's. Press the editor's Build first: the C# changed.
+- To try 239: play assets/secrect_level.tscn -- the lift cubes are orange with pale frames (the game's colours) and the two palms on the island are the
+  game's own: climb one (push into the trunk) and stand in its crown; the leaves hold you but do not dip (your PalmTree.tscn is untouched for other levels).
+- To try 237 / 238: open Levels/Rico4Secrect/Skybox/Rico4Secret.tscn or assets/secrect_level.tscn and play it (press the editor's Build first: the C# changed).
+  Each course is the game's: the intro is the game's start camera (16 s, skippable), you drop onto the island facing the course, and every piece is
+  where the game puts it at the game's size -- Ricco: the sticks turning slowly (the game's 7.5-10.5 degrees a second), the two blue walls with the
+  platform and 1-up between them, the three green rail blocks rolling over as they slide their rails, the four nails, the tilted sticks down to the
+  end; Hillside: the stair blocks sliding across with their rests, the pillar, the grid of lifts shuffling, the EX cubes rolling round their loops
+  along the green bridge, the stars spinning, the end platform with the tree. The skies are the game's: Ricco's blue dots with the 8-bit Mario
+  pulsing on a 20-s cycle, Hillside's dark star field with the rails, the train and the plane crossing on its 4.5-minute loop. Your scripts, piece
+  scenes, red-coin switch and Shine logic are untouched; the two scenes were rewritten (your old copies are in git: 6fc7a6f and f869051). Knobs: the
+  sky's speed and brightness on its material (assets/Sms/Sky/*.tres), each rail block's RailSpeeds / SpeedScale, each lift's MoveSpeed / WaitTime.
+  Not placed: the invisible board NPC and the 100-coin Shine; Hillside's palms are your PalmTree at the game's height; your papaya and the hidden
+  marioHUD in secrect_level are gone; the Hillside Mario is now a PlayerSpawner like Ricco's (the character select works there too).
+- To try 235: beat the casino fight. Where the Shine would come the table cracks and breaks as before, but now it is the TABLE breaking: no glow along
+  the cracks, no colour change when the cracking starts (the pieces are the table's own gold, red, green and marble, lit as the table was), dark seams
+  spreading from the centre for 1.4 s, then the pieces fly and tumble in their own colours and dissolve. Knobs on the FloorShatter node under
+  KingBooArena's RematchExit: Match Material (on), Crack Darken (0.6; 0 = no visible cracks, it just breaks), Crack Glow (0; 1.6 = the old lit glass),
+  the timing and the flight as before. The sound is still the glass-break sound -- say if you want it changed.
+- To try 236: pause the game and watch the yellow streaks around the highlighted option: ten of them, evenly spaced, all the way round (they used to
+  leave a gap over the right-hand quarter).
+- To try 234: play the casino fight to a fruit round (spray his tongue; the drums land on fruit) and watch the spit: the coconuts, papayas, pineapples,
+  durians and the two red peppers tumble out turning at the game's own rate -- fast out of his mouth, slowing as they roll out on the table and
+  stopping where they stop -- the peppers turning like the rest; up close every fruit is matte (no plastic shine band), lit flat like Mario. A pepper at
+  rest sits as the game's does: its stem end a body radius over the table and the rod lying where the roll left it (pointing up it floats, down it pokes
+  through the table) -- that is the game's own placement (its pepper model has its origin at the base); say if you want it centred instead. Knob: Sms
+  Roll Like The Game on a fruit (off = the old faster spin from the collision sphere's radius). The look is each fruit scene's material (roughness /
+  specular in the inspector). Your sizes and collision spheres are untouched. Press the editor's Build first: the C# changed.
+- To try 233 (after 233d): the rematch's entrance is as it was before 233 -- after King Boo's laugh and dive the game camera is back behind Mario
+  and he comes up at his spot by the intro's own animation (the glow and the wisps on the stone, then the leap out of the floor with the burst, the
+  stars and his cry); the entrance knobs of 233 / 233b / 233c are gone. In the casino fight beat a round and watch the fanfare: the confetti is now small crisp squares tumbling end over end as they fall fast and slow
+  into a drift, each flickering grey / yellow / red, gone in three seconds -- Confetti Height Units on BossTelesa (1125; 1707 = the game's placement,
+  mostly above the picture). Press the editor's Build first: the C# changed.
+- To try 232: in the casino fight set Force Result to Mixed on BossTelesa (KingBooArena.tscn) and beat a round: the drums stop on three different faces,
+  the third fanfare plays (no confetti) and he spits twelve pale blue bubbles that sink to the table, spread round it, rise to about 4.7 m and swell to 5.5 m
+  across over two seconds, wobbling. Walk under one and jump into it: it hurts you and pops. Hose one (aim up with R held and the stick, or the hover):
+  it pops into a LARGE water bottle on the floor under it (a full refill, there for ten seconds). Leave them eight seconds: each swells and splits into
+  three smaller ones at head height that drift, then walk at you -- no more than thirty alive at once. Knobs on OsenBubble.tscn: The bubble (bubble.prm's
+  numbers: Live Time, Num Division, Max Scale, Add Pos Base Units, Rate Expand, Float Height Units, Max Alive), Deviations (Spit Sink Seconds, Spit Drag,
+  Face Camera -- 0 / off = the game's), The bottle, Look (Refraction: off, the game's own flat blue; on = the screen behind them refracted, red in this room; Opacity). With Force Result back on The Game the
+  round never comes (the game's rates never land Mixed) -- a Hit Collect Rate under 1 on BossTelesa lets it happen on its own. Press the editor's
+  Build first: the C# changed, and the new model imports on the first open.
+- To try 231: play the casino fight. Beat a round (spray his tongue; three fruit) and watch the fanfare: confetti rains over the whole table from over his
+  crown for six seconds (Confetti Height Units on BossTelesa, 1000; 1707 = where the game puts it, mostly above the picture). After his spit, when he hides
+  and comes back, the slot machine comes up under him with him and thumps as he settles (Slot Snaps At Appear; Slot Land Frame) -- spray his tongue the
+  moment he pops up and the machine is under him in the same frame as he cuts to his roll. Beat him: at the end of his tumble the burst takes his body with
+  it (Hide Body At Burst; off = the game's, the tiny body held until the Shine). Press the editor's Build first: the C# changed.
+- To try 230: start far from a Shine and walk up to it -- silent beyond about 48 m, rising from about 16 m to full; King Boo's defeat sound, his vanishes
+  and the Shine's appear chime are heard at full from anywhere, as the game has them. Nothing else changed in how the sounds are picked or played.
+```
+git push -u origin feature/kingboo-casino
+git rev-list --count origin/feature/kingboo-casino..feature/kingboo-casino
+```
+Expect `0` from the rev-list. No PR, no merge. The working tree still carries Jaysonn's uncommitted `assets/Level.tscn`, the editor's retab of
+`assets/Sms/SmsHiddenCoin.cs`, his `KingBooArena.tscn` and `RematchArena.tscn` edits, the `.tres` re-saves, the `.png.import` flips, the `addons/godot_ai`
+churn and `KINGBOO_REMATCH_gdoc.txt` at the root: his, leave them.
+
+**2026-11-23 -- pushed by Jaysonn** (`d169f04`, his "Commit outstanding work" on top of 254's queue commit). **From 255 on the work happens in the Mac
+clone (`~/Repos/ProjectShine`, Godot 4.7.2 mono + .NET 8) and Kiro PUSHES each pass's commits to `origin/feature/kingboo-casino` itself** -- the local Claude
+and the PC are out of this loop. Still PUSH ONLY -- no PR until he says the touch-ups are done. On the PC: `git pull` before opening the editor, or its
+tree falls behind the branch.
+
+**The demo .exe from this tip** (what to know before Project -> Export):
+- There is no `export_presets.cfg` in the repo yet: add a Windows Desktop preset. It is a C# project, so the editor needs the .NET export templates for
+  4.7.1 (Editor -> Manage Export Templates) and the .NET SDK that already builds the project; the export runs `dotnet publish` itself. Commit the preset
+  file when it works (it is small and the next pass's exe is then one click).
+- Export all resources (the default). The game loads its scenes, shaders and textures by `res://` path (the new water shader and its three textures among
+  them; the Level Select's `.tres` entries; the sound tables' WAVs / the menu mp3) -- all imported resources, so the default filter carries them. The only
+  `FileAccess` reads are `user://save_data.json` (the save) and a PNG fallback behind a `ResourceLoader.Exists` check: nothing needs an "include filter".
+- The exe uses the same user folder as the editor (`%APPDATA%\Godot\app_userdata\ProjectShine\save_data.json`), so on this PC the demo starts from the
+  editor's play-test save; on a clean machine from nothing (the Player Select).
+- The renderer is Forward Plus (Vulkan): the demo machine needs a Vulkan GPU / current driver. The GameCube adapter (253) needs its WinUSB driver on
+  that machine (the Zadig step) and Delfinovin / Dolphin closed, else the game logs why and the adapter stays silent; a plain gamepad works without it.
+- 254's water: press the editor's Build once before exporting so the exported assembly is current (the export builds too, but the editor's preview of the
+  scenes is what you see while you set the preset up).

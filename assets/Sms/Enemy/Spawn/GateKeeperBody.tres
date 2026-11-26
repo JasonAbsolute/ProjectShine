@@ -1,11 +1,24 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://cgkbody126b"]
 
-[ext_resource type="Shader" path="res://assets/Sms/Enemy/Spawn/GateKeeperBody.gdshader" id="1_shader"]
+[ext_resource type="Shader" uid="uid://ce0prnff64v5x" path="res://assets/Sms/Enemy/Spawn/GateKeeperBody.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" uid="uid://diobl43kh7mcu" path="res://assets/Sms/models/goop_mark_bianco.png" id="2_goop"]
-[ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_hilight.png" id="3_hl"]
+[ext_resource type="Texture2D" uid="uid://b7j24xwj6tv28" path="res://models/Eniemes/GateKeeper/gk_hilight.png" id="3_hl"]
 
 [resource]
 resource_name = "The Polluted Piranha's stalk and head (_mat1): the stage's goop sheet + the sheen by the surface normal, x the baked vertex shading; opaque. Knobs: see the shader's header."
+render_priority = 0
 shader = ExtResource("1_shader")
 shader_parameter/goop_texture = ExtResource("2_goop")
+shader_parameter/goop_colour = Color(1, 1, 1, 1)
+shader_parameter/goop_colour_mode = 0
+shader_parameter/goop_uv_rotation_deg = 5.257
+shader_parameter/goop_uv_offset = Vector2(-0.0146167, 0)
+shader_parameter/goop_uv_scroll = Vector2(0, -0.04)
 shader_parameter/highlight_texture = ExtResource("3_hl")
+shader_parameter/highlight_colour = Color(1, 1, 1, 1)
+shader_parameter/highlight_scale = Vector2(1.12207, 0.908203)
+shader_parameter/highlight_rotation_deg = -145.816
+shader_parameter/highlight_offset = Vector2(0.371094, -0.0390625)
+shader_parameter/highlight_centre = Vector2(0.5, 0.537109)
+shader_parameter/damage_fog_colour = Color(0.7843, 0, 0.3137, 1)
+shader_parameter/damage_fog_amount = 0.0

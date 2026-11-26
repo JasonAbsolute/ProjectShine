@@ -1,13 +1,30 @@
 [gd_resource type="ShaderMaterial" format=3 uid="uid://cgkskirt126b"]
 
-[ext_resource type="Shader" path="res://assets/Sms/Enemy/Spawn/GateKeeperSkirt.gdshader" id="1_shader"]
+[ext_resource type="Shader" uid="uid://c3hipmqx4vv0d" path="res://assets/Sms/Enemy/Spawn/GateKeeperSkirt.gdshader" id="1_shader"]
 [ext_resource type="Texture2D" uid="uid://diobl43kh7mcu" path="res://assets/Sms/models/goop_mark_bianco.png" id="2_goop"]
-[ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_hilight.png" id="3_hl"]
-[ext_resource type="Texture2D" path="res://models/Eniemes/GateKeeper/gk_indtex.png" id="4_ind"]
+[ext_resource type="Texture2D" uid="uid://b7j24xwj6tv28" path="res://models/Eniemes/GateKeeper/gk_hilight.png" id="3_hl"]
+[ext_resource type="Texture2D" uid="uid://bx0fmcdpmiwba" path="res://models/Eniemes/GateKeeper/gk_indtex.png" id="4_ind"]
 
 [resource]
 resource_name = "The Polluted Piranha's goop mound (_mat2): the same sheet and sheen with the slow warp, blended by the rim's vertex alpha; the death melts it away (mound_alpha). Knobs: see the shader's header."
+render_priority = 0
 shader = ExtResource("1_shader")
 shader_parameter/goop_texture = ExtResource("2_goop")
+shader_parameter/goop_colour = Color(1, 1, 1, 1)
+shader_parameter/goop_colour_mode = 0
+shader_parameter/goop_uv_rotation_deg = 6.147
+shader_parameter/goop_uv_offset = Vector2(-0.0170867, 0)
+shader_parameter/goop_uv_scroll = Vector2(0, -0.04)
 shader_parameter/goop_warp_texture = ExtResource("4_ind")
+shader_parameter/goop_warp_scroll = Vector2(0, 0.08)
+shader_parameter/goop_warp_strength = 0.03
 shader_parameter/highlight_texture = ExtResource("3_hl")
+shader_parameter/highlight_colour = Color(1, 1, 1, 1)
+shader_parameter/highlight_scale = Vector2(-10, -10)
+shader_parameter/highlight_rotation_deg = 148.002
+shader_parameter/highlight_offset = Vector2(0.454102, 1.94336)
+shader_parameter/highlight_centre = Vector2(0.425, 0.166016)
+shader_parameter/damage_fog_colour = Color(0.7843, 0, 0.3137, 1)
+shader_parameter/damage_fog_amount = 0.0
+shader_parameter/mound_opacity = 1.0
+shader_parameter/mound_alpha = 1.0

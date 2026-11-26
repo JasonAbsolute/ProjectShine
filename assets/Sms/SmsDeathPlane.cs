@@ -10,6 +10,10 @@ using System.Linq;
 /// (the bottom of his capsule) go from above it to under it between two physics frames -- as the game's check only ever fires on the tick he drops
 /// through (from his last height down to this one). The red sheet under it (Preview) shows it in the editor; it is hidden in play.
 /// Knobs: Active (off = no death; Mario falls on, as before 212), MarioPath. Readouts for the drives: Deaths, LastFeetY, LastFrame.
+/// 261: one in each of the ten secret courses, at y 0 -- the game's own height: the Hillside Cave Secret's and the Secret of Ricco Tower's map.col
+/// (coro_ex1 / coro_ex2) hold nothing but this death-plane polygon at y 0 (50000 x 30000 / 60000 x 30000 units) and a catch floor at -16000; the
+/// courses' platforms are map objects placed 1700-3400 units above it. Jaysonn's other eight courses sit on the same unit grid with their lowest
+/// pieces 16-88 m over y 0, so they take the same plane (their map.col were not to hand to prove it; the node is his to move).
 /// </summary>
 [GlobalClass]
 public partial class SmsDeathPlane : Node3D
@@ -34,9 +38,22 @@ public partial class SmsDeathPlane : Node3D
         if (Engine.IsEditorHint()) return;
         var preview = GetNodeOrNull<Node3D>("Preview");
         if (preview != null) preview.Visible = false;   // the editor's red sheet only
+        // 261: in a course the Mario is the PlayerSpawner's (PlayerSpawner/Mario), made in the spawner's own _Ready -- a plane declared before the
+        // spawner in the scene finds nothing yet, so it looks once more once the whole scene is up (deferred), and only then gives up.
+        if (!FindMario()) CallDeferred(MethodName.FindMarioLater);
+    }
+
+    private bool FindMario()
+    {
         _mario = GetNodeOrNull<Mario>(MarioPath) ?? GetTree()?.CurrentScene?.FindChildren("*", "CharacterBody3D", true, false).OfType<Mario>().FirstOrDefault();
-        if (_mario == null) GD.PushWarning($"[SMS death plane] {GetPath()}: no Mario at {MarioPath} or in the scene -- the plane does nothing");
-        else if (DebugPrint) GD.Print($"[SMS death plane] {Name}: at y {GlobalPosition.Y:F2}, watching {_mario.Name}");
+        if (_mario != null && DebugPrint) GD.Print($"[SMS death plane] {Name}: at y {GlobalPosition.Y:F2}, watching {_mario.Name}");
+        return _mario != null;
+    }
+
+    private void FindMarioLater()
+    {
+        if (_mario == null && !FindMario())
+            GD.PushWarning($"[SMS death plane] {GetPath()}: no Mario at {MarioPath} or in the scene -- the plane does nothing");
     }
 
     public override void _PhysicsProcess(double delta)

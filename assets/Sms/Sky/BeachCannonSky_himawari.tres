@@ -1,0 +1,10 @@
+[gd_resource type="ShaderMaterial" load_steps=3 format=3]
+
+[ext_resource type="Shader" path="res://assets/Sms/Sky/SmsSkyBeachCannon.gdshader" id="1_shader"]
+[ext_resource type="Texture2D" path="res://models/Sms/Sky/BeachCannon/B_EXskyYg.png" id="2_tex"]
+
+[resource]
+render_priority = -100
+shader = ExtResource("1_shader")
+shader_parameter/albedo_tex = ExtResource("2_tex")
+shader_parameter/alpha_cut = true

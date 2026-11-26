@@ -8,7 +8,7 @@ resource_name = "m0_fruit1"
 cull_mode = 2
 vertex_color_use_as_albedo = true
 albedo_texture = ExtResource("1_imdhs")
-roughness = 0.5
+metallic_specular = 0.0
 
 [sub_resource type="ArrayMesh" id="ArrayMesh_ice0l"]
 resource_name = "FruitBanana_meshId0_name"

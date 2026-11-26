@@ -50,6 +50,9 @@ public partial class SmsWaterBottle : Node3D
     /// <summary>A bottle placed in the editor (TItem::load: MAP_OBJ_FLAG_UNK10000000): no item timer, takeable at once, at AppearedScale.
     /// Spawn() clears it for a dropped one.</summary>
     [Export] public bool Placed = true;
+    /// <summary>232: a dropped bottle's takeable window in ticks, in place of LifeTicks (480) -- the hot-spring bubble's large bottle lives 1200 (TBubble::behaveToWater:
+    /// killByTimer(0x4B0)). 0 = LifeTicks.</summary>
+    [Export] public int LifeTicksOverride = 0;
     /// <summary>The glass's sun (BottleGlass.gdshader sun_dir / sun_color): the scene's first DirectionalLight3D unless set.</summary>
     [Export] public DirectionalLight3D Sun;
     [Export] public bool DebugPrint;
@@ -164,7 +167,7 @@ public partial class SmsWaterBottle : Node3D
         if (_noCollision && _timer <= 0 && !_growing)
         {
             _noCollision = false;                                     // takeable
-            if (!Placed) { _disappearing = true; _timer = LifeTicks; } // the item timer, spawned items only (MAP_OBJ_FLAG_UNK10000000 spares the placed)
+            if (!Placed) { _disappearing = true; _timer = LifeTicksOverride > 0 ? LifeTicksOverride : LifeTicks; } // the item timer, spawned items only (MAP_OBJ_FLAG_UNK10000000 spares the placed); 232: the bubble's 1200
         }
         if (_growing)
         {

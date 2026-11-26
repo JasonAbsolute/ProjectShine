@@ -21,9 +21,9 @@ using Godot;
 /// (the 2D emitter manager is the last of Group 2D: over the letters), restarted at the crossing. The selected item's sparks (0x1FA,
 /// ms_2d_pause_sel at bounce 3) -- THE SPARKS (pass 80): TPauseMenu2 (441-457) creates emitter 0x1FA at the selected item's global
 /// bounds centre when its bounce clock hits mEffectKeyFrame (3: 6 frames into every 71-frame pulse), scaled (4 x width / 129, 1, 1) so
-/// the 14 sparks spawn along the item's width, and force-deletes it when the cursor moves (402-408, 431-434) -- here one
+/// the sparks (ten: the circle's division, pass 132) spawn along the item's width, and force-deletes it when the cursor moves (402-408, 431-434) -- here one
 /// PauseSparks.tscn (GPUParticles2D with PauseSparks.gdshader, the .jpa's numbers; pass 89: the emitter is rotated (90, 0, -12) degrees,
-/// so its circle stands in the screen and the 14 sparks fly OUT radially, a sunburst tilted like the pane -- pass 80 had read the rotation
+/// so its circle stands in the screen and the sparks fly OUT radially round the whole circle (236: the shader's angle step follows the burst's count), a sunburst tilted like the pane -- pass 80 had read the rotation
 /// as 0.49 degrees and laid them on a line) under SmokeRoot, restarted at the item's centre with rim_scale_x = 4 x width / 129 and the
 /// item's tilt, hidden on a move. The scene: assets/Sms/Console/PauseMenu.tscn under Mario.
 /// </summary>
@@ -81,6 +81,9 @@ public partial class SmsPauseMenu : CanvasLayer
     [Export] public string PauseAction = "button_start";
     /// <summary>Where EXIT AREA goes. Empty: the item is hidden and the menu has two entries, as in the game's plaza.</summary>
     [Export] public string ExitAreaScene = "";
+    /// <summary>242: where EXIT AREA goes -- the scene's own ExitAreaScene, else the Level Select this level was picked on (GameData.LevelSelectScene);
+    /// "" = no EXIT AREA item, as Delfino Plaza's menu.</summary>
+    public string ExitAreaTarget => ExitAreaScene != "" ? ExitAreaScene : (GameData.Instance?.LevelWayBack ?? "");   // 266: the Level Select's way back (its AfterLevelScene, else itself)
     /// <summary>1 = the blo's 480 lines on the window's height.</summary>
     [Export] public float Size = 1.0f;
     [Export] public AudioStreamPlayer PauseOn, CursorMove, NotNow;
@@ -139,7 +142,7 @@ public partial class SmsPauseMenu : CanvasLayer
         _firstItemRot = Items.Length > 0 ? Items[0].Rotation : 0f;
         _maskAlpha = Mask != null ? Mask.Color.A : 180f / 255f;
         _barAlpha = Stage != null ? Stage.Modulate.A : 1f;
-        _numItems = ExitAreaScene == "" ? 2 : 3; // Delfino Plaza's menu has no EXIT AREA
+        _numItems = ExitAreaTarget == "" ? 2 : 3; // Delfino Plaza's menu has no EXIT AREA
         if (!InputMap.HasAction(PauseAction))
         {
             InputMap.AddAction(PauseAction);
@@ -338,7 +341,10 @@ public partial class SmsPauseMenu : CanvasLayer
         Vector2 c = SmokeRoot.ToLocal(it.GetGlobalTransform() * (it.Size * 0.5f));  // getGlobalBounds's centre (the bounce keeps it)
         float width = it.Size.X;                                                     // getWidth(): the pane's bounds as reformed last tick (the bounce's +hw each side)
         if (_sparks.ProcessMaterial is ShaderMaterial sm)
+        {
             sm.SetShaderParameter("rim_scale_x", 4f * width / SparkStretch);   // setEmitterScale(4 x width / 129, 1, 1): the rim along the item
+            sm.SetShaderParameter("count", (float)_sparks.Amount);              // 236: the angle step is the burst's own count (JPAEmitter.cpp 415: (i << 16) / mEmitCount) -- the scene's 14 against its 10 particles left a 103-degree gap
+        }
         _sparks.Position = c;
         _sparks.Rotation = it.Rotation;                                       // the emitter's Rz(-12): the 2D screen's tilt of the menu pane (the item's)
         _sparks.Visible = true;
@@ -567,7 +573,7 @@ public partial class SmsPauseMenu : CanvasLayer
         if (Mask != null) Mask.Visible = false;
         GetTree().Paused = false;
         SmsHudLayer.Current?.Standard?.PauseOut(); // the director's resume: the console's pauseOut
-        if (_confirmed && _selected == 2 && ExitAreaScene != "")
+        if (_confirmed && _selected == 2 && ExitAreaTarget != "")
         {
             SmsFader.Current?.StartWipe(SmsFader.Wipe.Circle, 0f); // unkE4 = 2: the iris
             _leaving = true;
@@ -588,8 +594,9 @@ public partial class SmsPauseMenu : CanvasLayer
                 // SMS pass 119: decideNextStage + moveStage without a shine: the next level starts him at its return spot for this one
                 GameData.Instance.ReturnFromScene = GetTree().CurrentScene?.SceneFilePath;
                 GameData.Instance.ReturnWithShine = false;
+                GameData.Instance.FadeInFrom = Colors.Black;   // 266: the screen is the fader's black; the select screen fades in from it (the Player Select has no fade of its own)
             }
-            GetTree().ChangeSceneToFile(ExitAreaScene);
+            GetTree().ChangeSceneToFile(SmsReturnSpot.ScenePath(ExitAreaTarget));
         }
     }
 }

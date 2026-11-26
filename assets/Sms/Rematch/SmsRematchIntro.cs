@@ -6,7 +6,7 @@ using System;
 /// (SuppressForIntro) and King Boo hidden; the two-line card shows over the black (SmsRematchCard: Line1, then Line2 under it, Delfino,
 /// the timings below); then Mario is revealed FallHeight over the floor at the MarioSpawn marker (he falls) and the screen fades in on him
 /// falling; BooSpawnDelay after he lands (BooSpawnTimeout after the reveal at the latest) King Boo spawns at BooHeight over the floor at the
-/// BooSpawn marker and laughs; the fight may start (FightReady). A (the jump button) skips the card. No FLUDD here: the Level's HasFludd is
+/// BooSpawn marker and laughs; the fight may start (FightReady). A (the jump button) skips the card when SkipAllowed (off since 252). No FLUDD here: the Level's HasFludd is
 /// off. After a miss (GameData.CameFromMiss) the card is skipped: he falls straight in and King Boo comes.
 /// Knobs: the lines and their timing, the heights, the fade, SkipAllowed, the card's font (LabelSettings). PlayWithoutGameData: the intro
 /// runs when the scene is opened on its own too (F6), as it does when the casino sends him here.
@@ -43,8 +43,12 @@ public partial class SmsRematchIntro : Node
     /// <summary>The card's text style (empty = Delfino at 46 px, white, a black shadow).</summary>
     [Export] public LabelSettings LabelSettings;
     [Export] public int FontSize = 46;
-    /// <summary>A (the jump button) skips the card.</summary>
-    [Export] public bool SkipAllowed = true;
+    /// <summary>A (the jump button) skips the card and the cutscene. 252 (Jaysonn: "make it so you cant skip the intro cutscene on the king boo fight. but
+    /// keep it where if you die you just go right into the fight"): OFF -- the intro plays through; a miss still goes straight into the fight (CameFromMiss
+    /// skips the card and the cutscene on its own, below). On = 157's: A skips.</summary>
+    [Export] public bool SkipAllowed = false;
+    /// <summary>A build marker for the drives (read in the built DLL before a run).</summary>
+    public const string BuildMarker = "SMS252_INTRO_NO_SKIP";
     [ExportGroup("The fall and the spawn")]
     /// <summary>The fade in once he is revealed falling.</summary>
     [Export] public float FadeInSeconds = 0.7f;

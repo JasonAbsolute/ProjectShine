@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://cklycjby7mfk5"]
+
+[ext_resource type="Script" path="res://assets/Sms/Enemy/BossTelesa/SmsOsenBubble.cs" id="1_script"]
+[ext_resource type="PackedScene" path="res://models/Eniemes/BossTelesa/bubble/btelesa_osenbubbles_ind.glb" id="2_model"]
+[ext_resource type="PackedScene" path="res://assets/Sms/Fx/EnemyDisap.tscn" id="3_disap"]
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_body"]
+radius = 1.3
+
+[node name="OsenBubble" type="CharacterBody3D" groups=["sms_enemy"]]
+collision_mask = 5
+script = ExtResource("1_script")
+RelaunchTicks = -1
+DeathFxScene = ExtResource("3_disap")
+metadata/_sms_note = "Pass 232: the HOT-SPRING BUBBLE (TBubble), King Boo's MIXED slot result -- the three drums on three different faces (ForceResult Mixed on BossTelesa, or a Hit Collect Rate under 1; the game's own rates never land it, so the game never shows these). Twelve come out of his mouth on the fan (Slot Item Num 6, doubled), sink to 2 m over the table (Spit Sink Seconds; 0 = the game's jump cut to that height), spread (Spit Drag; 1 = the game's: they slide to the wall), rise to 4.7 m over about two seconds and GROW to Max Scale. Walk into one and it hurts you and pops; jump on one and it pops; HOSE one while it floats and it pops and leaves a LARGE WATER BOTTLE (a full refill) for 1200 ticks (at the floor under it: Bottle On Floor off = hanging where the bubble was, the game's). After Live Time (1000 ticks, 8 s) each splits into Num Division children (3) that drift, then chase you slowly -- the pool (Max Alive 30) caps the field. The bubble has no sounds in the game. Knobs: The bubble (bubble.prm's numbers), Deviations, The bottle, Look (Refraction off = the game's flat blue; on = the screen behind it refracted, the material's intent -- red in this room). A placed one floats over the floor under it, 50-150 u above its float height, and splits like the rest."
+
+[node name="Model" parent="." instance=ExtResource("2_model")]
+transform = Transform3D(0.013434, 0, 0, 0, 0.013434, 0, 0, 0, 0.013434, 0, 0, 0)
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+shape = SubResource("SphereShape3D_body")

@@ -266,6 +266,11 @@ public partial class SunshineCamera : Node3D
     public override void _Ready()
     {
         TopLevel = true;
+        // Going top-level bakes this node's CURRENT global transform into its own (Node3D::set_as_top_level), and his _Ready has not
+        // run yet: a spawner authored facing +X (the two secret courses) left this rig turned -90 deg, so the pivot's local yaw -- what
+        // Mario.cs rotates the stick by -- sat 90 deg off the eye's true bearing and the stick felt backwards (241). The rig itself
+        // never turns: Apply() places it and poses the pivot in world terms.
+        Rotation = Vector3.Zero;
         _target = GetNodeOrNull<Node3D>(TargetPath);
         _mario = _target as Mario;
         _armature = GetNodeOrNull<Node3D>(ArmaturePath);
@@ -1089,6 +1094,8 @@ public partial class SunshineCamera : Node3D
     // ============================================================ what Mario's half of the L camera reads (MarioYCam.cs)
     /// <summary>isLButtonCamera(): the mode proper, from the tick it turns on (through its inbetween) to the tick it leaves.</summary>
     public bool IsLCamera => _mode == SmsCamKind.LNormal;
+    /// <summary>263: MARIO_FLAG_OCCLUDED as the camera reads it (the ray from the eye to his waist blocked by the map) -- the silhouette's trigger.</summary>
+    public bool MarioOccluded => _occluded;
     /// <summary>mMode: the kind in force (the inbetween into it may still be running: InbetweenTicks).</summary>
     public SmsCamKind CurrentKind => _mode;
     public int InbetweenTicks => _ibFrames;
